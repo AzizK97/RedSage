@@ -36,5 +36,5 @@ def create_overview_agent(llm: ChatOpenAI):
         model=llm,
         tools=tools,
         name="overview_agent",
-        prompt=OVERVIEW_PROMPT
+        system_prompt=OVERVIEW_PROMPT
     )

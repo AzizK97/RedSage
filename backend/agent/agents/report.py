@@ -78,5 +78,5 @@ def create_report_agent(llm: ChatOpenAI):
         model=llm,
         tools=tools,
         name="report_agent",
-        prompt=REPORT_PROMPT
+        system_prompt=REPORT_PROMPT
     )

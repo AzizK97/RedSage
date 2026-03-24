@@ -69,5 +69,5 @@ def create_tasks_agent(llm: ChatOpenAI):
         model=llm,
         tools=tools,
         name="tasks_agent",
-        prompt=TASKS_PROMPT
+        system_prompt=TASKS_PROMPT
     )

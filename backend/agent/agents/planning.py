@@ -57,5 +57,5 @@ def create_planning_agent(llm: ChatOpenAI):
         model=llm,
         tools=tools,
         name="planning_agent",
-        prompt=PLANNING_PROMPT
+        system_prompt=PLANNING_PROMPT
     )   

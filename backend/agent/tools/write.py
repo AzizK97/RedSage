@@ -68,7 +68,7 @@ def create_issue(
         subject:        Title of the issue
         description:    Detailed description of the issue
         assigned_to_id: Numeric ID of the user to assign the issue to
-        priority_id:    3=low  4=normal  5=high  6=urgent  (default: 4)
+        priority_id:    1=low  2=normal  3=high  4=urgent 5=immediate  (default: 2)
         status_id:      1=New  2=In Progress  3=Resolved  5=Closed  (default: 1)
         version_id:     Numeric sprint/version ID to assign the issue to
         start_date:     Start date in YYYY-MM-DD format
