@@ -1,11 +1,42 @@
-from dotenv import load_dotenv
 import os
-
+from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routers.chat import router as chat_router
 
-# Load .env from parent directory (backend/)
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+# Load .env from the backend directory
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-app = FastAPI()
+# ── App ───────────────────────────────────────────────────────────────────────
+
+app = FastAPI(
+    title="Redmine Chat Assist API",
+    description="AI-powered project management chatbot backed by Redmine",
+    version="1.0.0"
+)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Allow Vue.js frontend to connect during development
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],      # tighten this in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+
 app.include_router(chat_router)
+
+
+# ── Root ──────────────────────────────────────────────────────────────────────
+
+@app.get("/")
+def root():
+    return {
+        "name":    "Redmine Chat Assist API",
+        "version": "1.0.0",
+        "docs":    "/docs"
+    }

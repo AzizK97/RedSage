@@ -37,4 +37,13 @@ CASES = [
         description="List tasks",
         tags=["read", "tasks"]
     ),
+    BenchmarkCase(
+        id="tasks-write-1",
+        query="Create a new issue for Ahmed in the ai-platform-project with subject 'Test issue' and description 'This is a test'",
+        expected_agent="tasks_agent",
+        accept_fn=lambda result: len(result) > 10,  # non-trivial response
+        description="Create issue (write operation)",
+        tags=["write", "tasks"]
+    ),
+
 ]

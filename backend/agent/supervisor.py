@@ -68,7 +68,7 @@ def create_app():
 
     # Create the supervisor workflow
     workflow = create_supervisor(
-        agents=[overview_agent, tasks_agent, planning_agent, report_agent],
+        [overview_agent, tasks_agent, planning_agent, report_agent],
         model=llm,
         prompt=SUPERVISOR_PROMPT,
         output_mode="last_message"   # return only the final agent response

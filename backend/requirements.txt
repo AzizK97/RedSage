@@ -1,0 +1,9 @@
+langchain
+langchain-openai
+langgraph
+langgraph-supervisor
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic>=2.7.0
+requests==2.31.0
+python-dotenv==1.0.0
