@@ -12,8 +12,6 @@ from agent.agents.report    import create_report_agent
 
 load_dotenv()
 
-# ── LLM ───────────────────────────────────────────────────────────────────────
-
 def create_llm() -> ChatOpenAI:
     return ChatOpenAI(
         model="openrouter/auto",
@@ -21,8 +19,6 @@ def create_llm() -> ChatOpenAI:
         openai_api_base="https://openrouter.ai/api/v1",
         temperature=0
     )
-
-# ── Supervisor Prompt ─────────────────────────────────────────────────────────
 
 SUPERVISOR_PROMPT = """You are an intelligent supervisor of a multi-agent Redmine project management system.
 You analyze the user's question and delegate it to the most appropriate specialized agent.
@@ -51,38 +47,27 @@ ROUTING RULES:
 6. You can reply in either French or English, depending on the language used in the user's prompt.
 """
 
-# ── App Factory ───────────────────────────────────────────────────────────────
-
 def create_app():
     """
     Build and compile the full supervisor multi-agent application.
     Returns a compiled LangGraph app ready to invoke.
     """
     llm = create_llm()
-
-    # Instantiate all sub-agents
     overview_agent  = create_overview_agent(llm)
     tasks_agent     = create_tasks_agent(llm)
     planning_agent  = create_planning_agent(llm)
     report_agent    = create_report_agent(llm)
 
-    # Create the supervisor workflow
     workflow = create_supervisor(
         [overview_agent, tasks_agent, planning_agent, report_agent],
         model=llm,
         prompt=SUPERVISOR_PROMPT,
-        output_mode="last_message"   # return only the final agent response
+        output_mode="last_message" 
     )
-
-    # Compile with in-memory checkpointer for conversation memory
     memory = InMemorySaver()
     app = workflow.compile(checkpointer=memory)
 
     return app
-
-
-# ── Singleton ─────────────────────────────────────────────────────────────────
-# Build once at import time so FastAPI reuses the same compiled graph
 
 _app = None
 
@@ -92,8 +77,6 @@ def get_app():
         _app = create_app()
     return _app
 
-
-# ── Chat Helper ───────────────────────────────────────────────────────────────
 
 def chat(question: str, thread_id: str = "default") -> str:
     """
@@ -113,8 +96,6 @@ def chat(question: str, thread_id: str = "default") -> str:
 
     return result["messages"][-1].content
 
-
-# ── Streaming Chat Helper ─────────────────────────────────────────────────────
 
 def chat_stream(question: str, thread_id: str = "default"):
     """
@@ -176,8 +157,6 @@ def chat_stream(question: str, thread_id: str = "default"):
             "content": str(e)
         }
 
-
-# ── CLI Entry Point ───────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("=== Redmine Supervisor Agent ===")

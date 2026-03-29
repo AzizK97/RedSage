@@ -2,8 +2,6 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from agent.tools.read import get_projects, get_issues, get_members, get_versions
 
-# ── Prompt ─────────────────────────────────────────────────────────────────────
-
 REPORT_PROMPT = """You are an expert assistant specialized in generating Redmine project management reports.
 You generate complete, well-structured health reports covering all aspects of a project.
 
@@ -65,8 +63,6 @@ RULES:
 """
 
 tools = [get_projects, get_issues, get_members, get_versions]
-
-# ── Agent Factory ──────────────────────────────────────────────────────────────
 
 def create_report_agent(llm: ChatOpenAI):
     """

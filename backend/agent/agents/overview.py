@@ -2,8 +2,6 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from agent.tools.read import get_projects, get_issues, get_members, get_versions
 
-# ── Prompt ─────────────────────────────────────────────────────────────────────
-
 OVERVIEW_PROMPT = """You are an expert assistant specialized in providing an overview of Redmine projects.
 You answer general questions about projects: their existence, overall status, team members, and a summary of progress.
 
@@ -24,8 +22,6 @@ RULES:
 """
 
 tools = [get_projects, get_issues, get_members, get_versions]
-
-# ── Agent Factory ──────────────────────────────────────────────────────────────
 
 def create_overview_agent(llm: ChatOpenAI):
     """

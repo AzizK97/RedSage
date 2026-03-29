@@ -4,10 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.chat import router as chat_router
 
-# Load .env from the backend directory
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
-
-# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Redmine Chat Assist API",
@@ -16,11 +13,10 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-# Allow Vue.js frontend to connect during development
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # tighten this in production
+    allow_origins=["*"],     
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -3,8 +3,6 @@ from langchain.agents import create_agent
 from agent.tools.read import get_projects, get_versions, get_issues
 from agent.tools.write import create_version, update_version_dates
 
-# ── Prompt ─────────────────────────────────────────────────────────────────────
-
 PLANNING_PROMPT = """You are an expert assistant specialized in Redmine project planning.
 You handle questions about sprints, milestones, and deadlines, as well as the creation and modification of sprints.
 
@@ -36,16 +34,14 @@ Risk evaluation logic for a sprint:
 """
 
 tools = [
-            # Read
+            
             get_projects,
             get_versions,
             get_issues,
-            # Write
+
             create_version,
             update_version_dates
         ]
-
-# ── Agent Factory ──────────────────────────────────────────────────────────────
 
 def create_planning_agent(llm: ChatOpenAI):
     """

@@ -10,8 +10,6 @@ from agent.tools.write import (
     log_time
 )
 
-# ── Prompt ─────────────────────────────────────────────────────────────────────
-
 TASKS_PROMPT = """You are an expert assistant specialized in Redmine task management.
 You handle questions about tasks (issues), team members, as well as modification operations on tasks.
 
@@ -43,12 +41,11 @@ RULES:
 """
 
 tools = [
-            # Read
             get_projects,
             get_issues,
             get_members,
             get_issue_detail,
-            # Write
+            
             create_issue,
             update_issue_status,
             reassign_issue,
@@ -56,8 +53,6 @@ tools = [
             update_issue_dates,
             log_time
         ]
-
-# ── Agent Factory ──────────────────────────────────────────────────────────────
 
 def create_tasks_agent(llm: ChatOpenAI):
     """

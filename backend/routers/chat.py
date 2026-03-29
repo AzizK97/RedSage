@@ -11,8 +11,6 @@ from langgraph.types import Command
 router = APIRouter(prefix="/api", tags=["chat"])
 
 
-# ── Request / Response Models ─────────────────────────────────────────────────
-
 class ChatRequest(BaseModel):
     message: str
     thread_id: str = "default"
@@ -25,11 +23,9 @@ class ChatResponse(BaseModel):
 
 
 class ApproveRequest(BaseModel):
-    decision_type: str = "approve"   # "approve" or "reject"
-    message: str = ""                # optional feedback on reject
+    decision_type: str = "approve"   
+    message: str = ""                
 
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
@@ -47,7 +43,6 @@ async def chat_endpoint(request: ChatRequest):
             config=config
         )
 
-        # Check for HITL interrupt (write operation pending confirmation)
         if hasattr(result, "interrupts") and result.interrupts:
             pending = result.interrupts[0].value
             return ChatResponse(
