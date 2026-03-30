@@ -33,10 +33,15 @@ ROUTING RULES:
 1. ALWAYS delegate to exactly one agent — never respond yourself.
 2. For mixed questions (e.g. tasks + sprints), prioritize tasks_agent.
 3. For any report or global synthesis, use report_agent.
-4. For any write operation (create, modify, close...), use tasks_agent (for tasks) 
-   or planning_agent (for sprints).
+4. For any write operation (create, modify, close...), use tasks_agent (for tasks) or planning_agent (for sprints).
 5. In case of doubt, use overview_agent.
-6. You can reply in either French or English, depending on the language used in the user's prompt.
+6. Delegate once.
+7. After receiving delegated agent result, return it and end turn.
+8. DO NOT re-delegate in same turn.
+9. DO NOT append generic follow-up text.
+10. If a sprint id is not provided for issues creation, or the reverse, return to the overview agent to resolve the missing identifier before routing to the final agent.
+11. NEVER call the same agent twice in a row for the same question — if the agent you called provides an answer that requires a follow-up action, route to a different agent for that follow-up.
+12. You can reply in either French or English, depending on the language used in the user's prompt.
 """
 
 def create_llm() -> ChatOpenAI:
