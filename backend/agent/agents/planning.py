@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from agent.tools.read import get_projects, get_versions, get_issues
 from agent.tools.write import create_version, update_version_dates
+from langchain.agents.middleware import HumanInTheLoopMiddleware
 
 PLANNING_PROMPT = """You are an expert assistant specialized in Redmine project planning.
 You handle questions about sprints, milestones, and deadlines, as well as the creation and modification of sprints.
@@ -43,6 +44,18 @@ tools = [
             update_version_dates
         ]
 
+interrupt_on = {
+    "create_version":
+        {"allowed_decisions": 
+            ["approve","reject"]
+        },
+    
+    "update_version_dates":
+        {"allowed_decisions":
+            ["approve","reject"]
+        }
+    }
+
 def create_planning_agent(llm: ChatOpenAI):
     """
     Creates and returns the Planning ReAct agent.
@@ -53,5 +66,6 @@ def create_planning_agent(llm: ChatOpenAI):
         model=llm,
         tools=tools,
         name="planning_agent",
-        system_prompt=PLANNING_PROMPT
+        system_prompt=PLANNING_PROMPT,
+        middleware=[HumanInTheLoopMiddleware(interrupt_on=interrupt_on)]
     )   

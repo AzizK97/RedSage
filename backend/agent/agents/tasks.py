@@ -9,6 +9,7 @@ from agent.tools.write import (
     update_issue_dates,
     log_time
 )
+from langchain.agents.middleware import HumanInTheLoopMiddleware
 
 TASKS_PROMPT = """You are an expert assistant specialized in Redmine task management.
 You handle questions about tasks (issues), team members, as well as modification operations on tasks.
@@ -54,6 +55,38 @@ tools = [
             log_time
         ]
 
+interrupt_on = {
+    "create_issue":
+        {"allowed_decisions": 
+            ["approve","reject"]
+        },
+    
+    "update_issue_status":
+        {"allowed_decisions":
+            ["approve","reject"]
+        },
+    
+    "reassign_issue":
+        {"allowed_decisions":
+            ["approve","reject"]
+        },
+    
+    "add_comment_to_issue":
+        {"allowed_decisions":
+            ["approve","reject"]
+        },
+    
+    "update_issue_dates":
+        {"allowed_decisions":
+            ["approve","reject"]
+        },
+    
+    "log_time":
+        {"allowed_decisions":
+            ["approve","reject"]
+        }
+    }
+
 def create_tasks_agent(llm: ChatOpenAI):
     """
     Creates and returns the Tasks ReAct agent.
@@ -64,5 +97,10 @@ def create_tasks_agent(llm: ChatOpenAI):
         model=llm,
         tools=tools,
         name="tasks_agent",
-        system_prompt=TASKS_PROMPT
+        system_prompt=TASKS_PROMPT,
+        middleware=[
+            HumanInTheLoopMiddleware(
+                interrupt_on=interrupt_on
+            )
+        ]
     )

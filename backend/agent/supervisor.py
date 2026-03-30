@@ -12,14 +12,6 @@ from agent.agents.report    import create_report_agent
 
 load_dotenv()
 
-def create_llm() -> ChatOpenAI:
-    return ChatOpenAI(
-        model="openrouter/auto",
-        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-        openai_api_base="https://openrouter.ai/api/v1",
-        temperature=0
-    )
-
 SUPERVISOR_PROMPT = """You are an intelligent supervisor of a multi-agent Redmine project management system.
 You analyze the user's question and delegate it to the most appropriate specialized agent.
 
@@ -47,6 +39,14 @@ ROUTING RULES:
 6. You can reply in either French or English, depending on the language used in the user's prompt.
 """
 
+def create_llm() -> ChatOpenAI:
+    return ChatOpenAI(
+        model="openrouter/auto",
+        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+        openai_api_base="https://openrouter.ai/api/v1",
+        temperature=0
+    )
+
 def create_app():
     """
     Build and compile the full supervisor multi-agent application.
@@ -71,6 +71,7 @@ def create_app():
 
 _app = None
 
+# Singleton pattern to reuse the same app instance across requests
 def get_app():
     global _app
     if _app is None:
