@@ -10,9 +10,6 @@ import ChatInterface from "./components/ChatInterface.vue";
 
 <style scoped>
 .app-shell {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 1rem;
   height: 100vh;
   box-sizing: border-box;
 }

@@ -137,6 +137,12 @@ def get_versions(project_id: str) -> dict:
     """
     data  = _get(f"/projects/{project_id}/versions.json")
     today = date.today().isoformat()
+
+    def normalize_due_date(value):
+        if isinstance(value, str) and value.strip():
+            return value
+        return None
+
     return {
         "total_count": len(data.get("versions", [])),
         "versions": [
@@ -144,10 +150,11 @@ def get_versions(project_id: str) -> dict:
                 "id":         v["id"],
                 "name":       v["name"],
                 "status":     v["status"],
-                "due_date":   v.get("due_date", "Not set"),
+                "due_date":   normalize_due_date(v.get("due_date")) or "Not set",
                 "is_overdue": (
-                    v.get("due_date", "9999") < today
-                    and v["status"] != "closed"
+                    bool(normalize_due_date(v.get("due_date")))
+                    and normalize_due_date(v.get("due_date")) < today
+                    and v.get("status") != "closed"
                 )
             }
             for v in data.get("versions", [])

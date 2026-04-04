@@ -1,3 +1,4 @@
+//like a DTO
 interface ChatRequest {
     message: string,
     thread_id: string

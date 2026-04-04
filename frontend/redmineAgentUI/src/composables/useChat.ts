@@ -1,6 +1,7 @@
 import { callChatAPI, callApproveAPI } from '../api/client';
 import type { ApproveRequest, Message } from '../types/index';
-import { ref, type Ref } from 'vue';
+import { ref, watch, type Ref } from 'vue';
+import { useThreads } from './useThreads';
 
 function pushMessage(messages: Ref<Message[]>, role: "user" | "assistant", content: string) {
     messages.value.push({ role, content, timestamp: Date.now() });
@@ -8,15 +9,71 @@ function pushMessage(messages: Ref<Message[]>, role: "user" | "assistant", conte
 
 export function useChat() {
 
-    const messages: Ref<Message[]> = ref([]);
-    const threadId: Ref<string> = ref("");
+    const { activeThreadId, currentConversation, getMessages, saveMessages } = useThreads();
+
+    const messages: Ref<Message[]> = ref(getMessages(activeThreadId.value));
+    const threadId = activeThreadId;
     const isLoading: Ref<boolean> = ref(false);
     const pendingInterrupt: Ref<Record<string, any> | null> = ref(null);
     const error: Ref<string | null> = ref(null);
+    const loadingStatus: Ref<string> = ref("");
+    const showLoadingStatus: Ref<boolean> = ref(false);
+    let loadingTimer: ReturnType<typeof setInterval> | null = null;
 
-    const localThreadId = localStorage.getItem("thread_id");
-    threadId.value = localThreadId ? localThreadId : crypto.randomUUID();
-    localStorage.setItem("thread_id", threadId.value);
+    function buildLoadingSteps(text: string): string[] {
+        const q = text.toLowerCase();
+
+        if (/(member|team|role)/.test(q)) {
+            return ["Reading sources...", "Fetching project members...", "Analyzing team roles..."];
+        }
+        if (/(version|sprint|milestone)/.test(q)) {
+            return ["Reading sources...", "Fetching versions...", "Analyzing sprint timeline..."];
+        }
+        if (/(issue|ticket|task|bug)/.test(q)) {
+            return ["Reading sources...", "Fetching issues...", "Analyzing issue details..."];
+        }
+        if (/(project)/.test(q)) {
+            return ["Reading sources...", "Fetching projects...", "Analyzing project data..."];
+        }
+
+        return ["Thinking...", "Gathering Redmine data...", "Analyzing results..."];
+    }
+
+    function startLoadingStatus(userText: string) {
+        const steps = buildLoadingSteps(userText);
+        let index = 0;
+
+        showLoadingStatus.value = true;
+        loadingStatus.value = steps[index];
+
+        if (loadingTimer) {
+            clearInterval(loadingTimer);
+        }
+
+        loadingTimer = setInterval(() => {
+            index = (index + 1) % steps.length;
+            loadingStatus.value = steps[index];
+        }, 1700);
+    }
+
+    function stopLoadingStatus() {
+        if (loadingTimer) {
+            clearInterval(loadingTimer);
+        }
+        loadingTimer = null;
+        showLoadingStatus.value = false;
+        loadingStatus.value = "";
+    }
+
+    watch(
+        activeThreadId,
+        (nextThreadId) => {
+            messages.value = getMessages(nextThreadId);
+            pendingInterrupt.value = null;
+            error.value = null;
+        },
+        { immediate: true },
+    );
 
     async function sendMessage(userText: string) {
 
@@ -30,16 +87,29 @@ export function useChat() {
         error.value = null;
         isLoading.value = true;
         const beforeCount = messages.value.length;
+        const currentThreadId = threadId.value;
 
         try{
             pushMessage(messages, "user", userText);
+            saveMessages(currentThreadId, messages.value);
+            startLoadingStatus(userText);
+
             const response = await callChatAPI(userText, threadId.value);
             pushMessage(messages, "assistant", response.response);
-            pendingInterrupt.value = response.requires_human ? response.interrupts : null;
+            const hasInterruptPayload = Array.isArray(response.interrupts)
+                ? response.interrupts.length > 0
+                : !!response.interrupts && Object.keys(response.interrupts).length > 0;
+            pendingInterrupt.value = (response.requires_human || hasInterruptPayload)
+                ? response.interrupts
+                : null;
+
+            saveMessages(currentThreadId, messages.value);
         }catch(err: any){
-            while(messages.value.length > beforeCount) messages.value.pop();
+            messages.value = messages.value.slice(0, beforeCount);
+            saveMessages(currentThreadId, messages.value);
             error.value = err?.message || "Failed to send message";
         }finally{
+            stopLoadingStatus();
             isLoading.value = false;
         }
     }
@@ -62,11 +132,14 @@ export function useChat() {
 
         error.value = null;
         isLoading.value = true;
+        const currentThreadId = threadId.value;
 
         try{
             const response = await callApproveAPI(threadId.value, payload);
             pushMessage(messages, "assistant", response.response);
             pendingInterrupt.value = null;
+
+            saveMessages(currentThreadId, messages.value);
         }catch(err: any){
             error.value = err?.message || "Failed to submit decision";
         }finally{
@@ -80,6 +153,9 @@ export function useChat() {
         isLoading,
         pendingInterrupt,
         error,
+        loadingStatus,
+        showLoadingStatus,
+        currentConversation,
         sendMessage,
         submitDecision
     };
