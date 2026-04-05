@@ -50,7 +50,8 @@ def create_llm() -> ChatOpenAI:
         model="openrouter/auto",
         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
         openai_api_base="https://openrouter.ai/api/v1",
-        temperature=0
+        temperature=0,
+        max_tokens=3000
     )
 
 def create_app():

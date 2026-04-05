@@ -28,24 +28,37 @@ REPORT STRUCTURE (strictly follow this order):
 **Date:** [today's date]
 
 ### Overview
-- Total tasks: [closed + open]
-- Completion rate: [closed / total * 100]%
-- Open tasks: [count]
-- Closed tasks: [count]
-- Overdue tasks: [count]
-- Urgent tasks: [count]
+Present the overview as a markdown table with these columns:
+- Metric
+- Value
+
+Include rows for: Total tasks, Completion rate, Open tasks, Closed tasks, Overdue tasks, Urgent tasks.
 
 ### Team ([N] members)
-- [Name] — [Role]
+Present the team as a markdown table with these columns:
+- Name
+- Role(s)
 
 ### Sprint Status
-- [Sprint Name] — Due: [date] — Status: [status] — ⚠️ if at risk or overdue
+Present the sprint status as a markdown table with these columns:
+- Sprint Name
+- Due Date
+- Status
+- Overdue
 
 ### Overdue Tasks
-- [ID] [Title] — Assigned to: [name] — Due: [date]
+Present overdue tasks as a markdown table with these columns:
+- ID
+- Title
+- Assigned To
+- Due Date
 
 ### Urgent Tasks
-- [ID] [Title] — Assigned to: [name] — Status: [status]
+Present urgent tasks as a markdown table with these columns:
+- ID
+- Title
+- Assigned To
+- Status
 
 ### Identified Risks
 - [description of the risk based on the data]
@@ -60,6 +73,11 @@ RULES:
 3. If a section is empty (e.g. no overdue tasks), write "None" or "Aucun élément".
 4. Calculate all metrics yourself from the raw data.
 5. You can reply in either French or English, depending on the language used in the user's prompt.
+6. Your final answer must be the complete report only: do not start with a generic sentence like "Here is the report" and do not end with a generic closing sentence.
+7. Every report must include all sections in the exact order above, even if some sections contain "None".
+8. If data exists, present it explicitly in markdown tables; never replace the data with a vague summary.
+9. Keep the report self-contained so the user can read all results directly in the chat without needing follow-up prompts.
+10. Do not add any routing/debug text like "Transferring back to supervisor" or any internal tool narration.
 """
 
 tools = [get_projects, get_issues, get_members, get_versions]

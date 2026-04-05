@@ -65,7 +65,27 @@ def _interrupt_to_payload(interrupt_obj: Any) -> Dict[str, Any]:
     
     return {"value": interrupt_obj}
 
-def _extract_last_message_content(result: Any) -> str:
+def _message_content_to_text(message: Any) -> str:
+    content = getattr(message, "content", message)
+
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                text = item.get("text") or item.get("content") or ""
+                if text:
+                    parts.append(str(text))
+            elif item is not None:
+                parts.append(str(item))
+        return "\n".join(part for part in parts if part).strip()
+
+    if content is None:
+        return ""
+
+    return str(content).strip()
+
+
+def _extract_full_message_content(result: Any) -> str:
     payload = result.value if hasattr(result, "value") else result
 
     if isinstance(payload, dict):
@@ -75,10 +95,37 @@ def _extract_last_message_content(result: Any) -> str:
 
     if not messages:
         return "No response message produced."
-    
-    last = messages[-1]
 
-    return getattr(last, "content", str(last))
+    text_blocks: list[str] = []
+    seen: set[str] = set()
+
+    for message in messages:
+        message_type = type(message).__name__.lower()
+        if "toolmessage" in message_type:
+            continue
+
+        text = _message_content_to_text(message)
+        if not text:
+            continue
+
+        if text not in seen:
+            seen.add(text)
+            text_blocks.append(text)
+
+    if not text_blocks:
+        last = messages[-1]
+        return _message_content_to_text(last) or str(last)
+
+    filtered_blocks = [
+        block for block in text_blocks
+        if block.strip().lower() not in {
+            "transferring back to supervisor",
+            "returning to supervisor",
+            "back to supervisor",
+        }
+    ]
+
+    return "\n\n".join(filtered_blocks or text_blocks)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -102,7 +149,7 @@ async def chat_endpoint(request: ChatRequest):
                 interrupts=pending
             )
 
-        return ChatResponse(response=_extract_last_message_content(result))
+        return ChatResponse(response=_extract_full_message_content(result))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -156,7 +203,7 @@ async def approve_endpoint(thread_id: str, request: ApproveRequest):
 
         return {
             "status": request.decision_type,
-            "response": _extract_last_message_content(result)
+            "response": _extract_full_message_content(result)
         }
 
     except Exception as e:
