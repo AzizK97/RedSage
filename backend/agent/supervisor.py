@@ -4,6 +4,7 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
+from langfuse import get_client
 from langgraph_supervisor import create_supervisor
 from typing import Any
 
@@ -12,45 +13,66 @@ from agent.agents.tasks     import create_tasks_agent
 from agent.agents.planning  import create_planning_agent
 from agent.agents.report    import create_report_agent
 
-try:
-    from langfuse.langchain import CallbackHandler
-except Exception:
-    CallbackHandler = None  # type: ignore[assignment]
+from langfuse.langchain import CallbackHandler
+from langfuse import Langfuse
+
+# try:
+#     from langfuse.langchain import CallbackHandler
+# except Exception:
+#     CallbackHandler = None  # type: ignore[assignment]
 
 load_dotenv()
 
+_langfuse_handler = None
 
-def _create_langfuse_handler() -> Any | None:
-    enabled = os.getenv("LANGFUSE_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
-    if not enabled or CallbackHandler is None:
-        return None
+def get_langfuse_handler() -> CallbackHandler | None:
+    global _langfuse_handler
 
+    if _langfuse_handler is not None:
+        return _langfuse_handler
+    
     try:
-        return CallbackHandler(
-            public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-            secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-            host=os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
-        )
-    except Exception:
+        get_client()
+
+        _langfuse_handler = CallbackHandler()
+        return _langfuse_handler
+
+    except Exception as e:
+        print(f"Error initializing Langfuse: {e}")
         return None
 
+# def _create_langfuse_handler() -> Any | None:
+#     enabled = os.getenv("LANGFUSE_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+#     if not enabled or CallbackHandler is None:
+#         return None
 
-langfuse_handler = _create_langfuse_handler()
+#     try:
+#         return CallbackHandler(
+#             public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+#             secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+#             host=os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
+#         )
+#     except Exception:
+#         return None
 
 
-def build_invoke_config(thread_id: str, entrypoint: str) -> dict[str, Any]:
-    config: dict[str, Any] = {
+# langfuse_handler = _create_langfuse_handler()
+
+def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
+    """Build config with thread_id + LangUse handler for observability."""
+    config: dict = {
         "configurable": {"thread_id": thread_id},
-        "metadata": {
+        "metadata":{
             "thread_id": thread_id,
             "entrypoint": entrypoint,
-            "app": "redmine-chat-assist",
+            "app": "redmine_agent",           
         },
-        "tags": ["redmine-chat-assist", f"entrypoint:{entrypoint}"],
+        "tags": ["redmine", "agent"],
     }
 
-    if langfuse_handler is not None:
-        config["callbacks"] = [langfuse_handler]
+    handler = get_langfuse_handler()
+    if handler:
+        config["callbacks"] = [handler]
 
     return config
 

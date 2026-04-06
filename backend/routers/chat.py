@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, Literal, Optional
 import json
 
-from agent.supervisor import chat_stream, get_app, build_invoke_config, chat_with_interrupts
+from agent.supervisor import chat_stream, get_app, chat_with_interrupts, build_invoke_config
 from langgraph.types import Command
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -168,11 +168,10 @@ async def chat_stream_endpoint(request: ChatRequest):
         }
     )
 
-
 @router.post("/chat/approve/{thread_id}")
 async def approve_endpoint(thread_id: str, request: ApproveRequest):
     app = get_app()
-    config = build_invoke_config(thread_id=thread_id, entrypoint="chat_approve")
+    config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
 
     try:
         if request.decision_type == "edit":
