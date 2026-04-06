@@ -5,20 +5,37 @@ from langchain_core.tools import tool
 
 # ── HTTP Helper ────────────────────────────────────────────────────────────────
 
-def _get(endpoint: str, params: dict = {}) -> dict:
+def _get(endpoint: str, params: dict | None = None) -> dict:
     """Base authenticated GET request to Redmine."""
-    redmine_url = os.getenv("REDMINE_URL", "http://localhost:3000")
+    redmine_url = os.getenv("REDMINE_URL", "http://localhost:3000").rstrip("/")
     api_key     = os.getenv("REDMINE_API_KEY", "")
+    timeout_seconds = float(os.getenv("REDMINE_TIMEOUT_SECONDS", "10"))
 
-    response = requests.get(
-        f"{redmine_url}{endpoint}",
-        headers={
-            "X-Redmine-API-Key": api_key,
-            "Content-Type": "application/json"
-        },
-        params=params
-    )
-    response.raise_for_status()
+    try:
+        response = requests.get(
+            f"{redmine_url}{endpoint}",
+            headers={
+                "X-Redmine-API-Key": api_key,
+                "Content-Type": "application/json"
+            },
+            params=params or {},
+            timeout=timeout_seconds,
+        )
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError(
+            f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{redmine_url}'. "
+            "Make sure Redmine is running and REDMINE_URL is correct."
+        ) from exc
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        response_body = (response.text or "").strip()
+        raise RuntimeError(
+            f"REDMINE_API_ERROR: GET {endpoint} failed with HTTP {response.status_code}. "
+            f"Response: {response_body or 'empty response'}"
+        ) from exc
+
     return response.json()
 
 

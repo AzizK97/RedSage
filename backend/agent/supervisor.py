@@ -1,16 +1,58 @@
 import os
 from dotenv import load_dotenv
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph_supervisor import create_supervisor
+from typing import Any
 
 from agent.agents.overview  import create_overview_agent
 from agent.agents.tasks     import create_tasks_agent
 from agent.agents.planning  import create_planning_agent
 from agent.agents.report    import create_report_agent
 
+try:
+    from langfuse.langchain import CallbackHandler
+except Exception:
+    CallbackHandler = None  # type: ignore[assignment]
+
 load_dotenv()
+
+
+def _create_langfuse_handler() -> Any | None:
+    enabled = os.getenv("LANGFUSE_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+    if not enabled or CallbackHandler is None:
+        return None
+
+    try:
+        return CallbackHandler(
+            public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+            secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+            host=os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
+        )
+    except Exception:
+        return None
+
+
+langfuse_handler = _create_langfuse_handler()
+
+
+def build_invoke_config(thread_id: str, entrypoint: str) -> dict[str, Any]:
+    config: dict[str, Any] = {
+        "configurable": {"thread_id": thread_id},
+        "metadata": {
+            "thread_id": thread_id,
+            "entrypoint": entrypoint,
+            "app": "redmine-chat-assist",
+        },
+        "tags": ["redmine-chat-assist", f"entrypoint:{entrypoint}"],
+    }
+
+    if langfuse_handler is not None:
+        config["callbacks"] = [langfuse_handler]
+
+    return config
 
 SUPERVISOR_PROMPT = """You are an intelligent supervisor of a multi-agent Redmine project management system.
 You analyze the user's question and delegate it to the most appropriate specialized agent.
@@ -44,6 +86,12 @@ ROUTING RULES:
 12. For sprint/version list questions, ensure the final response contains the actual list data, not a vague summary.
 13. You can reply in either French or English, depending on the language used in the user's prompt.
 """
+
+# def create_llm() -> ChatOllama:
+#     return ChatOllama(
+#         model="gemma4:e4b-it-q4_K_M",
+#         temperature=0
+#     )
 
 def create_llm() -> ChatOpenAI:
     return ChatOpenAI(
@@ -86,6 +134,87 @@ def get_app():
     return _app
 
 
+def _invoke_chat(question: str, thread_id: str) -> Any:
+    app = get_app()
+    config = build_invoke_config(thread_id=thread_id, entrypoint="chat")
+
+    return app.invoke(
+        {"messages": [HumanMessage(content=question)]},
+        config=config
+    )
+
+
+def extract_final_message_content(result: Any) -> str:
+    """
+    Extract the user-facing assistant text from a LangGraph result.
+
+    This skips tool messages and routing/transfer messages so callers do not
+    accidentally display internal supervisor chatter.
+    """
+    payload = result.value if hasattr(result, "value") else result
+
+    if isinstance(payload, dict):
+        messages = payload.get("messages", [])
+    else:
+        messages = getattr(payload, "messages", [])
+
+    if not messages:
+        return "No response message produced."
+
+    text_blocks: list[str] = []
+    seen: set[str] = set()
+
+    for message in messages:
+        message_type = type(message).__name__.lower()
+
+        if "aimessage" not in message_type:
+            continue
+
+        if "toolmessage" in message_type:
+            continue
+
+        content = getattr(message, "content", message)
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("text") or item.get("content") or ""
+                    if text:
+                        parts.append(str(text))
+                elif item is not None:
+                    parts.append(str(item))
+            text = "\n".join(part for part in parts if part).strip()
+        elif content is None:
+            text = ""
+        else:
+            text = str(content).strip()
+
+        if not text or text in seen:
+            continue
+
+        seen.add(text)
+        text_blocks.append(text)
+
+    if not text_blocks:
+        last = messages[-1]
+        return str(getattr(last, "content", last)).strip()
+
+    filtered_blocks = [
+        block for block in text_blocks
+        if block.strip().lower() not in {
+            "transferring back to supervisor",
+            "returning to supervisor",
+            "back to supervisor",
+            "transfer_to_report_agent",
+            "transfer_to_overview_agent",
+            "transfer_to_tasks_agent",
+            "transfer_to_planning_agent",
+        }
+    ]
+
+    return "\n\n".join(filtered_blocks or text_blocks)
+
+
 def chat(question: str, thread_id: str = "default") -> str:
     """
     Send a message to the supervisor and return the final response.
@@ -94,15 +223,29 @@ def chat(question: str, thread_id: str = "default") -> str:
         question:  User's natural language question
         thread_id: Conversation thread ID for memory persistence
     """
-    app    = get_app()
-    config = {"configurable": {"thread_id": thread_id}}
+    result = _invoke_chat(question, thread_id)
+    return extract_final_message_content(result)
 
-    result = app.invoke(
-        {"messages": [HumanMessage(content=question)]},
-        config=config
-    )
 
-    return result["messages"][-1].content
+def chat_with_interrupts(question: str, thread_id: str = "default") -> dict[str, Any]:
+    """
+    Send a message to the supervisor and return the raw result with a parsed
+    assistant response plus any pending interrupts.
+    """
+    result = _invoke_chat(question, thread_id)
+
+    messages = result["messages"]
+    interrupts: Any = []
+    if hasattr(result, "interrupts") and getattr(result, "interrupts", None):
+        interrupts = getattr(result, "interrupts")
+    elif isinstance(result, dict):
+        interrupts = result.get("__interrupt__", [])
+
+    return {
+        "result": result,
+        "response": extract_final_message_content(result),
+        "interrupts": list(interrupts) if interrupts else [],
+    }
 
 
 def chat_stream(question: str, thread_id: str = "default"):
@@ -117,7 +260,7 @@ def chat_stream(question: str, thread_id: str = "default"):
         - "error"    : something went wrong
     """
     app    = get_app()
-    config = {"configurable": {"thread_id": thread_id}}
+    config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
 
     try:
         for step in app.stream(

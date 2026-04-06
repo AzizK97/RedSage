@@ -4,8 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, Literal, Optional
 import json
 
-from agent.supervisor import chat_stream, get_app
-from langchain_core.messages import HumanMessage
+from agent.supervisor import chat_stream, get_app, build_invoke_config, chat_with_interrupts
 from langgraph.types import Command
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -42,18 +41,6 @@ class ApproveRequest(BaseModel):
             
         return self
 
-def _extract_interrupts(result: Any) -> list[Any]:
-
-    if hasattr(result, "interrupts") and getattr(result, "interrupts", None):
-        return list(result.interrupts)
-    
-    if isinstance(result, dict):
-        legacy = result.get("__interrupt__")
-        if legacy:
-            return list(legacy)
-        
-    return []
-    
 def _interrupt_to_payload(interrupt_obj: Any) -> Dict[str, Any]:
     if hasattr(interrupt_obj, "value"):
         value = interrupt_obj.value
@@ -128,18 +115,24 @@ def _extract_full_message_content(result: Any) -> str:
     return "\n\n".join(filtered_blocks or text_blocks)
 
 
+def _raise_http_from_exception(exc: Exception) -> None:
+    message = str(exc)
+
+    if message.startswith("REDMINE_UNAVAILABLE:"):
+        raise HTTPException(status_code=503, detail=message)
+
+    if message.startswith("REDMINE_API_ERROR:"):
+        raise HTTPException(status_code=502, detail=message)
+
+    raise HTTPException(status_code=500, detail=message)
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    app = get_app()
-    config = {"configurable": {"thread_id": request.thread_id}}
-
     try:
-        result = app.invoke(
-            {"messages": [HumanMessage(content=request.message)]},
-            config=config
-        )
+        result = chat_with_interrupts(request.message, request.thread_id)
 
-        interrupts = _extract_interrupts(result)
+        interrupts = result["interrupts"]
         if interrupts:
             pending = _interrupt_to_payload(interrupts[0])
 
@@ -149,10 +142,10 @@ async def chat_endpoint(request: ChatRequest):
                 interrupts=pending
             )
 
-        return ChatResponse(response=_extract_full_message_content(result))
+        return ChatResponse(response=result["response"])
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_http_from_exception(e)
 
 
 @router.post("/chat/stream")
@@ -179,7 +172,7 @@ async def chat_stream_endpoint(request: ChatRequest):
 @router.post("/chat/approve/{thread_id}")
 async def approve_endpoint(thread_id: str, request: ApproveRequest):
     app = get_app()
-    config = {"configurable": {"thread_id": thread_id}}
+    config = build_invoke_config(thread_id=thread_id, entrypoint="chat_approve")
 
     try:
         if request.decision_type == "edit":
@@ -207,7 +200,7 @@ async def approve_endpoint(thread_id: str, request: ApproveRequest):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_http_from_exception(e)
 
 
 @router.get("/health")

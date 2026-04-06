@@ -4,20 +4,43 @@ from langchain_core.tools import tool
 
 # ── HTTP Helpers ───────────────────────────────────────────────────────────────
 
+def _redmine_base_url() -> str:
+    return os.getenv("REDMINE_URL", "http://localhost:3000").rstrip("/")
+
+
+def _redmine_timeout_seconds() -> float:
+    return float(os.getenv("REDMINE_TIMEOUT_SECONDS", "10"))
+
 def _post(endpoint: str, payload: dict) -> dict:
     """Base authenticated POST request to Redmine."""
-    redmine_url = os.getenv("REDMINE_URL", "http://localhost:3000")
+    redmine_url = _redmine_base_url()
     api_key     = os.getenv("REDMINE_API_KEY", "")
 
-    response = requests.post(
-        f"{redmine_url}{endpoint}",
-        headers={
-            "X-Redmine-API-Key": api_key,
-            "Content-Type": "application/json"
-        },
-        json=payload
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            f"{redmine_url}{endpoint}",
+            headers={
+                "X-Redmine-API-Key": api_key,
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=_redmine_timeout_seconds(),
+        )
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError(
+            f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{redmine_url}'. "
+            "Make sure Redmine is running and REDMINE_URL is correct."
+        ) from exc
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        response_body = (response.text or "").strip()
+        raise RuntimeError(
+            f"REDMINE_API_ERROR: POST {endpoint} failed with HTTP {response.status_code}. "
+            f"Response: {response_body or 'empty response'}"
+        ) from exc
+
     # 201 Created returns a body, 200 may not
     try:
         return response.json()
@@ -27,18 +50,34 @@ def _post(endpoint: str, payload: dict) -> dict:
 
 def _put(endpoint: str, payload: dict) -> dict:
     """Base authenticated PUT request to Redmine."""
-    redmine_url = os.getenv("REDMINE_URL", "http://localhost:3000")
+    redmine_url = _redmine_base_url()
     api_key     = os.getenv("REDMINE_API_KEY", "")
 
-    response = requests.put(
-        f"{redmine_url}{endpoint}",
-        headers={
-            "X-Redmine-API-Key": api_key,
-            "Content-Type": "application/json"
-        },
-        json=payload
-    )
-    response.raise_for_status()
+    try:
+        response = requests.put(
+            f"{redmine_url}{endpoint}",
+            headers={
+                "X-Redmine-API-Key": api_key,
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=_redmine_timeout_seconds(),
+        )
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError(
+            f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{redmine_url}'. "
+            "Make sure Redmine is running and REDMINE_URL is correct."
+        ) from exc
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        response_body = (response.text or "").strip()
+        raise RuntimeError(
+            f"REDMINE_API_ERROR: PUT {endpoint} failed with HTTP {response.status_code}. "
+            f"Response: {response_body or 'empty response'}"
+        ) from exc
+
     try:
         return response.json()
     except Exception:
@@ -92,7 +131,7 @@ def create_issue(
         "status":  "created",
         "id":      created.get("id"),
         "subject": created.get("subject"),
-        "url":     f"{os.getenv('REDMINE_URL')}/issues/{created.get('id')}"
+        "url":     f"{_redmine_base_url()}/issues/{created.get('id')}"
     }
 
 
