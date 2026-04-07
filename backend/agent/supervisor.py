@@ -4,7 +4,6 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
-from langfuse import get_client
 from langgraph_supervisor import create_supervisor
 from typing import Any
 
@@ -13,53 +12,13 @@ from agent.agents.tasks     import create_tasks_agent
 from agent.agents.planning  import create_planning_agent
 from agent.agents.report    import create_report_agent
 
-from langfuse.langchain import CallbackHandler
-from langfuse import Langfuse
-
-# try:
-#     from langfuse.langchain import CallbackHandler
-# except Exception:
-#     CallbackHandler = None  # type: ignore[assignment]
+import mlflow
+from openai import OpenAI
 
 load_dotenv()
 
-_langfuse_handler = None
-
-def get_langfuse_handler() -> CallbackHandler | None:
-    global _langfuse_handler
-
-    if _langfuse_handler is not None:
-        return _langfuse_handler
-    
-    try:
-        get_client()
-
-        _langfuse_handler = CallbackHandler()
-        return _langfuse_handler
-
-    except Exception as e:
-        print(f"Error initializing Langfuse: {e}")
-        return None
-
-# def _create_langfuse_handler() -> Any | None:
-#     enabled = os.getenv("LANGFUSE_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
-#     if not enabled or CallbackHandler is None:
-#         return None
-
-#     try:
-#         return CallbackHandler(
-#             public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-#             secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-#             host=os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
-#         )
-#     except Exception:
-#         return None
-
-
-# langfuse_handler = _create_langfuse_handler()
-
 def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
-    """Build config with thread_id + LangUse handler for observability."""
+    """Build invoke config with thread_id and request metadata."""
     config: dict = {
         "configurable": {"thread_id": thread_id},
         "metadata":{
@@ -70,11 +29,22 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
         "tags": ["redmine", "agent"],
     }
 
-    handler = get_langfuse_handler()
-    if handler:
-        config["callbacks"] = [handler]
-
     return config
+
+# Specify the tracking URI for the MLflow server.
+mlflow.set_tracking_uri("http://localhost:5000")
+
+# Specify the experiment you just created for your LLM application or AI agent.
+mlflow.set_experiment("Redmine Agent")
+
+# Enable automatic tracing for all OpenAI API calls.
+mlflow.openai.autolog()
+
+client = OpenAI(
+    base_url=os.getenv("https://openrouter.ai/api/v1"),
+    api_key=os.getenv("OPENROUTER_API_KEY")
+)
+
 
 SUPERVISOR_PROMPT = """You are an intelligent supervisor of a multi-agent Redmine project management system.
 You analyze the user's question and delegate it to the most appropriate specialized agent.
