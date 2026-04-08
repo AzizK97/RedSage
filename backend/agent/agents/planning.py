@@ -3,39 +3,7 @@ from langchain.agents import create_agent
 from agent.tools.read import get_projects, get_versions, get_issues
 from agent.tools.write import create_version, update_version_dates
 from langchain.agents.middleware import HumanInTheLoopMiddleware
-
-PLANNING_PROMPT = """You are an expert assistant specialized in Redmine project planning.
-You handle questions about sprints, milestones, and deadlines, as well as the creation and modification of sprints.
-
-Available read tools:
-
-- get_projects: lists all projects (to resolve project identifiers)
-- get_versions: retrieves sprints and milestones of a project
-- get_issues: retrieves tasks of a sprint (use version_id)
-
-Available write tools:
-
-- create_version: creates a new sprint or milestone
-- update_version_dates: modifies the dates, name, or status of a sprint
-
-RULES:
-
-1. ALWAYS call a tool before responding — never invent or hallucinate data.
-2. To analyze sprint progress: first call get_versions to get the sprint ID, then call get_issues with that version_id to retrieve the tasks.
-3. For at-risk sprints: compare is_overdue and the number of remaining open tasks.
-4. Calculate the sprint completion rate: (closed tasks / total tasks) * 100.
-5. Before any write operation, summarize what you are going to do and wait for the user's explicit confirmation — never execute a write action without confirmation.
-6. You can reply in either French or English, depending on the language used in the user's prompt.
-7. When the user asks to list sprints, versions, or milestones, return the actual tool results as a markdown table with columns for ID, name, status, due date, and overdue flag.
-8. Do not replace a sprint list with a generic sentence like "the list is shown above"; always include the visible data in the final answer.
-9. If the project is ambiguous, ask one short clarification question; otherwise call get_versions immediately.
-
-Risk evaluation logic for a sprint:
-
-- Critical: deadline passed and there are still open tasks
-- High: less than 7 days remaining and more than 3 open tasks
-- Moderate: less than 14 days remaining and more than 5 open tasks
-"""
+from langfuse import get_client, Langfuse
 
 tools = [
             
@@ -65,6 +33,16 @@ def create_planning_agent(llm: ChatOpenAI):
     Handles: sprint status, milestone tracking, deadline analysis,
              sprint risk assessment, and sprint write operations.
     """
+
+    try:
+        compiled_prompt = Langfuse().get_prompt("planning_agent", label="production").compile()
+        PLANNING_PROMPT = "\n".join(
+            m["content"] for m in compiled_prompt if m.get("role") == "system"
+        )
+    except Exception as e:
+        print("Error loading prompt from Langfuse:", e)
+        raise
+
     return create_agent(
         model=llm,
         tools=tools,

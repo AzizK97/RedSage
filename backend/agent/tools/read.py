@@ -39,6 +39,12 @@ def _get(endpoint: str, params: dict | None = None) -> dict:
     return response.json()
 
 
+def _as_str_id(value):
+    if value is None:
+        return None
+    return str(value)
+
+
 # ── Read Tools ─────────────────────────────────────────────────────────────────
 
 @tool
@@ -66,11 +72,11 @@ def get_projects() -> dict:
 @tool
 def get_issues(
     project_id:     str,
-    status_id:      str = "open",
-    priority_id:    str = None,
-    assigned_to_id: str = None,
-    due_before:     str = None,
-    version_id:     str = None,
+    status_id:      str | int = "open",
+    priority_id:    str | int | None = None,
+    assigned_to_id: str | int | None = None,
+    due_before:     str | None = None,
+    version_id:     str | int | None = None,
     limit:          int = 50
 ) -> dict:
     """
@@ -81,24 +87,24 @@ def get_issues(
         project_id:     Project identifier  e.g. 'ai-chatbot-platform'
         status_id:      'open', 'closed', or '*' for all
         priority_id:    '1'=low  '2'=normal  '3'=high  '4'=urgent '5'=immediate
-        assigned_to_id: Numeric user ID of the assignee
+        assigned_to_id: User/assignee ID (string or integer)
         due_before:     YYYY-MM-DD — returns tasks whose due date <= this date
-        version_id:     Numeric sprint/version ID
+        version_id:     Sprint/version ID (string or integer)
         limit:          Max results to return (default 50)
     """
     params: dict = {
         "project_id": project_id,
-        "status_id":  status_id,
+        "status_id":  _as_str_id(status_id),
         "limit":      limit
     }
     if priority_id:
-        params["priority_id"] = priority_id
+        params["priority_id"] = _as_str_id(priority_id)
     if assigned_to_id:
-        params["assigned_to_id"] = assigned_to_id
+        params["assigned_to_id"] = _as_str_id(assigned_to_id)
     if due_before:
         params["due_date"] = f"<={due_before}"
     if version_id:
-        params["fixed_version_id"] = version_id
+        params["fixed_version_id"] = _as_str_id(version_id)
 
     data = _get("/issues.json", params)
     return {
@@ -180,7 +186,7 @@ def get_versions(project_id: str) -> dict:
 
 
 @tool
-def get_issue_detail(issue_id: int) -> dict:
+def get_issue_detail(issue_id: int | str) -> dict:
     """
     Retrieve the full details of a specific Redmine issue by its ID.
     Use when the user asks about a specific ticket or task by number.
@@ -188,7 +194,7 @@ def get_issue_detail(issue_id: int) -> dict:
     Args:
         issue_id: Numeric ID of the issue  e.g. 42
     """
-    data  = _get(f"/issues/{issue_id}.json")
+    data  = _get(f"/issues/{_as_str_id(issue_id)}.json")
     issue = data.get("issue", {})
     return {
         "id":          issue.get("id"),

@@ -12,24 +12,15 @@ from agent.agents.tasks     import create_tasks_agent
 from agent.agents.planning  import create_planning_agent
 from agent.agents.report    import create_report_agent
 
+from langfuse import get_client, Langfuse
+from langfuse.langchain import CallbackHandler
+
 import mlflow
 from openai import OpenAI
 
 load_dotenv()
 
-def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
-    """Build invoke config with thread_id and request metadata."""
-    config: dict = {
-        "configurable": {"thread_id": thread_id},
-        "metadata":{
-            "thread_id": thread_id,
-            "entrypoint": entrypoint,
-            "app": "redmine_agent",           
-        },
-        "tags": ["redmine", "agent"],
-    }
-
-    return config
+#------- MLflow setup -------
 
 # Specify the tracking URI for the MLflow server.
 mlflow.set_tracking_uri("http://localhost:5000")
@@ -45,39 +36,43 @@ client = OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY")
 )
 
+#------- LangFuse setup -------
 
-SUPERVISOR_PROMPT = """You are an intelligent supervisor of a multi-agent Redmine project management system.
-You analyze the user's question and delegate it to the most appropriate specialized agent.
+langfuse = Langfuse()
 
-Available agents:
+_langfuse_handler = None
 
-- overview_agent: General questions about projects — summary, team, overall status
-  Examples: "What projects exist?", "Tell me about project X"
-- tasks_agent: Everything related to tasks — listing, filtering, workload,
-  AND all write operations on tasks (create, close, reassign, comment, log time)
-  Examples: "Overdue tasks", "Create a ticket", "Close issue #5"
-- planning_agent: Sprints, milestones, deadlines, planning risks,
-  AND creation/modification of sprints
-  Examples: "Progress of Sprint 2", "Create Sprint 4", "At-risk sprints"
-- report_agent: Complete health reports covering all aspects of a project
-  Examples: "Full report", "How is the project doing?"
+def get_langfuse_handler():
+    global _langfuse_handler
+    if _langfuse_handler is not None:
+        return _langfuse_handler
 
-ROUTING RULES:
+    try:
+        # This initializes the global client using environment variables
+        get_client()   # Ensures Langfuse client is set up with your keys
 
-1. ALWAYS delegate to exactly one agent — never respond yourself.
-2. For mixed questions (e.g. tasks + sprints), prioritize tasks_agent.
-3. For any report or global synthesis, use report_agent.
-4. For any write operation (create, modify, close...), use tasks_agent (for tasks) or planning_agent (for sprints).
-5. In case of doubt, use overview_agent.
-6. Delegate once.
-7. After receiving delegated agent result, return it and end turn.
-8. DO NOT re-delegate in same turn.
-9. DO NOT append generic follow-up text.
-10. If a sprint id is not provided for issues creation, or the reverse, return to the overview agent to resolve the missing identifier before routing to the final agent.
-11. Once a sub-agent returns a final answer containing a markdown report or markdown table, return it immediately to the user without re-delegating or paraphrasing it away.
-12. For sprint/version list questions, ensure the final response contains the actual list data, not a vague summary.
-13. You can reply in either French or English, depending on the language used in the user's prompt.
-"""
+        _langfuse_handler = CallbackHandler()   # ← NO arguments!
+        return _langfuse_handler
+    except Exception as e:
+        print(f"⚠️ Failed to initialize LangFuse: {e}")
+        return None
+
+def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
+    config: dict = {
+        "configurable": {"thread_id": thread_id},
+        "metadata": {
+            "thread_id": thread_id,
+            "entrypoint": entrypoint,
+            "app": "redmine-agent",
+        },
+        "tags": ["redmine", "agent"],
+    }
+
+    handler = get_langfuse_handler()
+    if handler:
+        config["callbacks"] = [handler]
+
+    return config
 
 # def create_llm() -> ChatOllama:
 #     return ChatOllama(
@@ -104,6 +99,15 @@ def create_app():
     tasks_agent     = create_tasks_agent(llm)
     planning_agent  = create_planning_agent(llm)
     report_agent    = create_report_agent(llm)
+
+    try:
+        compiled_prompt = Langfuse().get_prompt("supervisor", label="production").compile()
+        SUPERVISOR_PROMPT = "\n".join(
+            m["content"] for m in compiled_prompt if m.get("role") == "system"
+        )
+    except Exception as e:
+        print("Error loading prompt from Langfuse:", e)
+        raise
 
     workflow = create_supervisor(
         [overview_agent, tasks_agent, planning_agent, report_agent],

@@ -11,6 +11,12 @@ def _redmine_base_url() -> str:
 def _redmine_timeout_seconds() -> float:
     return float(os.getenv("REDMINE_TIMEOUT_SECONDS", "10"))
 
+
+def _as_str_id(value):
+    if value is None:
+        return None
+    return str(value)
+
 def _post(endpoint: str, payload: dict) -> dict:
     """Base authenticated POST request to Redmine."""
     redmine_url = _redmine_base_url()
@@ -91,10 +97,10 @@ def create_issue(
     project_id:     str,
     subject:        str,
     description:    str  = None,
-    assigned_to_id: int  = None,
-    priority_id:    int  = 4,
-    status_id:      int  = 1,
-    version_id:     int  = None,
+    assigned_to_id: int | str | None  = None,
+    priority_id:    int | str  = 4,
+    status_id:      int | str  = 1,
+    version_id:     int | str | None  = None,
     start_date:     str  = None,
     due_date:       str  = None,
 ) -> dict:
@@ -106,22 +112,22 @@ def create_issue(
         project_id:     Project identifier  e.g. 'ai-chatbot-platform'
         subject:        Title of the issue
         description:    Detailed description of the issue
-        assigned_to_id: Numeric ID of the user to assign the issue to
+        assigned_to_id: User ID to assign the issue to (string or integer)
         priority_id:    1=low  2=normal  3=high  4=urgent 5=immediate  (default: 2)
         status_id:      1=New  2=In Progress  3=Resolved  5=Closed  (default: 1)
-        version_id:     Numeric sprint/version ID to assign the issue to
+        version_id:     Sprint/version ID to assign the issue to (string or integer)
         start_date:     Start date in YYYY-MM-DD format
         due_date:       Due date in YYYY-MM-DD format
     """
     issue: dict = {
         "project_id": project_id,
         "subject":    subject,
-        "priority_id": priority_id,
-        "status_id":   status_id,
+        "priority_id": _as_str_id(priority_id),
+        "status_id":   _as_str_id(status_id),
     }
     if description:    issue["description"]    = description
-    if assigned_to_id: issue["assigned_to_id"] = assigned_to_id
-    if version_id:     issue["fixed_version_id"] = version_id
+    if assigned_to_id is not None: issue["assigned_to_id"] = _as_str_id(assigned_to_id)
+    if version_id is not None:     issue["fixed_version_id"] = _as_str_id(version_id)
     if start_date:     issue["start_date"]     = start_date
     if due_date:       issue["due_date"]        = due_date
 
@@ -137,8 +143,8 @@ def create_issue(
 
 @tool
 def update_issue_status(
-    issue_id:  int,
-    status_id: int,
+    issue_id:  int | str,
+    status_id: int | str,
     notes:     str = None
 ) -> dict:
     """
@@ -155,27 +161,27 @@ def update_issue_status(
 
     Args:
         issue_id:  Numeric ID of the issue to update
-        status_id: New status ID (see above)
+        status_id: New status ID (see above; string or integer)
         notes:     Optional comment to add when changing the status
     """
-    payload: dict = {"issue": {"status_id": status_id}}
+    payload: dict = {"issue": {"status_id": _as_str_id(status_id)}}
     if notes:
         payload["issue"]["notes"] = notes
 
-    _put(f"/issues/{issue_id}.json", payload)
-    status_names = {1: "New", 2: "In Progress", 3: "Resolved",
-                    4: "Feedback", 5: "Closed", 6: "Rejected"}
+    _put(f"/issues/{_as_str_id(issue_id)}.json", payload)
+    status_names = {"1": "New", "2": "In Progress", "3": "Resolved",
+                    "4": "Feedback", "5": "Closed", "6": "Rejected"}
     return {
         "status":    "updated",
         "issue_id":  issue_id,
-        "new_status": status_names.get(status_id, str(status_id))
+        "new_status": status_names.get(str(status_id), str(status_id))
     }
 
 
 @tool
 def reassign_issue(
-    issue_id:       int,
-    assigned_to_id: int,
+    issue_id:       int | str,
+    assigned_to_id: int | str,
     notes:          str = None
 ) -> dict:
     """
@@ -184,14 +190,14 @@ def reassign_issue(
 
     Args:
         issue_id:       Numeric ID of the issue to reassign
-        assigned_to_id: Numeric ID of the user to assign the issue to
+        assigned_to_id: User ID to assign the issue to (string or integer)
         notes:          Optional comment to add when reassigning
     """
-    payload: dict = {"issue": {"assigned_to_id": assigned_to_id}}
+    payload: dict = {"issue": {"assigned_to_id": _as_str_id(assigned_to_id)}}
     if notes:
         payload["issue"]["notes"] = notes
 
-    _put(f"/issues/{issue_id}.json", payload)
+    _put(f"/issues/{_as_str_id(issue_id)}.json", payload)
     return {
         "status":           "updated",
         "issue_id":         issue_id,
@@ -201,7 +207,7 @@ def reassign_issue(
 
 @tool
 def add_comment_to_issue(
-    issue_id: int,
+    issue_id: int | str,
     comment:  str
 ) -> dict:
     """
@@ -212,7 +218,7 @@ def add_comment_to_issue(
         issue_id: Numeric ID of the issue
         comment:  The comment text to add
     """
-    _put(f"/issues/{issue_id}.json", {"issue": {"notes": comment}})
+    _put(f"/issues/{_as_str_id(issue_id)}.json", {"issue": {"notes": comment}})
     return {
         "status":   "comment_added",
         "issue_id": issue_id
@@ -221,7 +227,7 @@ def add_comment_to_issue(
 
 @tool
 def update_issue_dates(
-    issue_id:   int,
+    issue_id:   int | str,
     due_date:   str = None,
     start_date: str = None
 ) -> dict:
@@ -241,7 +247,7 @@ def update_issue_dates(
     if not issue:
         return {"status": "error", "message": "No dates provided."}
 
-    _put(f"/issues/{issue_id}.json", {"issue": issue})
+    _put(f"/issues/{_as_str_id(issue_id)}.json", {"issue": issue})
     return {
         "status":     "updated",
         "issue_id":   issue_id,
@@ -254,9 +260,9 @@ def update_issue_dates(
 
 @tool
 def log_time(
-    issue_id:    int,
+    issue_id:    int | str,
     hours:       float,
-    activity_id: int  = 9,
+    activity_id: int | str  = 9,
     comments:    str  = None,
     spent_on:    str  = None
 ) -> dict:
@@ -278,9 +284,9 @@ def log_time(
         spent_on:    Date in YYYY-MM-DD format (defaults to today)
     """
     entry: dict = {
-        "issue_id":    issue_id,
+        "issue_id":    _as_str_id(issue_id),
         "hours":       hours,
-        "activity_id": activity_id
+        "activity_id": _as_str_id(activity_id)
     }
     if comments: entry["comments"] = comments
     if spent_on: entry["spent_on"] = spent_on
@@ -335,7 +341,7 @@ def create_version(
 
 @tool
 def update_version_dates(
-    version_id:  int,
+    version_id:  int | str,
     due_date:    str  = None,
     name:        str  = None,
     status:      str  = None,
@@ -361,7 +367,7 @@ def update_version_dates(
     if not version:
         return {"status": "error", "message": "No fields provided to update."}
 
-    _put(f"/versions/{version_id}.json", {"version": version})
+    _put(f"/versions/{_as_str_id(version_id)}.json", {"version": version})
     return {
         "status":     "updated",
         "version_id": version_id,
