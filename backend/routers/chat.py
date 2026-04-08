@@ -83,36 +83,32 @@ def _extract_full_message_content(result: Any) -> str:
     if not messages:
         return "No response message produced."
 
-    text_blocks: list[str] = []
-    seen: set[str] = set()
+    # Walk backward and pick the latest AI/assistant message only.
+    for message in reversed(messages):
+        mtype = type(message).__name__.lower()
+        role = str(getattr(message, "type", "")).lower()
 
-    for message in messages:
-        message_type = type(message).__name__.lower()
-        if "toolmessage" in message_type:
+        is_tool = "toolmessage" in mtype or role == "tool"
+        is_ai = ("aimessage" in mtype) or (role in {"ai", "assistant"})
+
+        if is_tool:
             continue
 
+        if is_ai:
+            text = _message_content_to_text(message)
+            if text:
+                return text
+
+    # Fallback: last non-tool message
+    for message in reversed(messages):
+        mtype = type(message).__name__.lower()
+        if "toolmessage" in mtype:
+            continue
         text = _message_content_to_text(message)
-        if not text:
-            continue
+        if text:
+            return text
 
-        if text not in seen:
-            seen.add(text)
-            text_blocks.append(text)
-
-    if not text_blocks:
-        last = messages[-1]
-        return _message_content_to_text(last) or str(last)
-
-    filtered_blocks = [
-        block for block in text_blocks
-        if block.strip().lower() not in {
-            "transferring back to supervisor",
-            "returning to supervisor",
-            "back to supervisor",
-        }
-    ]
-
-    return "\n\n".join(filtered_blocks or text_blocks)
+    return "No response message produced."
 
 
 def _raise_http_from_exception(exc: Exception) -> None:

@@ -82,7 +82,7 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 
 def create_llm() -> ChatOpenAI:
     return ChatOpenAI(
-        model="openrouter/auto",
+        model=os.getenv("MODEL_NAME", "openrouter/auto"),
         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
         openai_api_base="https://openrouter.ai/api/v1",
         temperature=0,
@@ -157,21 +157,21 @@ def extract_final_message_content(result: Any) -> str:
     if not messages:
         return "No response message produced."
 
-    text_blocks: list[str] = []
-    seen: set[str] = set()
+    ignored_texts = {
+        "transferring back to supervisor",
+        "returning to supervisor",
+        "back to supervisor",
+        "transfer_to_report_agent",
+        "transfer_to_overview_agent",
+        "transfer_to_tasks_agent",
+        "transfer_to_planning_agent",
+    }
 
-    for message in messages:
-        message_type = type(message).__name__.lower()
-
-        if "aimessage" not in message_type:
-            continue
-
-        if "toolmessage" in message_type:
-            continue
-
+    def message_to_text(message: Any) -> str:
         content = getattr(message, "content", message)
+
         if isinstance(content, list):
-            parts = []
+            parts: list[str] = []
             for item in content:
                 if isinstance(item, dict):
                     text = item.get("text") or item.get("content") or ""
@@ -179,36 +179,42 @@ def extract_final_message_content(result: Any) -> str:
                         parts.append(str(text))
                 elif item is not None:
                     parts.append(str(item))
-            text = "\n".join(part for part in parts if part).strip()
-        elif content is None:
-            text = ""
-        else:
-            text = str(content).strip()
+            return "\n".join(part for part in parts if part).strip()
 
-        if not text or text in seen:
+        if content is None:
+            return ""
+
+        return str(content).strip()
+
+    # Return only the latest AI/assistant message from the current state,
+    # skipping tool and supervisor transfer chatter.
+    for message in reversed(messages):
+        message_type = type(message).__name__.lower()
+        role = str(getattr(message, "type", "")).lower()
+
+        is_tool = "toolmessage" in message_type or role == "tool"
+        if is_tool:
             continue
 
-        seen.add(text)
-        text_blocks.append(text)
+        is_ai = "aimessage" in message_type or role in {"ai", "assistant"}
+        if not is_ai:
+            continue
 
-    if not text_blocks:
-        last = messages[-1]
-        return str(getattr(last, "content", last)).strip()
+        text = message_to_text(message)
+        if text and text.strip().lower() not in ignored_texts:
+            return text
 
-    filtered_blocks = [
-        block for block in text_blocks
-        if block.strip().lower() not in {
-            "transferring back to supervisor",
-            "returning to supervisor",
-            "back to supervisor",
-            "transfer_to_report_agent",
-            "transfer_to_overview_agent",
-            "transfer_to_tasks_agent",
-            "transfer_to_planning_agent",
-        }
-    ]
+    # Fallback to latest non-tool message if no assistant message found.
+    for message in reversed(messages):
+        message_type = type(message).__name__.lower()
+        role = str(getattr(message, "type", "")).lower()
+        if "toolmessage" in message_type or role == "tool":
+            continue
+        text = message_to_text(message)
+        if text:
+            return text
 
-    return "\n\n".join(filtered_blocks or text_blocks)
+    return "No response message produced."
 
 
 def chat(question: str, thread_id: str = "default") -> str:

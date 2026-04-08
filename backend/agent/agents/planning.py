@@ -48,5 +48,7 @@ def create_planning_agent(llm: ChatOpenAI):
         tools=tools,
         name="planning_agent",
         system_prompt=PLANNING_PROMPT,
-        middleware=[HumanInTheLoopMiddleware(interrupt_on=interrupt_on)]
+        middleware=[
+            HumanInTheLoopMiddleware(interrupt_on=interrupt_on)
+            ]
     )   

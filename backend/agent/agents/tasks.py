@@ -78,5 +78,7 @@ def create_tasks_agent(llm: ChatOpenAI):
         tools=tools,
         name="tasks_agent",
         system_prompt=TASKS_PROMPT,
-        middleware=[HumanInTheLoopMiddleware(interrupt_on=interrupt_on)]
+        middleware=[
+            HumanInTheLoopMiddleware(interrupt_on=interrupt_on)
+            ]
     )
