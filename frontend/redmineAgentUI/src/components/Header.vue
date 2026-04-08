@@ -7,9 +7,9 @@
 
 <style scoped>
 .chat-header {
-  padding: 1rem 1.5rem;
-  background: #1f2937;
-  border-bottom: 1px solid #374151;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -17,13 +17,15 @@
 
 .chat-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
-  color: #f9fafb;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
 }
 
 .chat-subtitle {
-  color: #9ca3af;
-  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 400;
 }
 </style>

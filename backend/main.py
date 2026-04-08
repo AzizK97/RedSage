@@ -10,7 +10,7 @@ from routers.chat import router as chat_router
 app = FastAPI(
     title="Redmine Chat Assist API",
     description="AI-powered project management chatbot backed by Redmine",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

@@ -115,7 +115,7 @@ function removeConversation(threadId: string) {
 .chat-layout {
   height: 100vh;
   display: flex;
-  background: #111827;
+  background: var(--bg-primary);
 }
 
 .chat-panel {
@@ -123,75 +123,76 @@ function removeConversation(threadId: string) {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  background: var(--bg-primary);
 }
 
 .chat-body {
   flex: 1;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  gap: 0.75rem;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
 }
 
 .thread-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: baseline;
-  flex-wrap: wrap;
+  display: none;
 }
 
 .thread {
-  color: #9ca3af;
-  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
   margin: 0;
 }
 
 .conversation-name {
-  color: #e5e7eb;
-  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
   margin: 0;
 }
 
 .error {
   color: #fca5a5;
-  background: #3b1f1f;
+  background: rgba(127, 29, 29, 0.2);
   border: 1px solid #7f1d1d;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  margin: var(--space-md);
+  font-size: var(--text-sm);
 }
 
 .agent-status {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.25rem 0.35rem 0.1rem;
-  color: #9ca3af;
-  min-height: 1.5rem;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  color: var(--text-secondary);
+  min-height: 2rem;
+  justify-content: center;
+  font-size: var(--text-sm);
 }
 
 .status-text {
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
 }
 
 .status-dot {
-  width: 0.45rem;
-  height: 0.45rem;
+  width: 0.375rem;
+  height: 0.375rem;
   border-radius: 999px;
-  background: #9ca3af;
+  background: var(--accent-green);
   animation: pulse 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0% {
-    opacity: 0.35;
+    opacity: 0.4;
   }
   50% {
     opacity: 1;
   }
   100% {
-    opacity: 0.35;
+    opacity: 0.4;
   }
 }
 

@@ -109,76 +109,121 @@ function edit() {
 
 <style scoped>
 .hitl {
-  border: 1px solid #f59e0b;
-  background: rgba(120, 53, 15, 0.35);
-  color: #fef3c7;
-  border-radius: 12px;
-  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  margin: var(--space-md);
+  max-width: 900px;
 }
 
 h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--accent-amber);
 }
 
 pre {
   max-height: 200px;
   overflow: auto;
-  background: #111827;
-  color: #e5e7eb;
-  padding: 0.5rem;
-  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  line-height: 1.4;
 }
 
 .actions {
   display: flex;
-  gap: 0.5rem;
-  margin: 0.6rem 0;
+  gap: var(--space-md);
+  margin: var(--space-lg) 0;
 }
 
 .actions button {
-  padding: 0.5rem 0.85rem;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: none;
+  font-weight: 500;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .actions button:first-child {
-  background: #2563eb;
-  color: #fff;
+  background: var(--accent-green);
+  color: white;
+}
+
+.actions button:first-child:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 .actions button:nth-child(2) {
-  background: #dc2626;
-  color: #fff;
+  background: var(--accent-red);
+  color: white;
+}
+
+.actions button:nth-child(2):hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 input,
 textarea {
   width: 100%;
-  margin-top: 0.5rem;
-  padding: 0.55rem;
-  border: 1px solid #4b5563;
-  background: #1f2937;
-  color: #f9fafb;
-  border-radius: 8px;
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: var(--text-sm);
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .template-editor {
-  margin-top: 0.75rem;
+  margin-top: var(--space-lg);
 }
 
 .template-title {
   margin: 0;
-  font-size: 0.85rem;
-  color: #fde68a;
+  font-size: var(--text-sm);
+  color: var(--accent-amber);
+  font-weight: 500;
 }
 
 .template-editor button {
-  margin-top: 0.6rem;
-  padding: 0.5rem 0.85rem;
-  border-radius: 8px;
-  border: 1px solid #3b82f6;
-  background: #3b82f6;
-  color: #fff;
+  margin-top: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: none;
+  background: var(--accent-blue);
+  color: white;
+  font-weight: 500;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.template-editor button:hover:not(:disabled) {
+  background: var(--accent-blue-hover);
+  transform: translateY(-1px);
+}
+
+.template-editor button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

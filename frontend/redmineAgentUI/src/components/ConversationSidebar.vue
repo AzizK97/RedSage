@@ -60,63 +60,80 @@ function formatTime(timestamp: number) {
 
 <style scoped>
 .sidebar {
-  width: 300px;
-  min-width: 300px;
+  width: 280px;
+  min-width: 280px;
   height: 100%;
-  background: #1f2937;
-  border-right: 1px solid #374151;
-  color: #f9fafb;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .sidebar-header {
-  padding: 1rem;
-  border-bottom: 1px solid #374151;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
+  gap: var(--space-md);
+  align-items: flex-start;
 }
 
 h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 p {
-  margin: 0.15rem 0 0;
-  color: #9ca3af;
-  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
 }
 
 .new-btn {
-  border: 1px solid #3b82f6;
-  background: #3b82f6;
+  border: none;
+  background: var(--accent-blue);
   color: white;
-  border-radius: 0.65rem;
-  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.new-btn:hover {
+  background: var(--accent-blue-hover);
+  transform: translateY(-1px);
 }
 
 .conversation-list {
-  padding: 0.75rem;
+  padding: var(--space-md);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-sm);
 }
 
 .conversation-item {
   width: 100%;
-  border: 1px solid #374151;
-  background: #111827;
-  color: #f9fafb;
-  border-radius: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.conversation-item:hover {
+  border-color: var(--accent-blue);
+  background: var(--bg-tertiary);
 }
 
 .conversation-select {
@@ -125,57 +142,60 @@ p {
   border: 0;
   background: transparent;
   color: inherit;
-  padding: 0.85rem;
+  padding: var(--space-md);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--space-sm);
+  transition: all var(--transition-fast);
 }
 
 .conversation-item.active {
-  border-color: #60a5fa;
-  background: #172554;
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .conversation-item.active .conversation-select {
-  background: #172554;
+  background: transparent;
 }
 
 .conversation-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--space-xs);
 }
 
 .conversation-meta strong {
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .conversation-meta small {
-  color: #cbd5e1;
-  line-height: 1.35;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  font-size: var(--text-xs);
 }
 
 .conversation-time {
-  color: #9ca3af;
-  font-size: 0.72rem;
-}
-
-.conversation-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
 }
 
 .delete-btn {
-  margin: 0 0.85rem 0.85rem;
-  border: 1px solid #7f1d1d;
-  background: rgba(127, 29, 29, 0.35);
-  color: #fecaca;
-  border-radius: 0.55rem;
-  padding: 0.35rem 0.6rem;
+  margin: 0 var(--space-md) var(--space-md);
+  border: 0px solid white;
+  background: rgba(106, 106, 106, 0.1);
+  color: white;
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-md);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  transition: all var(--transition-fast);
+}
+
+.delete-btn:hover {
+  background: rgba(198, 198, 198, 0.2);
 }
 </style>

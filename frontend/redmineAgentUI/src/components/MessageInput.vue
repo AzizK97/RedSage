@@ -35,36 +35,57 @@ function submit() {
 <style scoped>
 .input-wrap {
   display: flex;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: #1f2937;
-  border-top: 1px solid #374151;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-md);
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-subtle);
+  justify-content: center;
 }
 
 input {
   flex: 1;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid #4b5563;
-  border-radius: 0.7rem;
-  background: #374151;
-  color: #fff;
+  max-width: 900px;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  transition: all var(--transition-fast);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 input::placeholder {
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 button {
-  padding: 0.65rem 1rem;
-  border: 1px solid #3b82f6;
-  background: #3b82f6;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  background: var(--accent-blue);
   color: white;
-  border-radius: 0.7rem;
-  font-weight: 600;
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 4rem;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-blue-hover);
+  transform: translateY(-1px);
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 </style>
