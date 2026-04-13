@@ -3,9 +3,11 @@ from dotenv import load_dotenv
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph_supervisor import create_supervisor
 from typing import Any
+
+from langgraph.checkpoint.postgres import PostgresSaver
+import psycopg
 
 from agent.agents.overview  import create_overview_agent
 from agent.agents.tasks     import create_tasks_agent
@@ -32,7 +34,7 @@ mlflow.set_experiment("Redmine Agent")
 mlflow.openai.autolog()
 
 client = OpenAI(
-    base_url=os.getenv("https://openrouter.ai/api/v1"),
+    base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
     api_key=os.getenv("OPENROUTER_API_KEY")
 )
 
@@ -109,15 +111,22 @@ def create_app():
         print("Error loading prompt from Langfuse:", e)
         raise
 
+    postgres_url = os.getenv("POSTGRES_URL")
+    if not postgres_url:
+        raise ValueError("POSTGRES_URL is not set in .env")
+
+    conn = psycopg.connect(postgres_url, autocommit=True)
+    checkpointer = PostgresSaver(conn)
+    checkpointer.setup()                    # Creates tables automatically
+
     workflow = create_supervisor(
         [overview_agent, tasks_agent, planning_agent, report_agent],
         model=llm,
         prompt=SUPERVISOR_PROMPT,
-        output_mode="last_message" 
+        output_mode="last_message"
     )
-    memory = InMemorySaver()
-    app = workflow.compile(checkpointer=memory)
 
+    app = workflow.compile(checkpointer=checkpointer)
     return app
 
 _app = None

@@ -1,66 +1,28 @@
 version: '3.8'
 
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: redmine-chat-assist-backend
+  chatbot-postgres:
+    image: postgres:16
+    container_name: chatbot-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: redmine_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - REDMINE_URL=${REDMINE_URL:-http://redmine:3000}
-      - REDMINE_API_KEY=${REDMINE_API_KEY}
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      - redmine
-    networks:
-      - redmine-network
-    restart: unless-stopped
+      - "5433:5432"                    # Different port from Langfuse
+    volumes:
+      - chatbot_postgres_data:/var/lib/postgresql/data
 
-  # Redmine service for local development
-  redmine:
-    image: redmine:5.1.2
-    container_name: redmine-server
+  chatbot-redis:
+    image: redis:7
+    container_name: chatbot-redis
+    restart: always
     ports:
-      - "${REDMINE_PORT:-3000}:3000"
-    environment:
-      - REDMINE_DB_POSTGRES=postgres
-      - REDMINE_DB_USERNAME=${POSTGRES_USER:-redmine}
-      - REDMINE_DB_PASSWORD=${POSTGRES_PASSWORD:-redmine}
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE:-changeMe}
+      - "6380:6379"                    # Different port from Langfuse
     volumes:
-      - redmine-data:/usr/src/redmine/files
-    depends_on:
-      - postgres
-    networks:
-      - redmine-network
-    restart: unless-stopped
-
-  # PostgreSQL database for Redmine
-  postgres:
-    image: postgres:15-alpine
-    container_name: redmine-postgres
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB:-redmine}
-      - POSTGRES_USER=${POSTGRES_USER:-redmine}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-redmine}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - redmine-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U redmine"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - chatbot_redis_data:/data
 
 volumes:
-  redmine-data:
-  postgres-data:
-
-networks:
-  redmine-network:
-    driver: bridge
+  chatbot_postgres_data:
+  chatbot_redis_data:

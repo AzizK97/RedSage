@@ -3,6 +3,8 @@ import requests
 from datetime import date
 from langchain_core.tools import tool
 
+from agent.cache import get_cached, set_cached
+
 # ── HTTP Helper ────────────────────────────────────────────────────────────────
 
 def _get(endpoint: str, params: dict | None = None) -> dict:
@@ -48,14 +50,21 @@ def _as_str_id(value):
 # ── Read Tools ─────────────────────────────────────────────────────────────────
 
 @tool
-def get_projects() -> dict:
+async def get_projects() -> dict:
     """
     Retrieve all available Redmine projects.
     Use this tool when the user asks about available projects,
     or when you need to resolve a project name to its identifier.
     """
+
+    cache_key = "redmine:projects"
+    cached = await get_cached(cache_key)
+
+    if cached:
+        return cached
+
     data = _get("/projects.json", {"limit": 100})
-    return {
+    result = {
         "total_count": data.get("total_count", 0),
         "projects": [
             {
@@ -67,6 +76,9 @@ def get_projects() -> dict:
             for p in data.get("projects", [])
         ]
     }
+
+    await set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
+    return result
 
 
 @tool
@@ -92,6 +104,7 @@ def get_issues(
         version_id:     Sprint/version ID (string or integer)
         limit:          Max results to return (default 50)
     """
+
     params: dict = {
         "project_id": project_id,
         "status_id":  _as_str_id(status_id),
@@ -107,7 +120,7 @@ def get_issues(
         params["fixed_version_id"] = _as_str_id(version_id)
 
     data = _get("/issues.json", params)
-    return {
+    result =  {
         "total_count": data.get("total_count", 0),
         "issues": [
             {
@@ -124,6 +137,9 @@ def get_issues(
         ]
     }
 
+    return result
+
+
 
 @tool
 def get_members(project_id: str) -> dict:
@@ -134,8 +150,9 @@ def get_members(project_id: str) -> dict:
     Args:
         project_id: Project identifier  e.g. 'ai-chatbot-platform'
     """
+
     data = _get(f"/projects/{project_id}/memberships.json")
-    return {
+    result = {
         "total_count": len(data.get("memberships", [])),
         "members": [
             {
@@ -147,7 +164,7 @@ def get_members(project_id: str) -> dict:
             if "user" in m
         ]
     }
-
+    return result
 
 @tool
 def get_versions(project_id: str) -> dict:
@@ -158,6 +175,7 @@ def get_versions(project_id: str) -> dict:
     Args:
         project_id: Project identifier  e.g. 'ai-chatbot-platform'
     """
+
     data  = _get(f"/projects/{project_id}/versions.json")
     today = date.today().isoformat()
 
@@ -166,7 +184,7 @@ def get_versions(project_id: str) -> dict:
             return value
         return None
 
-    return {
+    result = {
         "total_count": len(data.get("versions", [])),
         "versions": [
             {
@@ -183,6 +201,8 @@ def get_versions(project_id: str) -> dict:
             for v in data.get("versions", [])
         ]
     }
+
+    return result
 
 
 @tool
