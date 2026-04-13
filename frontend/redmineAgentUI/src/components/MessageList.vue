@@ -16,9 +16,12 @@ const md = new MarkDownIt({
   breaks: true,
 });
 
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString();
-}
+// function formatTime(ts: number) {
+//   return new Date(ts).toLocaleTimeString("en-US", {
+//     hour: "2-digit",
+//     minute: "2-digit",
+//   });
+// }
 
 function renderMarkdown(text: string) {
   const raw = md.render(text || "");
@@ -42,6 +45,8 @@ watch(
 onMounted(() => {
   scrollToBottom();
 });
+
+
 </script>
 
 <template>
@@ -55,7 +60,8 @@ onMounted(() => {
       <div class="bubble">
         <p v-if="msg.role === 'user'" class="text">{{ msg.content }}</p>
         <div v-else class="md-content" v-html="renderMarkdown(msg.content)"></div>
-        <small>{{ formatTime(msg.timestamp) }}</small>
+        
+        <!-- <small>{{ formatTime(msg.timestamp) }}</small> -->
       </div>
     </div>
   </div>
@@ -65,12 +71,11 @@ onMounted(() => {
 .list {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-lg);
+  padding-inline: 47vh;
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  max-width: 1300px;
   margin: 0 auto;
   width: 100%;
 }
@@ -89,21 +94,20 @@ onMounted(() => {
 }
 
 .bubble {
-  max-width: 70%;
+  max-width: 100%;
   padding: var(--space-md) var(--space-lg);
-  border-radius: var(--radius-lg);
   word-wrap: break-word;
 }
 
 .row.user .bubble {
-  background: #0042ac;
+  background: #252525;
+  border-radius: 20px;
   color: white;
 }
 
 .row.assistant .bubble {
-  background: var(--bg-secondary);
+  width: 100%;
   color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
 }
 
 small {
@@ -120,7 +124,7 @@ small {
 }
 
 :deep(.md-content) {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   line-height: 1.6;
 }
 
@@ -151,7 +155,6 @@ small {
   border-collapse: collapse;
   margin: var(--space-md) 0;
   background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   overflow: hidden;
   font-size: var(--text-xs);
@@ -162,13 +165,13 @@ small {
   padding: var(--space-md);
   text-align: left;
   font-weight: 600;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--bg-tertiary);
   color: var(--text-primary);
 }
 
 :deep(.md-content td) {
   padding: var(--space-md);
-  border-bottom: 1px solid var(--border-subtle);
+  border: 1px solid var(--bg-tertiary);
   color: var(--text-primary);
 }
 
@@ -177,7 +180,7 @@ small {
   color: var(--accent-green);
   padding: 0.125rem 0.375rem;
   border-radius: var(--radius-sm);
-  font-family: 'Monaco', 'Courier New', monospace;
+  font-family: 'Montserrat', 'Courier New', monospace;
   font-size: 0.85em;
 }
 
