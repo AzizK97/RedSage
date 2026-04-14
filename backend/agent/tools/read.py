@@ -50,18 +50,18 @@ def _as_str_id(value):
 # ── Read Tools ─────────────────────────────────────────────────────────────────
 
 @tool
-async def get_projects() -> dict:
+def get_projects() -> dict:
     """
     Retrieve all available Redmine projects.
     Use this tool when the user asks about available projects,
     or when you need to resolve a project name to its identifier.
     """
 
-    cache_key = "redmine:projects"
-    cached = await get_cached(cache_key)
+    # cache_key = "redmine:projects"
+    # cached = await get_cached(cache_key)
 
-    if cached:
-        return cached
+    # if cached:
+    #     return cached
 
     data = _get("/projects.json", {"limit": 100})
     result = {
@@ -77,7 +77,7 @@ async def get_projects() -> dict:
         ]
     }
 
-    await set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
+    # await set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
     return result
 
 

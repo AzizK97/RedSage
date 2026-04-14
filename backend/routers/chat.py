@@ -4,7 +4,13 @@ from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, Literal, Optional
 import json
 
-from agent.supervisor import chat_stream, get_app, chat_with_interrupts, build_invoke_config
+from agent.supervisor import (
+    chat_stream, 
+    get_app, 
+    chat_with_interrupts, 
+    build_invoke_config,
+    delete_thread_memory
+)
 from langgraph.types import Command
 
 router = APIRouter(prefix="/api", tags=["chat"])
@@ -197,6 +203,54 @@ async def approve_endpoint(thread_id: str, request: ApproveRequest):
     except Exception as e:
         _raise_http_from_exception(e)
 
+@router.delete("/chat/thread/{thread_id}")
+async def delete_thread_endpoint(thread_id: str):
+    """Delete a thread's entire checkpoint history from PostgreSQL."""
+    try:
+        print(f"🗑️ Delete endpoint called for thread: {thread_id}")
+        delete_thread_memory(thread_id)
+        print(f"✅ Successfully deleted thread: {thread_id}")
+        return {
+            "status": "deleted",
+            "thread_id": thread_id,
+            "message": f"Thread {thread_id} checkpoint purged from database"
+        }
+    except Exception as e:
+        print(f"❌ Delete failed for thread {thread_id}: {e}")
+        _raise_http_from_exception(e)
+
+@router.get("/chat/thread/{thread_id}/exists")
+async def check_thread_endpoint(thread_id: str):
+    """Diagnostic endpoint: Check if a thread has checkpoints in PostgreSQL."""
+    import os
+    import psycopg
+    
+    postgres_url = os.getenv("POSTGRES_URL")
+    if not postgres_url:
+        raise HTTPException(status_code=500, detail="POSTGRES_URL not configured")
+    
+    try:
+        with psycopg.connect(postgres_url) as conn:
+            with conn.cursor() as cur:
+                # Query the checkpoints table to see if thread exists
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM checkpoints 
+                    WHERE thread_id = %s
+                    """,
+                    (thread_id,)
+                )
+                count = cur.fetchone()[0]
+                
+                return {
+                    "thread_id": thread_id,
+                    "exists": count > 0,
+                    "checkpoint_count": count,
+                    "message": f"Thread has {count} checkpoint(s)" if count > 0 
+                            else "Thread has no checkpoints"
+                }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.get("/health")
 async def health():

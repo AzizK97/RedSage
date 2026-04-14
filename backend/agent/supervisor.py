@@ -88,7 +88,7 @@ def create_llm() -> ChatOpenAI:
         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
         openai_api_base="https://openrouter.ai/api/v1",
         temperature=0,
-        max_tokens=700
+        max_tokens=800
     )
 
 def create_app():
@@ -123,7 +123,10 @@ def create_app():
         [overview_agent, tasks_agent, planning_agent, report_agent],
         model=llm,
         prompt=SUPERVISOR_PROMPT,
-        output_mode="last_message"
+        output_mode="last_message",
+        add_handoff_messages=False,           # Disable automatic handoff messages
+        add_handoff_back_messages=False,      # Disable handoff back messages
+        handoff_tool_prefix=None,
     )
 
     app = workflow.compile(checkpointer=checkpointer)
@@ -138,6 +141,28 @@ def get_app():
         _app = create_app()
     return _app
 
+def delete_thread_memory(thread_id: str)-> None:
+    """
+    Permanently delete all checkpoints for a thread from PostgreSQL.
+    This removes all conversation history and state for that thread_id.
+    """
+    posgres_url = os.getenv("POSTGRES_URL")
+    if not posgres_url:
+        raise ValueError("POSTGRES_URL is not set in .env")
+    
+    print(f"[DELETE_THREAD] Starting deletion for thread_id={thread_id}")
+    
+    try:
+        with psycopg.connect(posgres_url, autocommit=True) as conn:
+            checkpointer = PostgresSaver(conn)
+            
+            # Delete the thread
+            checkpointer.delete_thread(thread_id)
+            
+            print(f"[DELETE_THREAD] ✅ Successfully deleted thread_id={thread_id} from PostgreSQL")
+    except Exception as e:
+        print(f"[DELETE_THREAD] ❌ Error deleting thread_id={thread_id}: {str(e)}")
+        raise
 
 def _invoke_chat(question: str, thread_id: str) -> Any:
     app = get_app()

@@ -1,5 +1,6 @@
 import { computed, ref } from "vue";
 import type { Message } from "../types";
+import { callDeleteThreadAPI } from "../api/client";
 
 export interface ConversationSummary {
   id: string;
@@ -160,32 +161,49 @@ export function useThreads() {
     persistState();
   }
 
-  function deleteThread(threadId: string) {
-    conversations.value = conversations.value.filter((conversation) => conversation.id !== threadId);
-
-    const nextMessages = { ...messagesByThread.value };
-    delete nextMessages[threadId];
-    messagesByThread.value = nextMessages;
-
-    if (activeThreadId.value === threadId) {
-      if (conversations.value.length > 0) {
-        activeThreadId.value = conversations.value[0].id;
-      } else {
-        const newId = crypto.randomUUID();
-        activeThreadId.value = newId;
-        conversations.value = [
-          {
-            id: newId,
-            title: "New conversation",
-            preview: "No messages yet",
-            updatedAt: Date.now(),
-          },
-        ];
-        messagesByThread.value[newId] = [];
-      }
+  async function deleteThread(threadId: string) {
+    // First attempt backend deletion
+    let deleteSuccess = false;
+    try {
+      console.log(`[deleteThread] Calling backend DELETE for thread: ${threadId}`);
+      await callDeleteThreadAPI(threadId);
+      console.log(`[deleteThread] ✅ Backend delete successful for thread: ${threadId}`);
+      deleteSuccess = true;
+    } catch (error) {
+      console.error(`[deleteThread] ❌ Backend delete failed for thread ${threadId}:`, error);
+      // Re-throw to let component handle the error
+      throw new Error(`Failed to delete thread on server: ${error instanceof Error ? error.message : String(error)}`);
     }
 
-    persistState();
+    // Only remove from local state if backend deletion succeeded
+    if (deleteSuccess) {
+      conversations.value = conversations.value.filter((conversation) => conversation.id !== threadId);
+
+      const nextMessages = { ...messagesByThread.value };
+      delete nextMessages[threadId];
+      messagesByThread.value = nextMessages;
+
+      if (activeThreadId.value === threadId) {
+        if (conversations.value.length > 0) {
+          activeThreadId.value = conversations.value[0].id;
+        } else {
+          const newId = crypto.randomUUID();
+          activeThreadId.value = newId;
+          conversations.value = [
+            {
+              id: newId,
+              title: "New conversation",
+              preview: "No messages yet",
+              updatedAt: Date.now(),
+            },
+          ];
+          messagesByThread.value[newId] = [];
+        }
+      }
+
+      persistState();
+      console.log(`[deleteThread] ✅ Local state cleaned for thread: ${threadId}`);
+    }
   }
 
   return {

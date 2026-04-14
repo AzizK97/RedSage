@@ -57,7 +57,7 @@ function selectConversation(threadId: string) {
   setActiveThread(threadId);
 }
 
-function removeConversation(threadId: string) {
+async function removeConversation(threadId: string) {
   const conversation = conversations.value.find((item) => item.id === threadId);
   const label = conversation?.title ?? "this conversation";
 
@@ -65,7 +65,14 @@ function removeConversation(threadId: string) {
     return;
   }
 
-  deleteThread(threadId);
+  try {
+    await deleteThread(threadId);
+    console.log(`✅ Conversation "${label}" deleted successfully`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`❌ Failed to delete conversation "${label}":`, errorMsg);
+    alert(`Failed to delete conversation: ${errorMsg}`);
+  }
 }
 </script>
 

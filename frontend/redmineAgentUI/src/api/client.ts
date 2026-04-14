@@ -48,4 +48,25 @@ async function callApproveAPI(thread_id: string, payload: ApproveRequest): Promi
     }
 }
 
-export { callChatAPI, callApproveAPI }
+async function callDeleteThreadAPI(thread_id: string): Promise<{ status: string; thread_id: string }>{
+    try{
+        const response = await fetch(`${BASE_API}/chat/thread/${thread_id}`,{
+            method: "DELETE",
+            headers:{
+                "Content-Type": "application/json" 
+            }
+        });
+
+        if (!response.ok){
+            const errorText = await response.text();
+            throw new Error(`API error: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+    } catch (error){
+        console.error("Error calling delete thread API:", error);
+        throw error;
+    }
+}
+
+export { callChatAPI, callApproveAPI, callDeleteThreadAPI }
