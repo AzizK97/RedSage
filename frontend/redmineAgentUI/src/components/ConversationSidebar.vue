@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { ConversationSummary } from "../composables/useThreads";
-import { MoreVertical, Trash } from '@lucide/vue';
+import { 
+  MoreVertical, 
+  Trash, 
+  ChevronsLeft, 
+  Plus
+} from '@lucide/vue';
 
 const props = defineProps<{
   conversations: ConversationSummary[];
@@ -15,6 +20,8 @@ const emit = defineEmits<{
 }>();
 
 const openMenu = ref<string | null>(null);
+
+const isCollapsed = ref(false)
 
 function groupConversationsByTime(conversations: ConversationSummary[]) {
   const now = Date.now();
@@ -65,24 +72,19 @@ function handleRename(threadId: string) {
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside :class="{ sidebar: true, collapsed: isCollapsed }">
     <div class="sidebar-header">
-      <div>
+      <div v-show="!isCollapsed" class="header-content">
         <h2>All chats</h2>
       </div>
       <div class="header-actions">
         <button class="new-btn" @click="emit('new')" aria-label="Create new conversation">
-          New
+          <Plus/>
         </button>
-        <!-- <button class="dropdown-toggle">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button> -->
       </div>
     </div>
 
-    <div class="conversation-list">
+    <div v-show="!isCollapsed" class="conversation-list">
       <template v-for="(group, key) in groupConversationsByTime(props.conversations)" :key="key">
         <div v-if="group.length > 0" class="conversation-group">
           <div class="group-label">
@@ -138,11 +140,18 @@ function handleRename(threadId: string) {
         </div>
       </template>
     </div>
+
+    <div class="sidebar-footer">
+      <button @click="isCollapsed = !isCollapsed" class="collapse-btn">
+        <ChevronsLeft :class="{ rotated: isCollapsed }" />
+      </button>
+    </div>
   </aside>
 </template>
 
 <style scoped>
 .sidebar {
+  position: relative;
   width: 280px;
   min-width: 280px;
   height: 100%;
@@ -152,14 +161,41 @@ function handleRename(threadId: string) {
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--border-subtle);
+  transition: width 280ms ease, min-width 280ms ease;
+}
+
+.sidebar.collapsed {
+  width: 70px;
+  min-width: 70px;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+
+.sidebar.collapsed .header-actions {
+  flex: 1;
+  justify-content: center;
+  margin-left: 0;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  padding: var(--space-sm);
 }
 
 .sidebar-header {
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-md);
+}
+
+.header-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  transition: max-width 240ms ease, opacity 180ms ease, transform 240ms ease;
 }
 
 h2 {
@@ -194,14 +230,15 @@ h2 {
 .new-btn {
   border: none;
   background: #d94a3a;
+  width: 36px;
+  height: 36px;
   color: white;
-  border-radius: var(--radius-md);
-  padding: var(--space-xs) var(--space-md);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: var(--text-xs);
-  font-weight: 500;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
+  transition: transform 180ms ease, background-color 180ms ease, opacity 180ms ease;
 }
 
 .new-btn:hover {
@@ -209,6 +246,8 @@ h2 {
 }
 
 .conversation-list {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -240,7 +279,7 @@ h2 {
   align-items: center;
   justify-content: space-between;
   border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  transition: background-color 180ms ease, transform 180ms ease, padding 180ms ease;
   padding: var(--space-sm);
 }
 
@@ -264,7 +303,7 @@ h2 {
   align-items: center;
   gap: var(--space-sm);
   font-size: var(--text-sm);
-  transition: all var(--transition-fast);
+  transition: gap 240ms ease, padding 240ms ease, opacity 180ms ease, transform 240ms ease;
   min-width: 0;
 }
 
@@ -275,6 +314,7 @@ h2 {
   color: var(--text-primary);
   font-size: var(--text-sm);
   font-weight: 400;
+  transition: opacity 180ms ease, transform 240ms ease, max-width 240ms ease;
 }
 
 .menu-container {
@@ -291,7 +331,7 @@ h2 {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  transition: opacity 180ms ease, transform 180ms ease, background-color 180ms ease, color 180ms ease;
 }
 
 .menu-btn:hover {
@@ -337,6 +377,24 @@ h2 {
   background: rgba(239, 68, 68, 0.1);
 }
 
+.collapse-btn {
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.collapse-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -353,4 +411,70 @@ h2 {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+.sidebar-footer {
+  padding: var(--space-md);
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  width: 100%;
+}
+
+/* .sidebar.collapsed .header-content,
+.sidebar.collapsed .conversation-title,
+.sidebar.collapsed .group-label,
+.sidebar.collapsed .menu-btn {
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+} */
+
+/* .sidebar.collapsed .header-content,
+.sidebar.collapsed .group-label {
+  max-width: 0;
+} */
+
+/* .sidebar.collapsed .conversation-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+} */
+
+/* .sidebar.collapsed .conversation-select {
+  padding-left: 0;
+  padding-right: 0;
+} */
+
+/* .sidebar.collapsed .menu-container {
+  width: 0;
+  overflow: hidden;
+} */
+
+.collapse-btn svg {
+  transition: transform 240ms ease-out;
+}
+
+.collapse-btn .rotated {
+  transform: rotate(180deg);
+}
+
+.sidebar.collapsed .new-btn {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    transform: translateX(-100%);
+  }
+
+  .sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+}
+
 </style>

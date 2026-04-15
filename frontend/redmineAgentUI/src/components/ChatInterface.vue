@@ -7,6 +7,7 @@ import ApprovalDialog from "./ApprovalDialog.vue";
 import { useChat } from "../composables/useChat";
 import { useThreads } from "../composables/useThreads";
 import type { ApproveRequest } from "../types";
+import { computed } from "vue";
 
 const {
   messages,
@@ -28,6 +29,8 @@ const {
   setActiveThread,
   deleteThread,
 } = useThreads();
+
+const isVirginChat = computed(()=> messages.value.length === 0);
 
 function onSend(text: string) {
   sendMessage(text);
@@ -89,31 +92,41 @@ async function removeConversation(threadId: string) {
     <div class="chat-panel">
       <Header />
 
-      <div class="chat-body">
-        <div class="thread-row">
-          <p class="thread">Thread: {{ threadId }}</p>
-          <p class="conversation-name">{{ currentConversation?.title ?? "New conversation" }}</p>
+      <div v-if="isVirginChat" class="virgin-shell">
+        <div class="virgin-center">
+          <h1 class="virgin-title">How can I help you today?</h1>
+          <MessageInput :disabled="isLoading || !!pendingInterrupt" @send="onSend" />
         </div>
-
-        <p v-if="error" class="error">{{ error }}</p>
-
-        <MessageList :messages="messages" />
-
-        <div v-if="isLoading && showLoadingStatus" class="agent-status" role="status" aria-live="polite">
-          <span class="status-dot" />
-          <span class="status-text">{{ loadingStatus }}</span>
-        </div>
-
-        <ApprovalDialog
-          :interrupt="pendingInterrupt"
-          :disabled="isLoading"
-          @approve="onApprove"
-          @reject="onReject"
-          @edit="onEdit"
-        />
       </div>
+      <template v-else>
+        <div class="chat-body">
+          <div class="thread-row">
+            <p class="thread">Thread: {{ threadId }}</p>
+            <p class="conversation-name">{{ currentConversation?.title ?? "New conversation" }}</p>
+          </div>
 
-      <MessageInput :disabled="isLoading || !!pendingInterrupt" @send="onSend" />
+          <p v-if="error" class="error">{{ error }}</p>
+
+          <MessageList :messages="messages" />
+
+          <div v-if="isLoading && showLoadingStatus" class="agent-status" role="status" aria-live="polite">
+            <span class="status-dot" />
+            <span class="status-text">{{ loadingStatus }}</span>
+          </div>
+
+          <ApprovalDialog
+            :interrupt="pendingInterrupt"
+            :disabled="isLoading"
+            @approve="onApprove"
+            @reject="onReject"
+            @edit="onEdit"
+          />
+        </div>
+
+        <div class="chat-input-docked">
+          <MessageInput :disabled="isLoading || !!pendingInterrupt" @send="onSend" />
+        </div>
+      </template>
     </div>
   </section>
 </template>
@@ -140,6 +153,34 @@ async function removeConversation(threadId: string) {
   overflow: hidden;
   padding: 0;
   gap: 0;
+}
+
+.virgin-shell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.virgin-center {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.virgin-title {
+  margin: 0;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: clamp(1.75rem, 2.6vw, 2.25rem);
+  font-weight: 600;
+}
+
+.chat-input-docked {
+  padding: 0 var(--space-md) var(--space-md);
 }
 
 .thread-row {

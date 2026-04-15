@@ -50,7 +50,7 @@ function submit() {
 .input-wrap {
   display: flex;
   justify-content: center;
-  padding-bottom: 1.5vw;
+  width: 100%;
 }
 
 .composer {
@@ -59,7 +59,7 @@ function submit() {
   gap: var(--space-sm);
   flex: 1;
   max-width: 760px;
-  padding: var(--space-sm);
+  padding: var(--space-md);
   border: 1px solid transparent;
   border-radius: 50px;
   background: var(--bg-secondary);
