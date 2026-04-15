@@ -22,22 +22,6 @@ from openai import OpenAI
 
 load_dotenv()
 
-#------- MLflow setup -------
-
-# Specify the tracking URI for the MLflow server.
-mlflow.set_tracking_uri("http://localhost:5000")
-
-# Specify the experiment you just created for your LLM application or AI agent.
-mlflow.set_experiment("Redmine Agent")
-
-# Enable automatic tracing for all OpenAI API calls.
-mlflow.openai.autolog()
-
-client = OpenAI(
-    base_url=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-    api_key=os.getenv("OPENROUTER_API_KEY")
-)
-
 #------- LangFuse setup -------
 
 langfuse = Langfuse()
@@ -124,9 +108,9 @@ def create_app():
         model=llm,
         prompt=SUPERVISOR_PROMPT,
         output_mode="last_message",
-        add_handoff_messages=False,           # Disable automatic handoff messages
-        add_handoff_back_messages=False,      # Disable handoff back messages
-        handoff_tool_prefix=None,
+        # add_handoff_messages=False,           # Disable automatic handoff messages
+        # add_handoff_back_messages=False,      # Disable handoff back messages
+        # handoff_tool_prefix=None,
     )
 
     app = workflow.compile(checkpointer=checkpointer)

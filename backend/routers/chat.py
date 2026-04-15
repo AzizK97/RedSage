@@ -251,8 +251,3 @@ async def check_thread_endpoint(thread_id: str):
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-@router.get("/health")
-async def health():
-    """Health check endpoint."""
-    return {"status": "ok"}

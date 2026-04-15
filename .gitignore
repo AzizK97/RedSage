@@ -5,3 +5,4 @@ __pycache__/
 *.pycbackend/mlflow.db
 mlflow.db
 backend/mlflow.db
+backend/data/monitoring.db
