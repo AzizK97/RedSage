@@ -1,9 +1,10 @@
 import os
 from dotenv import load_dotenv
+from langchain.agents import create_agent
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
-from langgraph_supervisor import create_supervisor
+from langchain_core.tools import tool
 from typing import Any
 
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -17,8 +18,8 @@ from agent.agents.report    import create_report_agent
 from langfuse import get_client, Langfuse
 from langfuse.langchain import CallbackHandler
 
-import mlflow
 from openai import OpenAI
+
 
 load_dotenv()
 
@@ -75,16 +76,68 @@ def create_llm() -> ChatOpenAI:
         max_tokens=1200
     )
 
+llm = create_llm()
+overview_agent  = create_overview_agent(llm)
+tasks_agent     = create_tasks_agent(llm)
+planning_agent  = create_planning_agent(llm)
+report_agent    = create_report_agent(llm)
+
+@tool
+def overview_tool(query: str) -> str:
+    """Use this when you need general project overviews, 
+    listing projects, comparisons, "biggest project", 
+    team info, high-level status. 
+    Returns clean markdown with tables."""
+
+    result = overview_agent.invoke({
+        "messages": [HumanMessage(content=query)]
+        })
+    messages = result.get("messages", []) if isinstance(result, dict) else getattr(result, "messages", [])
+    return messages[-1].content if messages else str(result)
+
+@tool 
+def planning_tool(query: str) -> str:
+    """Use this when you need to create or update project plans, 
+    timelines, milestones, roadmaps, dependencies. 
+    Returns clean markdown with tables."""
+
+    result = planning_agent.invoke({
+        "messages": [HumanMessage(content=query)]
+    })
+    messages = result.get('messages', []) if isinstance(result, dict) else getattr(result, "messages", [])
+    return messages[-1].content if messages else str(result)
+
+@tool
+def tasks_tool(query: str) -> str:
+    """Use this when you need to create, update, or list tasks, 
+    epics, issues, tickets. Also for task-level details or status. 
+    Returns clean markdown with tables."""
+
+    result = tasks_agent.invoke({
+        "messages": [HumanMessage(content=query)]
+    })
+    messages = result.get('messages', []) if isinstance(result, dict) else getattr(result, "messages", [])
+    return messages[-1].content if messages else str(result)
+
+@tool
+def report_tool(query: str) -> str:
+    """Use this when you need to generate reports, summaries, 
+    insights, or recommendations based on project data. 
+    Good for retrospectives, reviews, or high-level analysis. 
+    Returns clean markdown with tables."""
+
+    result = report_agent.invoke({
+        "messages": [HumanMessage(content=query)]
+    })
+    messages = result.get('messages', []) if isinstance(result, dict) else getattr(result, "messages", [])
+    return messages[-1].content if messages else str(result)
+
+
 def create_app():
     """
     Build and compile the full supervisor multi-agent application.
     Returns a compiled LangGraph app ready to invoke.
     """
-    llm = create_llm()
-    overview_agent  = create_overview_agent(llm)
-    tasks_agent     = create_tasks_agent(llm)
-    planning_agent  = create_planning_agent(llm)
-    report_agent    = create_report_agent(llm)
 
     try:
         compiled_prompt = Langfuse().get_prompt("supervisor", label="production").compile()
@@ -101,20 +154,17 @@ def create_app():
 
     conn = psycopg.connect(postgres_url, autocommit=True)
     checkpointer = PostgresSaver(conn)
-    checkpointer.setup()                    # Creates tables automatically
+    checkpointer.setup()                    
 
-    workflow = create_supervisor(
-        [overview_agent, tasks_agent, planning_agent, report_agent],
+    supervisor_agent = create_agent(
         model=llm,
-        prompt=SUPERVISOR_PROMPT,
-        output_mode="last_message",
-        # add_handoff_messages=False,           # Disable automatic handoff messages
-        # add_handoff_back_messages=False,      # Disable handoff back messages
-        # handoff_tool_prefix=None,
+        tools=[overview_tool, planning_tool, tasks_tool, report_tool],
+        system_prompt=SUPERVISOR_PROMPT,
+        checkpointer=checkpointer,
+        #recursion_limit=25
     )
 
-    app = workflow.compile(checkpointer=checkpointer)
-    return app
+    return supervisor_agent
 
 _app = None
 

@@ -7,7 +7,7 @@ import ApprovalDialog from "./ApprovalDialog.vue";
 import { useChat } from "../composables/useChat";
 import { useThreads } from "../composables/useThreads";
 import type { ApproveRequest } from "../types";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const {
   messages,
@@ -31,6 +31,16 @@ const {
 } = useThreads();
 
 const isVirginChat = computed(()=> messages.value.length === 0);
+const virginDraft = ref("");
+const starterSuggestions = [
+  "Give me a list of all the projects",
+  "List high-priority issues assigned to me",
+  "Summarize overdue tasks and next actions",
+];
+
+function setSuggestionDraft(suggestion: string) {
+  virginDraft.value = suggestion;
+}
 
 function onSend(text: string) {
   sendMessage(text);
@@ -95,7 +105,23 @@ async function removeConversation(threadId: string) {
       <div v-if="isVirginChat" class="virgin-shell">
         <div class="virgin-center">
           <h1 class="virgin-title">How can I help you today?</h1>
-          <MessageInput :disabled="isLoading || !!pendingInterrupt" @send="onSend" />
+          <div class="suggestions" role="list" aria-label="Suggested prompts">
+            <button
+              v-for="suggestion in starterSuggestions"
+              :key="suggestion"
+              type="button"
+              class="suggestion-chip"
+              :disabled="isLoading || !!pendingInterrupt"
+              @click="setSuggestionDraft(suggestion)"
+            >
+              {{ suggestion }}
+            </button>
+          </div>
+          <MessageInput
+            v-model="virginDraft"
+            :disabled="isLoading || !!pendingInterrupt"
+            @send="onSend"
+          />
         </div>
       </div>
       <template v-else>
@@ -169,6 +195,36 @@ async function removeConversation(threadId: string) {
   flex-direction: column;
   align-items: center;
   gap: var(--space-lg);
+}
+
+.suggestions {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: center;
+}
+
+.suggestion-chip {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.suggestion-chip:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+.suggestion-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .virgin-title {

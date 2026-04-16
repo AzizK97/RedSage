@@ -1,16 +1,29 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { Send } from '@lucide/vue';
 
 const props = defineProps<{
   disabled: boolean;
+  modelValue?: string;
 }>();
 
 const emit = defineEmits<{
   (e: "send", text: string): void;
+  (e: "update:modelValue", value: string): void;
 }>();
 
-const text = ref("");
+const internalText = ref("");
+
+const text = computed({
+  get: () => props.modelValue ?? internalText.value,
+  set: (value: string) => {
+    if (props.modelValue !== undefined) {
+      emit("update:modelValue", value);
+      return;
+    }
+    internalText.value = value;
+  },
+});
 
 function submit() {
   const value = text.value.trim();
