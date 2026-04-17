@@ -1,8 +1,29 @@
-backend/.env
+# Secrets
 .env
-venv
+.env.*
+!.env.example
+
+# Python
+venv/
+.venv/
 __pycache__/
-*.pycbackend/mlflow.db
-mlflow.db
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local data/artifacts
+*.db
 backend/mlflow.db
 backend/data/monitoring.db
+*.log
+
+# Frontend artifacts
+frontend/redmineAgentUI/node_modules/
+frontend/redmineAgentUI/dist/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
