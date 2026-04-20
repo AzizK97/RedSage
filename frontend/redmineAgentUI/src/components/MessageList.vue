@@ -71,13 +71,14 @@ onMounted(() => {
 .list {
   flex: 1;
   overflow-y: auto;
-  padding-inline: 47vh;
+  padding: 0 var(--space-md);
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   margin: 0 auto;
-  width: 100%;
+  width: min(100%, 850px);
+  min-width: 640px;
 }
 
 .row {
@@ -215,6 +216,8 @@ small {
 
 @media (max-width: 768px) {
   .list {
+    width: 100%;
+    min-width: 0;
     padding: var(--space-md);
   }
   

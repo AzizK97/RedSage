@@ -16,6 +16,12 @@ def create_overview_agent(llm: ChatOpenAI):
         OVERVIEW_PROMPT = "\n".join(
             m["content"] for m in compiled_prompt if m.get("role") == "system"
         )
+        OVERVIEW_PROMPT += "\n\n"
+        OVERVIEW_PROMPT += (
+            "Mandatory project resolution rule: when the user mentions a project by name and asks for members, "
+            "you must call get_projects first to resolve the exact project identifier, then call get_members with that identifier. "
+            "If members are empty, try the resolved identifier once before concluding no data."
+        )
     except Exception as e:
         print("Error loading prompt from Langfuse:", e)
         raise

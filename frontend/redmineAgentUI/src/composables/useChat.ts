@@ -1,15 +1,15 @@
-import { callChatAPI, callApproveAPI } from '../api/client';
+import { callChatAPI, callApproveAPI, callThreadMessagesAPI } from '../api/client';
 import type { ApproveRequest, Message } from '../types/index';
 import { ref, watch, type Ref } from 'vue';
-import { useThreads } from './useThreads';
+import type { ThreadsStore } from './useThreads';
 
 function pushMessage(messages: Ref<Message[]>, role: "user" | "assistant", content: string) {
     messages.value.push({ role, content, timestamp: Date.now() });
 }
 
-export function useChat() {
+export function useChat(token: string, threadsStore: ThreadsStore) {
 
-    const { activeThreadId, currentConversation, getMessages, saveMessages } = useThreads();
+    const { activeThreadId, currentConversation, getMessages, saveMessages, createThread } = threadsStore;
 
     const messages: Ref<Message[]> = ref(getMessages(activeThreadId.value));
     const threadId = activeThreadId;
@@ -19,6 +19,7 @@ export function useChat() {
     const loadingStatus: Ref<string> = ref("");
     const showLoadingStatus: Ref<boolean> = ref(false);
     let loadingTimer: ReturnType<typeof setInterval> | null = null;
+    let selectionVersion = 0;
 
     function buildLoadingSteps(text: string): string[] {
         const q = text.toLowerCase();
@@ -68,9 +69,29 @@ export function useChat() {
     watch(
         activeThreadId,
         (nextThreadId) => {
-            messages.value = getMessages(nextThreadId);
+            const currentSelection = ++selectionVersion;
+            const localMessages = getMessages(nextThreadId);
+            messages.value = localMessages;
             pendingInterrupt.value = null;
             error.value = null;
+
+            if (!nextThreadId || localMessages.length > 0) {
+                return;
+            }
+
+            void (async () => {
+                try {
+                    const remoteMessages = await callThreadMessagesAPI(nextThreadId, token);
+                    if (currentSelection !== selectionVersion) return;
+
+                    if (Array.isArray(remoteMessages) && remoteMessages.length > 0) {
+                        saveMessages(nextThreadId, remoteMessages);
+                        messages.value = remoteMessages;
+                    }
+                } catch {
+                    // Keep local empty state if backend history retrieval fails.
+                }
+            })();
         },
         { immediate: true },
     );
@@ -87,14 +108,24 @@ export function useChat() {
         error.value = null;
         isLoading.value = true;
         const beforeCount = messages.value.length;
-        const currentThreadId = threadId.value;
+        let currentThreadId = threadId.value;
+
+        if (!currentThreadId) {
+            try {
+                currentThreadId = await createThread();
+            } catch (err: any) {
+                error.value = err?.message || "Failed to create conversation";
+                isLoading.value = false;
+                return;
+            }
+        }
 
         try{
             pushMessage(messages, "user", userText);
             saveMessages(currentThreadId, messages.value);
             startLoadingStatus(userText);
 
-            const response = await callChatAPI(userText, threadId.value);
+            const response = await callChatAPI(userText, currentThreadId, token);
             pushMessage(messages, "assistant", response.response);
             const hasInterruptPayload = Array.isArray(response.interrupts)
                 ? response.interrupts.length > 0
@@ -135,7 +166,7 @@ export function useChat() {
         const currentThreadId = threadId.value;
 
         try{
-            const response = await callApproveAPI(threadId.value, payload);
+            const response = await callApproveAPI(threadId.value, payload, token);
             pushMessage(messages, "assistant", response.response);
             pendingInterrupt.value = null;
 

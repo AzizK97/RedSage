@@ -9,6 +9,18 @@ import { useThreads } from "../composables/useThreads";
 import type { ApproveRequest } from "../types";
 import { computed, ref } from "vue";
 
+const props = defineProps<{
+  token: string;
+  storageScope: string;
+  role: "admin" | "project_manager";
+}>();
+
+const emit = defineEmits<{
+  (event: "logout"): void;
+}>();
+
+const threadsStore = useThreads(props.token, props.storageScope);
+
 const {
   messages,
   threadId,
@@ -20,7 +32,7 @@ const {
   error,
   sendMessage,
   submitDecision,
-} = useChat();
+} = useChat(props.token, threadsStore);
 
 const {
   conversations,
@@ -28,9 +40,9 @@ const {
   createThread,
   setActiveThread,
   deleteThread,
-} = useThreads();
+} = threadsStore;
 
-const isVirginChat = computed(()=> messages.value.length === 0);
+const isVirginChat = computed(() => conversations.value.length === 0 && !threadId.value);
 const virginDraft = ref("");
 const starterSuggestions = [
   "Give me a list of all the projects",
@@ -62,8 +74,8 @@ function onEdit(payload: { name: string; args: Record<string, any> }) {
   submitDecision(request);
 }
 
-function startNewConversation() {
-  createThread();
+async function startNewConversation() {
+  await createThread();
 }
 
 function selectConversation(threadId: string) {
@@ -87,6 +99,10 @@ async function removeConversation(threadId: string) {
     alert(`Failed to delete conversation: ${errorMsg}`);
   }
 }
+
+function logout() {
+  emit("logout");
+}
 </script>
 
 <template>
@@ -101,6 +117,10 @@ async function removeConversation(threadId: string) {
 
     <div class="chat-panel">
       <Header />
+      <div class="session-bar">
+        <span class="session-role">Signed in as {{ props.role }}</span>
+        <button type="button" class="logout-btn" @click="logout">Log out</button>
+      </div>
 
       <div v-if="isVirginChat" class="virgin-shell">
         <div class="virgin-center">
@@ -133,7 +153,25 @@ async function removeConversation(threadId: string) {
 
           <p v-if="error" class="error">{{ error }}</p>
 
-          <MessageList :messages="messages" />
+          <div v-if="messages.length === 0" class="empty-thread-shell">
+            <div class="empty-thread-center">
+              <h2 class="empty-thread-title">Start this conversation</h2>
+              <p class="empty-thread-subtitle">Send a message or pick a suggestion to continue.</p>
+              <div class="suggestions" role="list" aria-label="Suggested prompts">
+                <button
+                  v-for="suggestion in starterSuggestions"
+                  :key="`empty-${suggestion}`"
+                  type="button"
+                  class="suggestion-chip"
+                  :disabled="isLoading || !!pendingInterrupt"
+                  @click="setSuggestionDraft(suggestion)"
+                >
+                  {{ suggestion }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <MessageList v-else :messages="messages" />
 
           <div v-if="isLoading && showLoadingStatus" class="agent-status" role="status" aria-live="polite">
             <span class="status-dot" />
@@ -150,7 +188,11 @@ async function removeConversation(threadId: string) {
         </div>
 
         <div class="chat-input-docked">
-          <MessageInput :disabled="isLoading || !!pendingInterrupt" @send="onSend" />
+          <MessageInput
+            v-model="virginDraft"
+            :disabled="isLoading || !!pendingInterrupt"
+            @send="onSend"
+          />
         </div>
       </template>
     </div>
@@ -179,6 +221,29 @@ async function removeConversation(threadId: string) {
   overflow: hidden;
   padding: 0;
   gap: 0;
+}
+
+.session-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-lg) var(--space-sm);
+}
+
+.session-role {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.logout-btn {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+  font-size: var(--text-xs);
+  cursor: pointer;
 }
 
 .virgin-shell {
@@ -240,7 +305,10 @@ async function removeConversation(threadId: string) {
 }
 
 .thread-row {
-  display: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-md) var(--space-sm);
 }
 
 .thread {
@@ -253,6 +321,35 @@ async function removeConversation(threadId: string) {
   color: var(--text-primary);
   font-size: var(--text-sm);
   margin: 0;
+}
+
+.empty-thread-shell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.empty-thread-center {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.empty-thread-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 600;
+}
+
+.empty-thread-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 .error {
