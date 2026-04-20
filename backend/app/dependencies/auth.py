@@ -12,8 +12,6 @@ from app.repositories.entitlement_repository import EntitlementRepository
 @dataclass
 class CurrentUser:
     id: str
-    username: str
-    full_name: str
     redmine_user_id: int
     role: Role
     enabled: bool
@@ -49,13 +47,8 @@ def get_current_user(
         )
     
     enabled = ents.is_enabled(user["id"])
-    email = str(user.get("email", "")).strip()
-    username = email.split("@", 1)[0] if "@" in email else email or user["id"]
-
     return CurrentUser(
         id=user["id"],
-        username=username,
-        full_name=user.get("full_name", ""),
         redmine_user_id=user["redmine_user_id"],
         role=Role(user["platform_role"]),
         enabled=enabled
@@ -63,7 +56,7 @@ def get_current_user(
 
 def require_permission(permission: Permission):
     def _checker(current: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-        if current.role != Role.ADMIN and not current.enabled:
+        if not current.enabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access disabled by Admin"

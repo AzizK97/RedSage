@@ -37,11 +37,3 @@ def set_pm_access(
             status_code=400,
             detail=str(exc)
         ) from exc
-
-
-@router.get("/pm-candidates")
-def list_pm_candidates(
-    _: CurrentUser = Depends(require_permission(Permission.PM_ACCESS_MANAGE)),
-    db: Connection = Depends(get_db),
-):
-    return {"items": AdminService(db).list_pm_candidates()}

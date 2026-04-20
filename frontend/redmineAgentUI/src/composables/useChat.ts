@@ -1,15 +1,15 @@
-import { callChatAPI, callApproveAPI, callThreadMessagesAPI } from '../api/client';
+import { callChatAPI, callApproveAPI } from '../api/client';
 import type { ApproveRequest, Message } from '../types/index';
 import { ref, watch, type Ref } from 'vue';
-import type { ThreadsStore } from './useThreads';
+import { useThreads } from './useThreads';
 
 function pushMessage(messages: Ref<Message[]>, role: "user" | "assistant", content: string) {
     messages.value.push({ role, content, timestamp: Date.now() });
 }
 
-export function useChat(token: string, threadsStore: ThreadsStore) {
+export function useChat() {
 
-    const { activeThreadId, currentConversation, getMessages, saveMessages, createThread } = threadsStore;
+    const { activeThreadId, currentConversation, getMessages, saveMessages } = useThreads();
 
     const messages: Ref<Message[]> = ref(getMessages(activeThreadId.value));
     const threadId = activeThreadId;
@@ -19,7 +19,6 @@ export function useChat(token: string, threadsStore: ThreadsStore) {
     const loadingStatus: Ref<string> = ref("");
     const showLoadingStatus: Ref<boolean> = ref(false);
     let loadingTimer: ReturnType<typeof setInterval> | null = null;
-    let selectionVersion = 0;
 
     function buildLoadingSteps(text: string): string[] {
         const q = text.toLowerCase();
@@ -69,29 +68,9 @@ export function useChat(token: string, threadsStore: ThreadsStore) {
     watch(
         activeThreadId,
         (nextThreadId) => {
-            const currentSelection = ++selectionVersion;
-            const localMessages = getMessages(nextThreadId);
-            messages.value = localMessages;
+            messages.value = getMessages(nextThreadId);
             pendingInterrupt.value = null;
             error.value = null;
-
-            if (!nextThreadId || localMessages.length > 0) {
-                return;
-            }
-
-            void (async () => {
-                try {
-                    const remoteMessages = await callThreadMessagesAPI(nextThreadId, token);
-                    if (currentSelection !== selectionVersion) return;
-
-                    if (Array.isArray(remoteMessages) && remoteMessages.length > 0) {
-                        saveMessages(nextThreadId, remoteMessages);
-                        messages.value = remoteMessages;
-                    }
-                } catch {
-                    // Keep local empty state if backend history retrieval fails.
-                }
-            })();
         },
         { immediate: true },
     );
@@ -108,24 +87,14 @@ export function useChat(token: string, threadsStore: ThreadsStore) {
         error.value = null;
         isLoading.value = true;
         const beforeCount = messages.value.length;
-        let currentThreadId = threadId.value;
-
-        if (!currentThreadId) {
-            try {
-                currentThreadId = await createThread();
-            } catch (err: any) {
-                error.value = err?.message || "Failed to create conversation";
-                isLoading.value = false;
-                return;
-            }
-        }
+        const currentThreadId = threadId.value;
 
         try{
             pushMessage(messages, "user", userText);
             saveMessages(currentThreadId, messages.value);
             startLoadingStatus(userText);
 
-            const response = await callChatAPI(userText, currentThreadId, token);
+            const response = await callChatAPI(userText, threadId.value);
             pushMessage(messages, "assistant", response.response);
             const hasInterruptPayload = Array.isArray(response.interrupts)
                 ? response.interrupts.length > 0
@@ -166,7 +135,7 @@ export function useChat(token: string, threadsStore: ThreadsStore) {
         const currentThreadId = threadId.value;
 
         try{
-            const response = await callApproveAPI(threadId.value, payload, token);
+            const response = await callApproveAPI(threadId.value, payload);
             pushMessage(messages, "assistant", response.response);
             pendingInterrupt.value = null;
 

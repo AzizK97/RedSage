@@ -28,23 +28,6 @@ class ChatRequest(BaseModel):
     thread_id: str = "default"
 
 
-class CreateThreadResponse(BaseModel):
-    thread_id: str
-
-
-class ThreadSummary(BaseModel):
-    id: str
-    title: str
-    preview: str
-    updatedAt: float
-
-
-class ThreadMessage(BaseModel):
-    role: Literal["user", "assistant"]
-    content: str
-    timestamp: int
-
-
 class ChatResponse(BaseModel):
     response: str
     requires_human: bool = False
@@ -153,114 +136,19 @@ def _raise_http_from_exception(exc: Exception) -> None:
     raise HTTPException(status_code=500, detail=message)
 
 
-def _extract_thread_messages(state: Any) -> list[ThreadMessage]:
-    payload = state.values if hasattr(state, "values") else state
-
-    if isinstance(payload, dict):
-        raw_messages = payload.get("messages", [])
-    else:
-        raw_messages = getattr(payload, "messages", [])
-
-    extracted: list[ThreadMessage] = []
-    for idx, message in enumerate(raw_messages):
-        mtype = type(message).__name__.lower()
-        role = str(getattr(message, "type", "")).lower()
-
-        is_tool = "toolmessage" in mtype or role == "tool"
-        if is_tool:
-            continue
-
-        is_assistant = "aimessage" in mtype or role in {"ai", "assistant"}
-        is_user = "humanmessage" in mtype or role in {"human", "user"}
-
-        if is_assistant:
-            normalized_role: Literal["user", "assistant"] = "assistant"
-        elif is_user:
-            normalized_role = "user"
-        else:
-            continue
-
-        text = _message_content_to_text(message)
-        if not text:
-            continue
-
-        extracted.append(
-            ThreadMessage(
-                role=normalized_role,
-                content=text,
-                timestamp=idx,
-            )
-        )
-
-    return extracted
-
-
 def _enforce_thread_access(
         repo: ThreadRepository,
         thread_id: str,
         current_user: CurrentUser,
 ) -> None:
     repo.ensure_table()
+    repo.bind_owner_if_missing(thread_id, current_user.id)
     owner_id = repo.get_owner(thread_id)
 
     if owner_id is None:
         raise HTTPException(status_code=404, detail="Thread ownership not found")
     if current_user.role != Role.ADMIN and owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden: thread does not belong to current user")
-
-
-def _attach_user_identity_context(message: str, current_user: CurrentUser) -> str:
-    identity_block = (
-        "Authenticated user context:\n"
-        f"- username: {current_user.username}\n"
-        f"- full_name: {current_user.full_name or 'Unknown'}\n"
-        f"- platform_user_id: {current_user.id}\n"
-        f"- redmine_user_id: {current_user.redmine_user_id}\n"
-        f"- platform_role: {current_user.role.value}\n"
-        "Use this identity context for all references like 'me', 'my', 'mine', or 'our'."
-    )
-    return f"{identity_block}\n\nUser request:\n{message}"
-
-
-@router.post("/chat/thread", response_model=CreateThreadResponse)
-async def create_thread_endpoint(
-    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
-):
-    thread_repo = ThreadRepository(db)
-    thread_repo.ensure_table()
-    thread_id = thread_repo.create_thread(current.id)
-    return CreateThreadResponse(thread_id=thread_id)
-
-
-@router.get("/chat/threads", response_model=list[ThreadSummary])
-async def list_threads_endpoint(
-    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
-):
-    thread_repo = ThreadRepository(db)
-    thread_repo.ensure_table()
-    items = thread_repo.list_threads_for_owner(current.id)
-    return [ThreadSummary(**item) for item in items]
-
-
-@router.get("/chat/thread/{thread_id}/messages", response_model=list[ThreadMessage])
-async def get_thread_messages_endpoint(
-    thread_id: str,
-    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
-):
-    thread_repo = ThreadRepository(db)
-    _enforce_thread_access(thread_repo, thread_id, current)
-
-    app = get_app()
-    config = build_invoke_config(thread_id=thread_id, entrypoint="history")
-
-    try:
-        state = app.get_state(config)
-        return _extract_thread_messages(state)
-    except Exception as e:
-        _raise_http_from_exception(e)
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(
@@ -272,8 +160,7 @@ async def chat_endpoint(
     _enforce_thread_access(thread_repo, request.thread_id, current)
 
     try:
-        enriched_message = _attach_user_identity_context(request.message, current)
-        result = chat_with_interrupts(enriched_message, request.thread_id)
+        result = chat_with_interrupts(request.message, request.thread_id)
 
         interrupts = result["interrupts"]
         if interrupts:
@@ -285,11 +172,6 @@ async def chat_endpoint(
                 interrupts=pending
             )
 
-        thread_repo.update_thread_summary(
-            request.thread_id,
-            title=request.message[:42].strip() or "New conversation",
-            preview=result["response"][:70].strip() or "No messages yet",
-        )
         return ChatResponse(response=result["response"])
 
     except Exception as e:
@@ -310,8 +192,7 @@ async def chat_stream_endpoint(
     Streams the agent's thought process step by step.
     """
     def event_generator():
-        enriched_message = _attach_user_identity_context(request.message, current)
-        for event in chat_stream(enriched_message, request.thread_id):
+        for event in chat_stream(request.message, request.thread_id):
             yield f"data: {json.dumps(event)}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -357,12 +238,6 @@ async def approve_endpoint(
             config=config
         )
 
-        thread_repo.update_thread_summary(
-            thread_id,
-            title=f"Conversation {thread_id[:8]}",
-            preview=_extract_full_message_content(result)[:70],
-        )
-
         return {
             "status": request.decision_type,
             "response": _extract_full_message_content(result)
@@ -384,7 +259,6 @@ async def delete_thread_endpoint(
     try:
         print(f"🗑️ Delete endpoint called for thread: {thread_id}")
         delete_thread_memory(thread_id)
-        thread_repo.delete_thread(thread_id)
         print(f"✅ Successfully deleted thread: {thread_id}")
         return {
             "status": "deleted",

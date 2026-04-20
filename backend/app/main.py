@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.api.endpoints.chat import router as chat_router
 from app.api.endpoints.admin_users import router as admin_users_router
-from app.api.endpoints.auth import router as auth_router
 from app.core.config import settings
 
 # from monitoring.config import settings
@@ -57,7 +56,6 @@ app.add_middleware(
 
 app.include_router(chat_router)
 app.include_router(admin_users_router)
-app.include_router(auth_router)
 #app.include_router(monitoring_router)
 
 

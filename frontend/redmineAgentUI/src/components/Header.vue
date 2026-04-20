@@ -1,6 +1,6 @@
 <template>
   <header class="chat-header">
-    <h1 class="chat-title">RedSage</h1>
+    <h1 class="chat-title">Redmine Chat Assist</h1>
     <span class="chat-subtitle">AI Assistant</span>
   </header>
 </template>

@@ -93,38 +93,7 @@ def overview_tool(query: str) -> str:
         "messages": [HumanMessage(content=query)]
         })
     messages = result.get("messages", []) if isinstance(result, dict) else getattr(result, "messages", [])
-
-    if not messages:
-        return str(result)
-
-    for message in reversed(messages):
-        message_type = type(message).__name__.lower()
-        role = str(getattr(message, "type", "")).lower()
-
-        is_tool = "toolmessage" in message_type or role == "tool"
-        is_ai = "aimessage" in message_type or role in {"ai", "assistant"}
-        if is_tool or not is_ai:
-            continue
-
-        content = getattr(message, "content", "")
-        text = ""
-        if isinstance(content, list):
-            parts: list[str] = []
-            for item in content:
-                if isinstance(item, dict):
-                    value = item.get("text") or item.get("content") or ""
-                    if value:
-                        parts.append(str(value))
-                elif item is not None:
-                    parts.append(str(item))
-            text = "\n".join(part for part in parts if part).strip()
-        else:
-            text = str(content).strip() if content is not None else ""
-
-        if text:
-            return text
-
-    return "I couldn't retrieve a clear overview response. Please try with a specific project identifier."
+    return messages[-1].content if messages else str(result)
 
 @tool 
 def planning_tool(query: str) -> str:
