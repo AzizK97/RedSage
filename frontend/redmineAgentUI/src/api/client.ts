@@ -1,72 +1,98 @@
-import type { ChatResponse, ApproveResponse, ApproveRequest } from "../types";
+// src/api/client.ts
+const BASE_API = import.meta.env.VITE_API_URL || '/api';
+const REQUEST_TIMEOUT_MS = 3600000;
 
-const BASE_API = import.meta.env.VITE_API_URL;
+export function authHeaders(token?: string): Record<string, string> {
+  const resolvedToken = token?.trim();
 
-async function callChatAPI(message: string, thread_id: string): Promise<ChatResponse> {
-    try {
-        const response = await fetch(`${BASE_API}/chat`, 
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ message, thread_id })
-            });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API error: ${response.status} - ${errorText}`);
-        } else {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error("Error calling chat API:", error);
-        throw error;
-    }
+  if (!resolvedToken) {
+    return {
+      'Content-Type': 'application/json',
+    };
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${resolvedToken}`,
+  };
 }
 
+export async function handleResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") || "";
 
-async function callApproveAPI(thread_id: string, payload: ApproveRequest): Promise<ApproveResponse> {
-    try{
-        const response = await fetch(`${BASE_API}/chat/approve/${thread_id}`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
-            });
+  if (!response.ok) {
+    let errorText = "Unknown error";
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API error: ${response.status} - ${errorText}`);
-        } else {
-            return await response.json();
-        }
-    }catch(error){
-        console.error("Error calling approve API:", error);
-        throw error;
+    if (contentType.includes('application/json')) {
+      const payload = await response.json().catch(() => null);
+      if (payload && typeof payload === 'object') {
+        errorText =
+          (payload as Record<string, unknown>).detail?.toString() ||
+          (payload as Record<string, unknown>).message?.toString() ||
+          JSON.stringify(payload);
+      }
+    } else {
+      errorText = await response.text().catch(() => "Unknown error");
     }
+
+    throw new Error(`API Error ${response.status}: ${errorText}`);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text().catch(() => "");
+  return (text as unknown) as T;
 }
 
-async function callDeleteThreadAPI(thread_id: string): Promise<{ status: string; thread_id: string }>{
-    try{
-        const response = await fetch(`${BASE_API}/chat/thread/${thread_id}`,{
-            method: "DELETE",
-            headers:{
-                "Content-Type": "application/json" 
-            }
-        });
+async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-        if (!response.ok){
-            const errorText = await response.text();
-            throw new Error(`API error: ${response.status} - ${errorText}`);
-        }
-
-        return await response.json();
-    } catch (error){
-        console.error("Error calling delete thread API:", error);
-        throw error;
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
     }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
-export { callChatAPI, callApproveAPI, callDeleteThreadAPI }
+// Reusable HTTP client
+export const apiClient = {
+  async get<T>(endpoint: string, token?: string): Promise<T> {
+    const headers = authHeaders(token);
+    const response = await fetchWithTimeout(`${BASE_API}${endpoint}`, {
+      method: "GET",
+      headers
+    });
+    return handleResponse<T>(response);
+  },
+
+  async post<T>(endpoint: string, body: unknown, token?: string): Promise<T> {
+    const headers = authHeaders(token);
+    const response = await fetchWithTimeout(`${BASE_API}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    return handleResponse<T>(response);
+  },
+
+  async delete<T>(endpoint: string, token?: string): Promise<T> {
+    const headers = authHeaders(token);
+    const response = await fetchWithTimeout(`${BASE_API}${endpoint}`, {
+      method: "DELETE",
+      headers,
+    });
+    return handleResponse<T>(response);
+  },
+};

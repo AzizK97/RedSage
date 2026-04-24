@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from psycopg import Connection
 from pydantic import BaseModel, Field, model_validator
-from typing import Dict, Any, Literal, Optional
+from typing import Dict, Any, List, Literal, Optional
 import json
+
+from psycopg import Connection
 
 from app.agent.supervisor import (
     chat_stream, 
@@ -12,13 +13,18 @@ from app.agent.supervisor import (
     build_invoke_config,
     delete_thread_memory
 )
-from langgraph.types import Command
-
-from app.dependencies.auth import CurrentUser, require_permission
 from app.core.rbac import Permission
-from app.repositories.thread_repository import ThreadRepository
+from app.dependencies.auth import CurrentUser, require_permission
 from app.dependencies.db import get_db
-from app.core.rbac import Role
+from app.repositories.thread_message_repository import ThreadMessageRepository
+from app.repositories.thread_repository import ThreadRepository
+from app.services.chat_persistence import (
+    ensure_thread_tables,
+    persist_assistant_only,
+    persist_user_and_assistant,
+)
+from app.services.thread_access import ensure_thread_owner
+from langgraph.types import Command
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -39,6 +45,7 @@ class ApproveRequest(BaseModel):
     message: str = ""                
     edited_action: Optional[Dict[str, Any]] = None
 
+
     @model_validator(mode="after")
     def validate_edit_payload(self):
         if self.decision_type == "edit":
@@ -53,6 +60,18 @@ class ApproveRequest(BaseModel):
                 raise ValueError("edited_action 'args' must be a dictionary")
             
         return self
+
+
+class CreateThreadResponse(BaseModel):
+    thread_id: str
+
+
+class ThreadListItem(BaseModel):
+    thread_id: str
+    title: str
+    preview: str
+    updated_at: int
+
 
 def _interrupt_to_payload(interrupt_obj: Any) -> Dict[str, Any]:
     if hasattr(interrupt_obj, "value"):
@@ -135,43 +154,35 @@ def _raise_http_from_exception(exc: Exception) -> None:
 
     raise HTTPException(status_code=500, detail=message)
 
-
-def _enforce_thread_access(
-        repo: ThreadRepository,
-        thread_id: str,
-        current_user: CurrentUser,
-) -> None:
-    repo.ensure_table()
-    repo.bind_owner_if_missing(thread_id, current_user.id)
-    owner_id = repo.get_owner(thread_id)
-
-    if owner_id is None:
-        raise HTTPException(status_code=404, detail="Thread ownership not found")
-    if current_user.role != Role.ADMIN and owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Forbidden: thread does not belong to current user")
-
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(
     request: ChatRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db)
+    db: Connection = Depends(get_db),
 ):
-    thread_repo = ThreadRepository(db)
-    _enforce_thread_access(thread_repo, request.thread_id, current)
-
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, request.thread_id, current.id)
     try:
         result = chat_with_interrupts(request.message, request.thread_id)
 
         interrupts = result["interrupts"]
         if interrupts:
             pending = _interrupt_to_payload(interrupts[0])
-
+            persist_user_and_assistant(
+                db,
+                request.thread_id,
+                request.message,
+                "Action waiting for human confirmation.",
+            )
             return ChatResponse(
                 response="Action waiting for human confirmation.",
                 requires_human=True,
                 interrupts=pending
             )
 
+        persist_user_and_assistant(
+            db, request.thread_id, request.message, result["response"]
+        )
         return ChatResponse(response=result["response"])
 
     except Exception as e:
@@ -182,15 +193,16 @@ async def chat_endpoint(
 async def chat_stream_endpoint(
     request: ChatRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db)
+    db: Connection = Depends(get_db),
 ):
-    thread_repo = ThreadRepository(db)
-    _enforce_thread_access(thread_repo, request.thread_id, current)
-
     """
     Streaming chat endpoint using Server-Sent Events.
     Streams the agent's thought process step by step.
+    No server-side message persistence for this path (use POST /api/chat for durable history).
     """
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, request.thread_id, current.id)
+
     def event_generator():
         for event in chat_stream(request.message, request.thread_id):
             yield f"data: {json.dumps(event)}\n\n"
@@ -210,13 +222,12 @@ async def approve_endpoint(
     thread_id: str, 
     request: ApproveRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db)
+    db: Connection = Depends(get_db),
 ):
-    thread_repo = ThreadRepository(db)
-    _enforce_thread_access(thread_repo, thread_id, current)
-
     app = get_app()
     config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, thread_id, current.id)
 
     try:
         if request.decision_type == "edit":
@@ -238,9 +249,11 @@ async def approve_endpoint(
             config=config
         )
 
+        response_text = _extract_full_message_content(result)
+        persist_assistant_only(db, thread_id, response_text)
         return {
             "status": request.decision_type,
-            "response": _extract_full_message_content(result)
+            "response": response_text
         }
 
     except Exception as e:
@@ -250,15 +263,15 @@ async def approve_endpoint(
 async def delete_thread_endpoint(
     thread_id: str,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db)
+    db: Connection = Depends(get_db),
 ):
-    thread_repo = ThreadRepository(db)
-    _enforce_thread_access(thread_repo, thread_id, current)
-
     """Delete a thread's entire checkpoint history from PostgreSQL."""
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, thread_id, current.id)
     try:
         print(f"🗑️ Delete endpoint called for thread: {thread_id}")
         delete_thread_memory(thread_id)
+        ThreadRepository(db).delete_thread(thread_id)
         print(f"✅ Successfully deleted thread: {thread_id}")
         return {
             "status": "deleted",
@@ -273,11 +286,11 @@ async def delete_thread_endpoint(
 async def check_thread_endpoint(
     thread_id: str,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db)
+    db: Connection = Depends(get_db),
 ):
-    thread_repo = ThreadRepository(db)
-    _enforce_thread_access(thread_repo, thread_id, current)
     """Diagnostic endpoint: Check if a thread has checkpoints in PostgreSQL."""
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, thread_id, current.id)
     import os
     import psycopg
     
@@ -307,3 +320,43 @@ async def check_thread_endpoint(
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.post("/chat/thread", response_model=CreateThreadResponse)
+def create_thread_endpoint(
+    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+    db: Connection = Depends(get_db),
+):
+    ensure_thread_tables(db)
+    thread_id = ThreadRepository(db).create_thread(current.id)
+    return CreateThreadResponse(thread_id=thread_id)
+
+
+@router.get("/chat/threads", response_model=List[ThreadListItem])
+def list_threads_endpoint(
+    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+    db: Connection = Depends(get_db),
+):
+    ensure_thread_tables(db)
+    rows = ThreadRepository(db).list_for_owner(current.id)
+    return [
+        ThreadListItem(
+            thread_id=r["thread_id"],
+            title=r["title"],
+            preview=r["preview"],
+            updated_at=r["updated_at_ms"],
+        )
+        for r in rows
+    ]
+
+
+@router.get("/chat/thread/{thread_id}/messages")
+def get_thread_messages_endpoint(
+    thread_id: str,
+    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+    db: Connection = Depends(get_db),
+):
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, thread_id, current.id)
+    raw = ThreadMessageRepository(db).list_for_thread(thread_id)
+    return {"messages": raw}

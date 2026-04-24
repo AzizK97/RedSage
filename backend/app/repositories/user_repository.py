@@ -45,6 +45,30 @@ class UserRepository:
             "platform_role": row[4],
         }
 
+    def list_by_role(self, platform_role: str) -> list[dict]:
+        with self.db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, redmine_user_id, email, full_name, platform_role
+                FROM redmine_users
+                WHERE platform_role = %s
+                ORDER BY full_name ASC
+                """,
+                (platform_role,),
+            )
+            rows = cur.fetchall()
+
+        return [
+            {
+                "id": row[0],
+                "redmine_user_id": row[1],
+                "email": row[2],
+                "full_name": row[3],
+                "platform_role": row[4],
+            }
+            for row in rows
+        ]
+
     def mirror_user_from_redmine(
             self,
             redmine_user_id: int,
@@ -73,7 +97,7 @@ class UserRepository:
                 INSERT INTO redmine_users (id, redmine_user_id, email, full_name, platform_role)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
-                (redmine_user_id, email, full_name, platform_role),
+                (str(uuid.uuid4()), redmine_user_id, email, full_name, platform_role),
             )
         self.db.commit()
         return self.get_by_redmine_user_id(redmine_user_id)

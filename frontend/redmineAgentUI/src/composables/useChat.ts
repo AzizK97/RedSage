@@ -1,4 +1,4 @@
-import { callChatAPI, callApproveAPI } from '../api/client';
+import { chatApi } from '../api/chat';
 import type { ApproveRequest, Message } from '../types/index';
 import { ref, watch, type Ref } from 'vue';
 import { useThreads } from './useThreads';
@@ -7,9 +7,21 @@ function pushMessage(messages: Ref<Message[]>, role: "user" | "assistant", conte
     messages.value.push({ role, content, timestamp: Date.now() });
 }
 
-export function useChat() {
+export function useChat(token: string, userId: string) {
 
-    const { activeThreadId, currentConversation, getMessages, saveMessages } = useThreads();
+    const {
+        activeThreadId,
+        currentConversation,
+        getMessages,
+        saveMessages,
+        conversations,
+        createThread,
+        setActiveThread,
+        deleteThread,
+        syncError,
+        isSyncing,
+        reloadThreadMessages,
+    } = useThreads(token, userId);
 
     const messages: Ref<Message[]> = ref(getMessages(activeThreadId.value));
     const threadId = activeThreadId;
@@ -68,7 +80,8 @@ export function useChat() {
     watch(
         activeThreadId,
         (nextThreadId) => {
-            messages.value = getMessages(nextThreadId);
+            const localMessages = getMessages(nextThreadId);
+            messages.value = localMessages;
             pendingInterrupt.value = null;
             error.value = null;
         },
@@ -89,12 +102,21 @@ export function useChat() {
         const beforeCount = messages.value.length;
         const currentThreadId = threadId.value;
 
+        if (!currentThreadId) {
+            error.value = "No active conversation found.";
+            isLoading.value = false;
+            return;
+        }
+
+        let responseReceived = false;
+
         try{
             pushMessage(messages, "user", userText);
             saveMessages(currentThreadId, messages.value);
             startLoadingStatus(userText);
 
-            const response = await callChatAPI(userText, threadId.value);
+            const response = await chatApi.sendMessage(userText, currentThreadId, token);
+            responseReceived = true;
             pushMessage(messages, "assistant", response.response);
             const hasInterruptPayload = Array.isArray(response.interrupts)
                 ? response.interrupts.length > 0
@@ -103,10 +125,18 @@ export function useChat() {
                 ? response.interrupts
                 : null;
 
+            try {
+                await reloadThreadMessages(currentThreadId);
+                messages.value = getMessages(currentThreadId);
+            } catch {
+                // Keep optimistic messages if history sync fails.
+            }
             saveMessages(currentThreadId, messages.value);
         }catch(err: any){
-            messages.value = messages.value.slice(0, beforeCount);
-            saveMessages(currentThreadId, messages.value);
+            if (!responseReceived) {
+                messages.value = messages.value.slice(0, beforeCount);
+                saveMessages(currentThreadId, messages.value);
+            }
             error.value = err?.message || "Failed to send message";
         }finally{
             stopLoadingStatus();
@@ -134,11 +164,23 @@ export function useChat() {
         isLoading.value = true;
         const currentThreadId = threadId.value;
 
+        if (!currentThreadId) {
+            error.value = "No active conversation found for this decision.";
+            isLoading.value = false;
+            return;
+        }
+
         try{
-            const response = await callApproveAPI(threadId.value, payload);
+            const response = await chatApi.approve(currentThreadId, payload, token);
             pushMessage(messages, "assistant", response.response);
             pendingInterrupt.value = null;
 
+            try {
+                await reloadThreadMessages(currentThreadId);
+                messages.value = getMessages(currentThreadId);
+            } catch {
+                // Keep optimistic assistant message if history sync fails.
+            }
             saveMessages(currentThreadId, messages.value);
         }catch(err: any){
             error.value = err?.message || "Failed to submit decision";
@@ -150,12 +192,19 @@ export function useChat() {
     return{
         messages,
         threadId,
+        activeThreadId,
         isLoading,
         pendingInterrupt,
         error,
         loadingStatus,
         showLoadingStatus,
+        isSyncing,
+        syncError,
         currentConversation,
+        conversations,
+        createThread,
+        setActiveThread,
+        deleteThread,
         sendMessage,
         submitDecision
     };

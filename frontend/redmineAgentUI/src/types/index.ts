@@ -30,4 +30,64 @@ interface Message {
     timestamp: number
 }
 
-export type { ChatRequest, ChatResponse, ApproveRequest, ApproveResponse, Message }
+/** API shape for GET /api/chat/threads */
+interface ThreadSummary {
+    thread_id: string;
+    title: string;
+    preview: string;
+    updated_at: number;
+}
+
+interface CreateThreadResponse {
+    thread_id: string
+}
+
+interface LoginResult {
+    access_token: string;
+    token_type: string;
+}
+
+interface RootInfo {
+    name: string;
+    version: string;
+    docs: string;
+}
+
+interface SyncPmResponse {
+    synced_count: number;
+}
+
+interface SetPmAccessResponse {
+    user_id: string;
+    redmine_user_id: number;
+    email: string;
+    full_name: string;
+    enabled: boolean;
+    generated_account: boolean;
+    enabled_by_admin_id: string | null;
+}
+
+interface PmCandidate {
+    user_id?: string;
+    redmine_user_id: number;
+    email: string;
+    full_name: string;
+    in_platform: boolean;
+    credentials_ready: boolean;
+    enabled: boolean;
+}
+
+export type {
+    ChatRequest,
+    ChatResponse,
+    ApproveRequest,
+    ApproveResponse,
+    Message,
+    ThreadSummary,
+    CreateThreadResponse,
+    LoginResult,
+    RootInfo,
+    SyncPmResponse,
+    SetPmAccessResponse,
+    PmCandidate
+}

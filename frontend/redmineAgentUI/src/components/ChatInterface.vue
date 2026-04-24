@@ -5,9 +5,18 @@ import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
 import ApprovalDialog from "./ApprovalDialog.vue";
 import { useChat } from "../composables/useChat";
-import { useThreads } from "../composables/useThreads";
 import type { ApproveRequest } from "../types";
 import { computed, ref } from "vue";
+
+const props = defineProps<{
+  token: string;
+  userId: string;
+  role: "admin" | "project_manager";
+}>();
+
+const emit = defineEmits<{
+  (event: "logout"): void;
+}>();
 
 const {
   messages,
@@ -16,21 +25,21 @@ const {
   isLoading,
   loadingStatus,
   showLoadingStatus,
+  isSyncing,
   pendingInterrupt,
   error,
+  syncError,
   sendMessage,
   submitDecision,
-} = useChat();
-
-const {
   conversations,
   activeThreadId,
   createThread,
   setActiveThread,
   deleteThread,
-} = useThreads();
+} = useChat(props.token, props.userId);
 
-const isVirginChat = computed(()=> messages.value.length === 0);
+const isVirginChat = computed(() => messages.value.length === 0);
+const visibleError = computed(() => error.value || syncError.value);
 const virginDraft = ref("");
 const starterSuggestions = [
   "Give me a list of all the projects",
@@ -44,6 +53,10 @@ function setSuggestionDraft(suggestion: string) {
 
 function onSend(text: string) {
   sendMessage(text);
+}
+
+function onLogout() {
+  emit("logout");
 }
 
 function onApprove() {
@@ -62,12 +75,22 @@ function onEdit(payload: { name: string; args: Record<string, any> }) {
   submitDecision(request);
 }
 
-function startNewConversation() {
-  createThread();
+async function startNewConversation() {
+  try {
+    await createThread();
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    alert(`Failed to create conversation: ${errorMsg}`);
+  }
 }
 
-function selectConversation(threadId: string) {
-  setActiveThread(threadId);
+async function selectConversation(threadId: string) {
+  try {
+    await setActiveThread(threadId);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    alert(`Failed to load conversation: ${errorMsg}`);
+  }
 }
 
 async function removeConversation(threadId: string) {
@@ -100,7 +123,7 @@ async function removeConversation(threadId: string) {
     />
 
     <div class="chat-panel">
-      <Header />
+      <Header :role="props.role" @logout="onLogout" />
 
       <div v-if="isVirginChat" class="virgin-shell">
         <div class="virgin-center">
@@ -131,7 +154,9 @@ async function removeConversation(threadId: string) {
             <p class="conversation-name">{{ currentConversation?.title ?? "New conversation" }}</p>
           </div>
 
-          <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="visibleError" class="error">{{ visibleError }}</p>
+
+          <p v-if="isSyncing" class="thread">Syncing conversation…</p>
 
           <MessageList :messages="messages" />
 

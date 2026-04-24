@@ -12,3 +12,4 @@ class PmCandidate(BaseModel):
     full_name: str
     in_platform: bool
     enabled: bool
+    credentials_ready: bool = True

@@ -61,20 +61,21 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 
     return config
 
-# def create_llm() -> ChatOllama:
-#     return ChatOllama(
-#         model="gemma4:e4b-it-q4_K_M",
-#         temperature=0
+def create_llm() -> ChatOllama:
+    return ChatOllama(
+        model="qwen3:4b-thinking",
+        temperature=0
+    )
+
+# def create_llm() -> ChatOpenAI:
+#     return ChatOpenAI(
+#         model=os.getenv("MODEL_NAME"),
+#         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+#         openai_api_base="https://openrouter.ai/api/v1",
+#         temperature=0,
+#         max_tokens=800
 #     )
 
-def create_llm() -> ChatOpenAI:
-    return ChatOpenAI(
-        model=os.getenv("MODEL_NAME", "openrouter/auto"),
-        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-        openai_api_base="https://openrouter.ai/api/v1",
-        temperature=0,
-        max_tokens=1200
-    )
 
 llm = create_llm()
 overview_agent  = create_overview_agent(llm)
