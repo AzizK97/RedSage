@@ -71,13 +71,14 @@ onMounted(() => {
 .list {
   flex: 1;
   overflow-y: auto;
-  padding-inline: 47vh;
+  padding-inline: 30vh;
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   margin: 0 auto;
   width: 100%;
+  min-width: 760px;
 }
 
 .row {

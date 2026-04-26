@@ -14,10 +14,6 @@ const props = defineProps<{
   role: "admin" | "project_manager";
 }>();
 
-const emit = defineEmits<{
-  (event: "logout"): void;
-}>();
-
 const {
   messages,
   threadId,
@@ -53,10 +49,6 @@ function setSuggestionDraft(suggestion: string) {
 
 function onSend(text: string) {
   sendMessage(text);
-}
-
-function onLogout() {
-  emit("logout");
 }
 
 function onApprove() {
@@ -123,7 +115,7 @@ async function removeConversation(threadId: string) {
     />
 
     <div class="chat-panel">
-      <Header :role="props.role" @logout="onLogout" />
+      <Header :role="props.role" />
 
       <div v-if="isVirginChat" class="virgin-shell">
         <div class="virgin-center">
@@ -184,7 +176,7 @@ async function removeConversation(threadId: string) {
 
 <style scoped>
 .chat-layout {
-  height: 100vh;
+  height: 100%;
   display: flex;
   background: var(--bg-primary);
 }

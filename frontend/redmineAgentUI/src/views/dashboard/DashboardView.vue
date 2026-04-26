@@ -323,7 +323,7 @@ function healthClass(health: ProjectStatus["health"]) {
 
 <style scoped>
 .dashboard-shell {
-  min-height: 100vh;
+  min-height: 100%;
   padding: var(--space-lg) var(--space-xl);
   background: var(--bg-primary);
   color: var(--text-primary);

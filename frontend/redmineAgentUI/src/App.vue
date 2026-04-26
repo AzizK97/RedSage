@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import AppSidebar from "./components/AppSidebar.vue";
+import AppTopBar from "./components/AppTopBar.vue";
 import ChatInterface from "./components/ChatInterface.vue";
 import LoginView from "./views/auth/LoginView.vue";
 import DashboardView from "./views/dashboard/DashboardView.vue";
+import ProfileView from "./views/profile/ProfileView.vue";
 import { useSession, type PlatformRole } from "./composables/useSession";
 
 const { token, role, userId, isAuthenticated, setSession, clearSession } = useSession();
-const currentView = ref<"dashboard" | "chat">("dashboard");
+const currentView = ref<"dashboard" | "chat" | "profile">("dashboard");
 
 function handleLogin(payload: { token: string; role: PlatformRole }) {
   setSession(payload.token, payload.role);
@@ -18,9 +21,8 @@ function handleLogout() {
   currentView.value = "dashboard";
 }
 
-function navLabel(view: "dashboard" | "chat") {
-  if (view === "dashboard") return "Dashboard";
-  return "Chatbot";
+function handleNavigate(view: "dashboard" | "chat" | "profile") {
+  currentView.value = view;
 }
 </script>
 
@@ -28,40 +30,42 @@ function navLabel(view: "dashboard" | "chat") {
   <main v-if="!isAuthenticated" class="app-shell">
     <LoginView @login="handleLogin" />
   </main>
-  <main v-else class="app-shell">
-    <section class="top-nav">
-      <button
-        class="nav-btn"
-        :class="{ active: currentView === 'dashboard' }"
-        type="button"
-        @click="currentView = 'dashboard'"
-      >
-        {{ navLabel("dashboard") }}
-      </button>
-      <button
-        class="nav-btn"
-        :class="{ active: currentView === 'chat' }"
-        type="button"
-        @click="currentView = 'chat'"
-      >
-        {{ navLabel("chat") }}
-      </button>
-    </section>
-
-    <DashboardView
-      v-if="currentView === 'dashboard'"
+  <main v-else class="app-shell app-auth-shell">
+    <AppSidebar
       :role="role === 'admin' ? 'admin' : 'project_manager'"
-      :token="token"
-    />
-
-    <ChatInterface
-      v-else
-      :key="userId"
-      :token="token"
-      :user-id="userId"
-      :role="role === 'admin' ? 'admin' : 'project_manager'"
+      :current-view="currentView"
+      @navigate="handleNavigate"
       @logout="handleLogout"
     />
+
+    <section class="app-content">
+      <AppTopBar
+        :role="role === 'admin' ? 'admin' : 'project_manager'"
+        :user-id="userId"
+      />
+
+      <section class="app-view">
+        <DashboardView
+          v-if="currentView === 'dashboard'"
+          :role="role === 'admin' ? 'admin' : 'project_manager'"
+          :token="token"
+        />
+
+        <ChatInterface
+          v-else-if="currentView === 'chat'"
+          :key="userId"
+          :token="token"
+          :user-id="userId"
+          :role="role === 'admin' ? 'admin' : 'project_manager'"
+        />
+
+        <ProfileView
+          v-else
+          :role="role === 'admin' ? 'admin' : 'project_manager'"
+          :user-id="userId"
+        />
+      </section>
+    </section>
   </main>
 </template>
 
@@ -71,25 +75,23 @@ function navLabel(view: "dashboard" | "chat") {
   box-sizing: border-box;
 }
 
-.top-nav {
+.app-auth-shell {
   display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
+  overflow: hidden;
 }
 
-.nav-btn {
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  padding: 0.45rem 0.7rem;
-  cursor: pointer;
+.app-content {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.nav-btn.active {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+.app-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 </style>

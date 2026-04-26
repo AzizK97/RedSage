@@ -4,7 +4,6 @@ import type { ConversationSummary } from "../composables/useThreads";
 import { 
   MoreVertical, 
   Trash, 
-  ChevronsLeft, 
   Plus
 } from '@lucide/vue';
 
@@ -20,8 +19,6 @@ const emit = defineEmits<{
 }>();
 
 const openMenu = ref<string | null>(null);
-
-const isCollapsed = ref(false)
 
 function groupConversationsByTime(conversations: ConversationSummary[]) {
   const now = Date.now();
@@ -72,9 +69,9 @@ function handleRename(threadId: string) {
 </script>
 
 <template>
-  <aside :class="{ sidebar: true, collapsed: isCollapsed }">
+  <aside class="sidebar">
     <div class="sidebar-header">
-      <div v-show="!isCollapsed" class="header-content">
+      <div class="header-content">
         <h2>All chats</h2>
       </div>
       <div class="header-actions">
@@ -84,7 +81,7 @@ function handleRename(threadId: string) {
       </div>
     </div>
 
-    <div v-show="!isCollapsed" class="conversation-list">
+    <div class="conversation-list">
       <template v-for="(group, key) in groupConversationsByTime(props.conversations)" :key="key">
         <div v-if="group.length > 0" class="conversation-group">
           <div class="group-label">
@@ -141,11 +138,6 @@ function handleRename(threadId: string) {
       </template>
     </div>
 
-    <div class="sidebar-footer">
-      <button @click="isCollapsed = !isCollapsed" class="collapse-btn">
-        <ChevronsLeft :class="{ rotated: isCollapsed }" />
-      </button>
-    </div>
   </aside>
 </template>
 
@@ -161,26 +153,6 @@ function handleRename(threadId: string) {
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--border-subtle);
-  transition: width 280ms ease, min-width 280ms ease;
-}
-
-.sidebar.collapsed {
-  width: 70px;
-  min-width: 70px;
-}
-
-.sidebar.collapsed .sidebar-header {
-  justify-content: center;
-}
-
-.sidebar.collapsed .header-actions {
-  flex: 1;
-  justify-content: center;
-  margin-left: 0;
-}
-
-.sidebar.collapsed .sidebar-footer {
-  padding: var(--space-sm);
 }
 
 .sidebar-header {
@@ -377,24 +349,6 @@ h2 {
   background: rgba(239, 68, 68, 0.1);
 }
 
-.collapse-btn {
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: var(--space-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
-}
-
-.collapse-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -412,56 +366,6 @@ h2 {
   background: var(--text-secondary);
 }
 
-.sidebar-footer {
-  padding: var(--space-md);
-  display: flex;
-  justify-content: flex-end;
-  margin-top: auto;
-  width: 100%;
-}
-
-/* .sidebar.collapsed .header-content,
-.sidebar.collapsed .conversation-title,
-.sidebar.collapsed .group-label,
-.sidebar.collapsed .menu-btn {
-  opacity: 0;
-  transform: translateX(-8px);
-  pointer-events: none;
-} */
-
-/* .sidebar.collapsed .header-content,
-.sidebar.collapsed .group-label {
-  max-width: 0;
-} */
-
-/* .sidebar.collapsed .conversation-item {
-  justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
-} */
-
-/* .sidebar.collapsed .conversation-select {
-  padding-left: 0;
-  padding-right: 0;
-} */
-
-/* .sidebar.collapsed .menu-container {
-  width: 0;
-  overflow: hidden;
-} */
-
-.collapse-btn svg {
-  transition: transform 240ms ease-out;
-}
-
-.collapse-btn .rotated {
-  transform: rotate(180deg);
-}
-
-.sidebar.collapsed .new-btn {
-  transform: translateY(0);
-}
-
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;
@@ -472,7 +376,7 @@ h2 {
     transform: translateX(-100%);
   }
 
-  .sidebar:not(.collapsed) {
+  .sidebar {
     transform: translateX(0);
   }
 }
