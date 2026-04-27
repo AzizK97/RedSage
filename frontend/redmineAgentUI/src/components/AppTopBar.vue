@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { Bell, CircleHelp, LifeBuoy, Search, UserCircle2 } from "@lucide/vue";
+import { Bell, CircleHelp, Search, UserCircle2 } from "@lucide/vue";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
   userId: string;
+  fullName?: string;
 }>();
 
 const roleLabel = props.role === "admin" ? "Admin" : "Project Manager";
+const displayName = props.fullName?.trim() || props.userId || "Unknown user";
 </script>
 
 <template>
@@ -23,16 +25,12 @@ const roleLabel = props.role === "admin" ? "Admin" : "Project Manager";
       <button type="button" class="icon-btn" aria-label="Help">
         <CircleHelp :size="18" />
       </button>
-      <button type="button" class="support-btn">
-        <LifeBuoy :size="16" />
-        Support
-      </button>
 
       <div class="profile-pill" aria-label="Profile">
         <UserCircle2 :size="18" />
         <div class="profile-meta">
+          <span class="user">{{ displayName }}</span>
           <span class="role">{{ roleLabel }}</span>
-          <span class="user">{{ userId || "Unknown user" }}</span>
         </div>
       </div>
     </div>
@@ -126,12 +124,12 @@ const roleLabel = props.role === "admin" ? "Admin" : "Project Manager";
   line-height: 1.1;
 }
 
-.role {
+.user {
   font-size: var(--text-xs);
 }
 
-.user {
-  font-size: 11px;
+.role {
+  font-size: var(--text-xs);
   color: var(--text-secondary);
 }
 

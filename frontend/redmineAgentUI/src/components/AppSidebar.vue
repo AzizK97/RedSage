@@ -38,8 +38,10 @@ function roleLabel() {
         type="button"
         @click="emit('navigate', 'dashboard')"
       >
-        <span v-show="!isCollapsed"><LayoutDashboard />Dashboard</span>
-        <span v-show="isCollapsed"><LayoutDashboard /></span>
+        <span class="nav-item" :class="{ collapsed: isCollapsed }">
+          <LayoutDashboard class="nav-icon" :size="16" />
+          <span v-show="!isCollapsed" class="nav-label">Dashboard</span>
+        </span>
       </button>
       <button
         class="nav-btn"
@@ -47,8 +49,10 @@ function roleLabel() {
         type="button"
         @click="emit('navigate', 'chat')"
       >
-        <span v-show="!isCollapsed"><Bot />Chatbot</span>
-        <span v-show="isCollapsed"><Bot /></span>
+        <span class="nav-item" :class="{ collapsed: isCollapsed }">
+          <Bot class="nav-icon" :size="16" />
+          <span v-show="!isCollapsed" class="nav-label">Chatbot</span>
+        </span>
       </button>
       <button
         class="nav-btn"
@@ -56,15 +60,19 @@ function roleLabel() {
         type="button"
         @click="emit('navigate', 'profile')"
       >
-        <span v-show="!isCollapsed"><User />Profile</span>
-        <span v-show="isCollapsed"><User /></span>
+        <span class="nav-item" :class="{ collapsed: isCollapsed }">
+          <User class="nav-icon" :size="16" />
+          <span v-show="!isCollapsed" class="nav-label">Profile</span>
+        </span>
       </button>
     </nav>
 
     <div class="sidebar-footer">
       <button class="logout-btn" type="button" @click="emit('logout')">
-        <span v-show="!isCollapsed"><LogOut />Log out</span>
-        <span v-show="isCollapsed"><LogOut /></span>
+        <span class="nav-item" :class="{ collapsed: isCollapsed }">
+          <LogOut class="nav-icon" :size="16" />
+          <span v-show="!isCollapsed" class="nav-label">Log out</span>
+        </span>
       </button>
     </div>
   </aside>
@@ -145,15 +153,44 @@ function roleLabel() {
   background: transparent;
   color: var(--text-primary);
   border-radius: var(--radius-md);
-  padding: 0.55rem 0.75rem;
-  text-align: center;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
   font-size: var(--text-sm);
   cursor: pointer;
 }
 
-.app-sidebar:not(.collapsed) .nav-btn,
-.app-sidebar:not(.collapsed) .logout-btn {
-  text-align: left;
+.nav-btn,
+.logout-btn,
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.nav-btn,
+.logout-btn {
+  width: 100%;
+}
+
+.nav-item {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.nav-item.collapsed {
+  justify-content: center;
+  gap: 0;
+}
+
+.nav-icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+.nav-btn:hover,
+.logout-btn:hover {
+  background: var(--bg-tertiary);
 }
 
 .nav-btn.active {
@@ -166,5 +203,9 @@ function roleLabel() {
 
 .logout-btn {
   width: 100%;
+}
+
+.nav-label {
+  line-height: 1;
 }
 </style>

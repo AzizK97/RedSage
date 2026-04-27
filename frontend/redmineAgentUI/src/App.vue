@@ -8,11 +8,11 @@ import DashboardView from "./views/dashboard/DashboardView.vue";
 import ProfileView from "./views/profile/ProfileView.vue";
 import { useSession, type PlatformRole } from "./composables/useSession";
 
-const { token, role, userId, isAuthenticated, setSession, clearSession } = useSession();
+const { token, role, fullName, email, userId, isAuthenticated, setSession, clearSession } = useSession();
 const currentView = ref<"dashboard" | "chat" | "profile">("dashboard");
 
-function handleLogin(payload: { token: string; role: PlatformRole }) {
-  setSession(payload.token, payload.role);
+function handleLogin(payload: { token: string; role: PlatformRole; fullName: string }) {
+  setSession(payload.token, payload.role, payload.fullName);
   currentView.value = "dashboard";
 }
 
@@ -42,6 +42,7 @@ function handleNavigate(view: "dashboard" | "chat" | "profile") {
       <AppTopBar
         :role="role === 'admin' ? 'admin' : 'project_manager'"
         :user-id="userId"
+        :full-name="fullName"
       />
 
       <section class="app-view">
@@ -63,6 +64,8 @@ function handleNavigate(view: "dashboard" | "chat" | "profile") {
           v-else
           :role="role === 'admin' ? 'admin' : 'project_manager'"
           :user-id="userId"
+          :full-name="fullName"
+          :email="email"
         />
       </section>
     </section>

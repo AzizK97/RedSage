@@ -44,6 +44,7 @@ interface CreateThreadResponse {
 
 interface LoginResult {
     access_token: string;
+    full_name: string;
     token_type: string;
 }
 

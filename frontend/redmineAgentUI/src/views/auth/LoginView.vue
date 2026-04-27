@@ -4,7 +4,7 @@ import { authApi } from "../../api/auth";
 import type { PlatformRole } from "../../composables/useSession";
 
 const emit = defineEmits<{
-  (event: "login", payload: { token: string; role: PlatformRole }): void;
+  (event: "login", payload: { token: string; role: PlatformRole; fullName: string }): void;
 }>();
 
 const email = ref("");
@@ -44,7 +44,7 @@ async function submitLogin() {
   try {
     const result = await authApi.login(email.value.trim(), password.value);
     const role = decodeRoleFromToken(result.access_token);
-    emit("login", { token: result.access_token, role });
+    emit("login", { token: result.access_token, role, fullName: result.full_name });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Login failed";
   } finally {

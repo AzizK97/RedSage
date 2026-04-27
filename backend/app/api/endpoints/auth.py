@@ -55,7 +55,7 @@ def login(payload: LoginRequest, db: Connection = Depends(get_db)):
             "email": user["email"],
         }
     )
-    return LoginResponse(access_token=token)
+    return LoginResponse(access_token=token, full_name=user["full_name"])
 
 
 @router.get("/me", response_model=MeResponse)
