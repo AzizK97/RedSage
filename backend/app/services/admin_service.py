@@ -50,6 +50,11 @@ class AdminService:
         items = []
         for user in users:
             access_state = self.entitlements.get_access_state(user["id"])
+            try:
+                managed_projects = redmine_client.list_managed_projects_for_user(user["redmine_user_id"])
+            except RuntimeError:
+                managed_projects = []
+
             items.append(
                 {
                     "redmine_user_id": user["redmine_user_id"],
@@ -58,6 +63,7 @@ class AdminService:
                     "in_platform": True,
                     "enabled": access_state["enabled"],
                     "credentials_ready": True,
+                    "managed_projects": managed_projects,
                 }
             )
 

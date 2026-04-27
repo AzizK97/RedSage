@@ -64,6 +64,8 @@ onMounted(() => {
         <!-- <small>{{ formatTime(msg.timestamp) }}</small> -->
       </div>
     </div>
+
+    <slot name="after-messages" />
   </div>
 </template>
 

@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.api.endpoints.chat import router as chat_router
 from app.api.endpoints.admin_users import router as admin_users_router
 from app.api.endpoints.auth import router as auth_router
-from app.core.config import settings
+from app.core.settings import settings
 
 # from monitoring.config import settings
 # from monitoring.service import MonitoringService

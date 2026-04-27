@@ -76,6 +76,7 @@ interface PmCandidate {
     in_platform: boolean;
     credentials_ready: boolean;
     enabled: boolean;
+    managed_projects: string[];
 }
 
 export type {

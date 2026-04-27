@@ -280,6 +280,7 @@ function healthClass(health: ProjectStatus["health"]) {
               <th>Redmine ID</th>
               <th>Name</th>
               <th>Email</th>
+              <th>Projects</th>
               <th>Credentials</th>
               <th>Access status</th>
               <th>Action</th>
@@ -287,12 +288,18 @@ function healthClass(health: ProjectStatus["health"]) {
           </thead>
           <tbody>
             <tr v-if="pmRows.length === 0">
-              <td colspan="6" class="empty-cell">No PM found yet. Click “Refresh from Redmine”.</td>
+              <td colspan="7" class="empty-cell">No PM found yet. Click “Refresh from Redmine”.</td>
             </tr>
             <tr v-for="pm in pmRows" :key="pm.redmine_user_id">
               <td>{{ pm.redmine_user_id }}</td>
               <td>{{ pm.full_name }}</td>
               <td>{{ pm.email }}</td>
+              <td>
+                <span v-if="pm.managed_projects && pm.managed_projects.length > 0">
+                  {{ pm.managed_projects.join(", ") }}
+                </span>
+                <span v-else class="empty-cell">—</span>
+              </td>
               <td>
                 <span :class="pm.credentials_ready ? 'status-enabled' : 'status-disabled'">
                   {{ pm.credentials_ready ? 'Ready' : 'Missing' }}

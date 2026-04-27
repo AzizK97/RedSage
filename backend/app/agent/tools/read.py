@@ -47,6 +47,36 @@ def _as_str_id(value):
     return str(value)
 
 
+def _resolve_fixed_version_id(project_id: str, version_id: str | int | None) -> str | None:
+    """Resolve a sprint/version reference to a Redmine fixed_version_id.
+
+    Redmine's issues endpoint expects the version identifier, while the agent may
+    pass a human-readable sprint label like "Sprint 3". If the value already
+    looks numeric, keep it. Otherwise, look up the project's versions and match
+    by id or name.
+    """
+    if version_id is None:
+        return None
+
+    version_text = str(version_id).strip()
+    if not version_text:
+        return None
+
+    if version_text.isdigit():
+        return version_text
+
+    versions_payload = _get(f"/projects/{project_id}/versions.json")
+    for version in versions_payload.get("versions", []):
+        version_name = str(version.get("name", "")).strip()
+        version_identifier = str(version.get("identifier", "")).strip()
+        if version_text == version_name or version_text == version_identifier:
+            version_id_value = version.get("id")
+            if version_id_value is not None:
+                return str(version_id_value)
+
+    return version_text
+
+
 # ── Read Tools ─────────────────────────────────────────────────────────────────
 
 @tool
@@ -117,7 +147,7 @@ def get_issues(
     if due_before:
         params["due_date"] = f"<={due_before}"
     if version_id:
-        params["fixed_version_id"] = _as_str_id(version_id)
+        params["fixed_version_id"] = _resolve_fixed_version_id(project_id, version_id)
 
     data = _get("/issues.json", params)
     result =  {

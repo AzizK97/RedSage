@@ -13,3 +13,4 @@ class PmCandidate(BaseModel):
     in_platform: bool
     enabled: bool
     credentials_ready: bool = True
+    managed_projects: list[str] = []

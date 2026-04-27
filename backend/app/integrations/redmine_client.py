@@ -1,5 +1,5 @@
 import requests
-from app.core.config import settings
+from app.core.settings import settings
 
 
 class RedmineClient:
@@ -90,5 +90,82 @@ class RedmineClient:
             if (user.get("mail") or "").strip().lower() == target:
                 return user
         return None
+
+    def list_projects(self) -> list[dict]:
+        if not self.base_url or not settings.REDMINE_API_KEY:
+            raise RuntimeError("REDMINE_URL / REDMINE_API_KEY not configured")
+
+        projects: list[dict] = []
+        offset = 0
+        limit = 100
+
+        while True:
+            url = f"{self.base_url}/projects.json?limit={limit}&offset={offset}"
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            if resp.status_code >= 400:
+                raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+            payload = resp.json()
+            chunk = payload.get("projects", [])
+            projects.extend(chunk)
+
+            total_count = int(payload.get("total_count", len(projects)))
+            if len(chunk) < limit or len(projects) >= total_count:
+                break
+            offset += limit
+
+        return projects
+
+    def list_managed_projects_for_user(self, redmine_user_id: int) -> list[str]:
+        """Return project names for a PM user.
+
+        Prefers projects where the user's membership role looks managerial.
+        If none are detected (custom role names, localization), falls back to
+        all projects where the user is at least a member.
+        """
+        managed_project_names: list[str] = []
+        member_project_names: list[str] = []
+
+        for project in self.list_projects():
+            project_identifier = project.get("identifier")
+            if not project_identifier:
+                continue
+
+            url = f"{self.base_url}/projects/{project_identifier}/memberships.json"
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            if resp.status_code >= 400:
+                raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+            memberships = resp.json().get("memberships", [])
+            for membership in memberships:
+                member_user = membership.get("user") or {}
+                if member_user.get("id") != redmine_user_id:
+                    continue
+
+                roles = membership.get("roles") or []
+                member_project_names.append(project.get("name", ""))
+                has_manager_role = any(
+                    any(
+                        keyword in str(role.get("name", "")).lower()
+                        for keyword in ("manager", "lead", "owner", "chef", "responsable")
+                    )
+                    for role in roles
+                )
+                if has_manager_role:
+                    managed_project_names.append(project.get("name", ""))
+                break
+
+        source_names = managed_project_names if managed_project_names else member_project_names
+
+        seen: set[str] = set()
+        unique_names: list[str] = []
+        for name in source_names:
+            normalized = (name or "").strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_names.append(normalized)
+
+        return unique_names
     
 redmine_client = RedmineClient()

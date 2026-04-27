@@ -14,6 +14,7 @@ from app.agent.agents.overview  import create_overview_agent
 from app.agent.agents.tasks     import create_tasks_agent
 from app.agent.agents.planning  import create_planning_agent
 from app.agent.agents.report    import create_report_agent
+from app.agent.provider import ModelProvider
 
 from langfuse import get_client, Langfuse
 from langfuse.langchain import CallbackHandler
@@ -62,10 +63,15 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
     return config
 
 def create_llm() -> ChatOllama:
-    return ChatOllama(
-        model="qwen3:4b-thinking",
-        temperature=0
-    )
+    """Create a ChatOllama model instance using ModelProvider for configuration.
+    
+    The model name and base URL are loaded from environment variables:
+    - LLM_MODEL: defaults to "gemma4:26b"
+    - LLM_BASE_URL: defaults to "http://127.0.0.1:11434"
+    - LLM_TEMPERATURE: defaults to 0.7
+    """
+    provider = ModelProvider.instance()
+    return provider.build()
 
 # def create_llm() -> ChatOpenAI:
 #     return ChatOpenAI(

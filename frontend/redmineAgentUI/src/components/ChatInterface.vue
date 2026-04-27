@@ -150,20 +150,23 @@ async function removeConversation(threadId: string) {
 
           <p v-if="isSyncing" class="thread">Syncing conversation…</p>
 
-          <MessageList :messages="messages" />
+          <MessageList :messages="messages">
+            <template #after-messages>
+              <ApprovalDialog
+                :interrupt="pendingInterrupt"
+                :disabled="isLoading"
+                @approve="onApprove"
+                @reject="onReject"
+                @edit="onEdit"
+              />
+            </template>
+          </MessageList>
 
           <div v-if="isLoading && showLoadingStatus" class="agent-status" role="status" aria-live="polite">
             <span class="status-dot" />
             <span class="status-text">{{ loadingStatus }}</span>
           </div>
 
-          <ApprovalDialog
-            :interrupt="pendingInterrupt"
-            :disabled="isLoading"
-            @approve="onApprove"
-            @reject="onReject"
-            @edit="onEdit"
-          />
         </div>
 
         <div class="chat-input-docked">
