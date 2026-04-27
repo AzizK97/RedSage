@@ -23,8 +23,41 @@ const md = new MarkDownIt({
 //   });
 // }
 
+function splitBrokenTableRows(text: string) {
+  return (text || "")
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trimEnd();
+      if (!trimmed.startsWith("|")) {
+        return line;
+      }
+
+      const headerLike = /^\|(\s*[-:]+\s*\|)+/.test(trimmed);
+      const splitIndex = trimmed.indexOf("|$$");
+      if (headerLike && splitIndex !== -1) {
+        return `${trimmed.slice(0, splitIndex + 1)}\n${trimmed.slice(splitIndex + 1)}`;
+      }
+
+      return line;
+    })
+    .join("\n");
+}
+
+function normalizeMarkdown(text: string) {
+  return splitBrokenTableRows(text)
+    // Remove math-style wrappers and keep inner text
+    .replace(/\$\$([^$]+)\$\$/gs, (_, inner) => inner)
+    // Convert function-like wrappers from the model: text(Sprint 1) -> Sprint 1
+    .replace(/text\(([^)]+)\)/g, "$1")
+    // Convert escaped LaTeX \text{...} to plain text
+    .replace(/\\text\{([^}]*)\}/g, "$1")
+    // Unescape common markdown punctuation that the model may emit with backslashes
+    .replace(/\\([\\`*_{}\[\]()#\+.!\-|$])/g, "$1");
+}
+
 function renderMarkdown(text: string) {
-  const raw = md.render(text || "");
+  const normalized = normalizeMarkdown(text);
+  const raw = md.render(normalized);
   return DOMPurify.sanitize(raw);
 }
 

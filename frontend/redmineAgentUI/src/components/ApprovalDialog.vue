@@ -175,41 +175,6 @@ function edit() {
       <div class="panel">
         <p class="panel-title">Incoming payload</p>
 
-        <!-- <div class="field-row">
-          <div class="field-meta">
-            <span class="field-label">Tool name</span>
-          </div>
-
-          <div class="field-value">
-            <input
-              v-if="editingName"
-              v-model="nameDraft"
-              :disabled="disabled"
-              placeholder="Tool name"
-            />
-            <input v-else :value="editName" readonly />
-          </div>
-
-          <div class="field-actions">
-            <button
-              v-if="!editingName"
-              class="btn btn-inline"
-              :disabled="disabled"
-              @click="beginEditName"
-            >
-              Edit
-            </button>
-            <template v-else>
-              <button class="btn btn-inline" :disabled="disabled || !nameDraft.trim()" @click="saveEditName">
-                Save
-              </button>
-              <button class="btn btn-inline btn-ghost" :disabled="disabled" @click="cancelEditName">
-                Cancel
-              </button>
-            </template>
-          </div>
-        </div> -->
-
         <div v-if="argEntries.length" class="field-list">
           <div v-for="([key, value]) in argEntries" :key="key" class="field-row">
             <div class="field-meta">

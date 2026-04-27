@@ -1,5 +1,6 @@
 import os
 import requests
+import json
 from datetime import date
 from langchain_core.tools import tool
 
@@ -87,11 +88,11 @@ def get_projects() -> dict:
     or when you need to resolve a project name to its identifier.
     """
 
-    # cache_key = "redmine:projects"
-    # cached = await get_cached(cache_key)
+    cache_key = "redmine:projects"
+    cached = get_cached(cache_key)
 
-    # if cached:
-    #     return cached
+    if cached:
+        return cached
 
     data = _get("/projects.json", {"limit": 100})
     result = {
@@ -107,7 +108,7 @@ def get_projects() -> dict:
         ]
     }
 
-    # await set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
+    set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
     return result
 
 
@@ -149,6 +150,12 @@ def get_issues(
     if version_id:
         params["fixed_version_id"] = _resolve_fixed_version_id(project_id, version_id)
 
+    # Create cache key from params
+    cache_key = f"redmine:issues:{json.dumps(params, sort_keys=True)}"
+    cached = get_cached(cache_key)
+    if cached:
+        return cached
+
     data = _get("/issues.json", params)
     result =  {
         "total_count": data.get("total_count", 0),
@@ -167,6 +174,7 @@ def get_issues(
         ]
     }
 
+    set_cached(cache_key, result, ttl_seconds=300)  # Cache for 5 minutes
     return result
 
 
@@ -181,6 +189,11 @@ def get_members(project_id: str) -> dict:
         project_id: Project identifier  e.g. 'ai-chatbot-platform'
     """
 
+    cache_key = f"redmine:members:{project_id}"
+    cached = get_cached(cache_key)
+    if cached:
+        return cached
+
     data = _get(f"/projects/{project_id}/memberships.json")
     result = {
         "total_count": len(data.get("memberships", [])),
@@ -194,6 +207,8 @@ def get_members(project_id: str) -> dict:
             if "user" in m
         ]
     }
+
+    set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
     return result
 
 @tool
@@ -205,6 +220,11 @@ def get_versions(project_id: str) -> dict:
     Args:
         project_id: Project identifier  e.g. 'ai-chatbot-platform'
     """
+
+    cache_key = f"redmine:versions:{project_id}"
+    cached = get_cached(cache_key)
+    if cached:
+        return cached
 
     data  = _get(f"/projects/{project_id}/versions.json")
     today = date.today().isoformat()
@@ -232,6 +252,7 @@ def get_versions(project_id: str) -> dict:
         ]
     }
 
+    set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
     return result
 
 
@@ -244,9 +265,14 @@ def get_issue_detail(issue_id: int | str) -> dict:
     Args:
         issue_id: Numeric ID of the issue  e.g. 42
     """
+    cache_key = f"redmine:issue_detail:{issue_id}"
+    cached = get_cached(cache_key)
+    if cached:
+        return cached
+
     data  = _get(f"/issues/{_as_str_id(issue_id)}.json")
     issue = data.get("issue", {})
-    return {
+    result = {
         "id":          issue.get("id"),
         "subject":     issue.get("subject"),
         "description": issue.get("description", "No description"),
@@ -262,3 +288,6 @@ def get_issue_detail(issue_id: int | str) -> dict:
         "created_on":  issue.get("created_on"),
         "updated_on":  issue.get("updated_on")
     }
+
+    set_cached(cache_key, result, ttl_seconds=300)  # Cache for 5 minutes
+    return result
