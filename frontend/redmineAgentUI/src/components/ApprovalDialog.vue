@@ -175,7 +175,7 @@ function edit() {
       <div class="panel">
         <p class="panel-title">Incoming payload</p>
 
-        <div class="field-row">
+        <!-- <div class="field-row">
           <div class="field-meta">
             <span class="field-label">Tool name</span>
           </div>
@@ -208,7 +208,7 @@ function edit() {
               </button>
             </template>
           </div>
-        </div>
+        </div> -->
 
         <div v-if="argEntries.length" class="field-list">
           <div v-for="([key, value]) in argEntries" :key="key" class="field-row">

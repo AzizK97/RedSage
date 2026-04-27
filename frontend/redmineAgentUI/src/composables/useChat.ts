@@ -35,18 +35,18 @@ export function useChat(token: string, userId: string) {
     function buildLoadingSteps(text: string): string[] {
         const q = text.toLowerCase();
 
-        if (/(member|team|role)/.test(q)) {
-            return ["Reading sources...", "Fetching project members...", "Analyzing team roles..."];
-        }
-        if (/(version|sprint|milestone)/.test(q)) {
-            return ["Reading sources...", "Fetching versions...", "Analyzing sprint timeline..."];
-        }
-        if (/(issue|ticket|task|bug)/.test(q)) {
-            return ["Reading sources...", "Fetching issues...", "Analyzing issue details..."];
-        }
-        if (/(project)/.test(q)) {
-            return ["Reading sources...", "Fetching projects...", "Analyzing project data..."];
-        }
+        // if (/(member|team|role)/.test(q)) {
+        //     return ["Reading sources...", "Fetching project members...", "Analyzing team roles..."];
+        // }
+        // if (/(version|sprint|milestone)/.test(q)) {
+        //     return ["Reading sources...", "Fetching versions...", "Analyzing sprint timeline..."];
+        // }
+        // if (/(issue|ticket|task|bug)/.test(q)) {
+        //     return ["Reading sources...", "Fetching issues...", "Analyzing issue details..."];
+        // }
+        // if (/(project)/.test(q)) {
+        //     return ["Reading sources...", "Fetching projects...", "Analyzing project data..."];
+        // }
 
         return ["Thinking...", "Gathering Redmine data...", "Analyzing results..."];
     }
