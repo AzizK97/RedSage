@@ -78,6 +78,65 @@ interface PmCandidate {
     enabled: boolean;
 }
 
+interface MonitoringMetrics {
+    total_projects: number;
+    open_issues: number;
+    in_progress: number;
+    overdue: number;
+    critical: number;
+}
+
+interface MonitoringProjectStatus {
+    project_id: number;
+    project_name: string;
+    open_issues: number;
+    in_progress: number;
+    overdue: number;
+    critical: number;
+}
+
+interface MonitoringRunTrend {
+    started_at: string;
+    events_count: number;
+}
+
+interface MonitoringEvent {
+    event_type: string;
+    severity: "critical" | "important" | "info";
+    title: string;
+    details: string;
+    occurred_at: string;
+    project_id?: number;
+    issue_id?: number;
+}
+
+interface MonitoringLastRun {
+    id: string;
+    started_at: string;
+    projects_count: number;
+    issues_count: number;
+    events_count: number;
+    synced_pms: number;
+}
+
+interface MonitoringOverview {
+    metrics: MonitoringMetrics;
+    last_run: MonitoringLastRun | null;
+    project_status: MonitoringProjectStatus[];
+    run_trend: MonitoringRunTrend[];
+    recent_events: MonitoringEvent[];
+}
+
+interface MonitoringRunResponse {
+    status: "success" | "skipped";
+    run_id?: string;
+    projects_count?: number;
+    issues_count?: number;
+    events_count?: number;
+    synced_pms?: number;
+    reason?: string;
+}
+
 export type {
     ChatRequest,
     ChatResponse,
@@ -90,5 +149,12 @@ export type {
     RootInfo,
     SyncPmResponse,
     SetPmAccessResponse,
-    PmCandidate
+    PmCandidate,
+    MonitoringMetrics,
+    MonitoringProjectStatus,
+    MonitoringRunTrend,
+    MonitoringEvent,
+    MonitoringLastRun,
+    MonitoringOverview,
+    MonitoringRunResponse
 }

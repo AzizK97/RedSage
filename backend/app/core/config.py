@@ -8,8 +8,16 @@ class Settings:
     ENV: str = os.getenv("ENV", "dev")
 
     PLATFORM_POSTGRES_URL: str = os.getenv("PLATFORM_POSTGRES_URL", "")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6380/0")
     REDMINE_URL: str = os.getenv("REDMINE_URL", "")
     REDMINE_API_KEY: str = os.getenv("REDMINE_API_KEY", "")
+    SLACK_WEBHOOK_URL: str = os.getenv("SLACK_WEBHOOK_URL", "")
+
+    ENABLE_MONITORING: bool = os.getenv("ENABLE_MONITORING", "false").lower() == "true"
+    MONITORING_INTERVAL_SECONDS: int = int(os.getenv("MONITORING_INTERVAL_SECONDS", "1800"))
+    MONITORING_ALERT_COOLDOWN_SECONDS: int = int(os.getenv("MONITORING_ALERT_COOLDOWN_SECONDS", "3600"))
+    MONITORING_DUE_SOON_HOURS: int = int(os.getenv("MONITORING_DUE_SOON_HOURS", "48"))
+    MONITORING_CACHE_TTL_SECONDS: int = int(os.getenv("MONITORING_CACHE_TTL_SECONDS", "120"))
 
     JWT_SECRET: str = os.getenv("JWT_SECRET", "change-me")
     JWT_ALG: str = os.getenv("JWT_ALG", "HS256")

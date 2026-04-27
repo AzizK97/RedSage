@@ -1,5 +1,6 @@
 import requests
 from app.core.config import settings
+from datetime import datetime
 
 
 class RedmineClient:
@@ -33,6 +34,56 @@ class RedmineClient:
             offset += limit
 
         return users
+
+    def _paginate(self, endpoint: str, array_key: str, params: dict | None = None) -> list[dict]:
+        if not self.base_url or not settings.REDMINE_API_KEY:
+            raise RuntimeError("REDMINE_URL / REDMINE_API_KEY not configured")
+
+        items: list[dict] = []
+        offset = 0
+        limit = 100
+        query = params.copy() if params else {}
+
+        while True:
+            query.update({"limit": limit, "offset": offset})
+            url = f"{self.base_url}/{endpoint}"
+            resp = requests.get(url, headers=self.headers, params=query, timeout=25)
+            if resp.status_code >= 400:
+                raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+            payload = resp.json()
+            chunk = payload.get(array_key, [])
+            items.extend(chunk)
+
+            total_count = int(payload.get("total_count", len(items)))
+            if len(chunk) < limit or len(items) >= total_count:
+                break
+            offset += limit
+
+        return items
+
+    def list_projects(self) -> list[dict]:
+        return self._paginate("projects.json", "projects")
+
+    def list_issues(self) -> list[dict]:
+        return self._paginate(
+            "issues.json",
+            "issues",
+            params={
+                "status_id": "*",
+                "sort": "updated_on:desc",
+            },
+        )
+
+    @staticmethod
+    def parse_redmine_datetime(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            normalized = value.replace("Z", "+00:00")
+            return datetime.fromisoformat(normalized)
+        except Exception:
+            return None
 
     def get_user(self, redmine_user_id: int) -> dict | None:
         if not self.base_url or not settings.REDMINE_API_KEY:

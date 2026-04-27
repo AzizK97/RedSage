@@ -1,75 +1,56 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { adminApi } from "../../api/admin";
-import type { PmCandidate } from "../../types";
+import { monitoringApi } from "../../api/monitoring";
+import type { MonitoringOverview, PmCandidate } from "../../types";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
   token: string;
 }>();
 
-interface ProjectStatus {
-  id: string;
-  name: string;
-  owner: string;
-  progress: number;
-  health: "On track" | "At risk" | "Delayed";
-  completionEta: string;
-}
+const monitoring = ref<MonitoringOverview | null>(null);
+const monitoringLoading = ref(false);
+const monitoringError = ref("");
 
-const projects = ref<ProjectStatus[]>([
-  {
-    id: "proj-01",
-    name: "E-commerce Revamp",
-    owner: "Nadia F.",
-    progress: 72,
-    health: "On track",
-    completionEta: "May 10",
-  },
-  {
-    id: "proj-02",
-    name: "Customer Portal",
-    owner: "Amine B.",
-    progress: 54,
-    health: "At risk",
-    completionEta: "May 28",
-  },
-  {
-    id: "proj-03",
-    name: "Billing Automation",
-    owner: "Sara M.",
-    progress: 88,
-    health: "On track",
-    completionEta: "Apr 30",
-  },
-  {
-    id: "proj-04",
-    name: "Search Optimization",
-    owner: "Yassine H.",
-    progress: 31,
-    health: "Delayed",
-    completionEta: "Jun 15",
-  },
-]);
+const totalProjects = computed(() => monitoring.value?.metrics.total_projects ?? 0);
+const openIssues = computed(() => monitoring.value?.metrics.open_issues ?? 0);
+const overdueIssues = computed(() => monitoring.value?.metrics.overdue ?? 0);
+const criticalIssues = computed(() => monitoring.value?.metrics.critical ?? 0);
 
-const totalProjects = computed(() => projects.value.length);
-const avgProgress = computed(() => {
-  if (!projects.value.length) return 0;
-  const sum = projects.value.reduce((acc, item) => acc + item.progress, 0);
-  return Math.round(sum / projects.value.length);
+const projectRows = computed(() => {
+  const rows = monitoring.value?.project_status ?? [];
+  return rows.map((row) => {
+    const progress = row.open_issues > 0
+      ? Math.round((row.in_progress / row.open_issues) * 100)
+      : 100;
+
+    const health: "On track" | "At risk" | "Delayed" =
+      row.overdue > 0 ? "Delayed" : row.critical > 0 ? "At risk" : "On track";
+
+    return {
+      id: String(row.project_id),
+      name: row.project_name,
+      progress,
+      health,
+      subtitle: `Open: ${row.open_issues} • In progress: ${row.in_progress} • Overdue: ${row.overdue}`,
+    };
+  });
 });
-const atRiskCount = computed(() =>
-  projects.value.filter((item) => item.health === "At risk" || item.health === "Delayed").length,
-);
-const completedSoon = computed(() => projects.value.filter((item) => item.progress >= 80).length);
 
-const weeklyVelocity = [18, 22, 19, 27, 24, 29, 31];
 const velocityBars = computed(() => {
-  const max = Math.max(...weeklyVelocity, 1);
-  return weeklyVelocity.map((value, index) => ({
-    label: `W${index + 1}`,
-    value,
-    height: `${Math.max(16, Math.round((value / max) * 100))}%`,
+  const trend = monitoring.value?.run_trend ?? [];
+  if (!trend.length) {
+    return [
+      { label: "Run", value: 0, height: "16%" },
+    ];
+  }
+
+  const max = Math.max(...trend.map((row) => row.events_count), 1);
+  return trend.map((row, index) => ({
+    label: `R${index + 1}`,
+    value: row.events_count,
+    height: `${Math.max(16, Math.round((row.events_count / max) * 100))}%`,
   }));
 });
 
@@ -87,6 +68,24 @@ const pmError = ref("");
 const pmSuccess = ref("");
 
 const enabledPmCount = computed(() => pmRows.value.filter((item) => item.enabled).length);
+
+async function loadMonitoringOverview() {
+  if (!props.token.trim()) {
+    monitoringError.value = "Missing authentication token.";
+    return;
+  }
+
+  monitoringLoading.value = true;
+  monitoringError.value = "";
+
+  try {
+    monitoring.value = await monitoringApi.getOverview(props.token.trim());
+  } catch (error) {
+    monitoringError.value = error instanceof Error ? error.message : "Failed to load monitoring overview.";
+  } finally {
+    monitoringLoading.value = false;
+  }
+}
 
 function setRowLoading(redmineUserId: number, loading: boolean) {
   rowLoading.value = {
@@ -167,11 +166,12 @@ async function togglePmAccess(pm: PmCandidate, enabled: boolean) {
 }
 
 onMounted(async () => {
+  await loadMonitoringOverview();
   if (!isAdmin.value) return;
   await refreshPmFromRedmine();
 });
 
-function healthClass(health: ProjectStatus["health"]) {
+function healthClass(health: "On track" | "At risk" | "Delayed") {
   if (health === "On track") return "health-good";
   if (health === "At risk") return "health-warn";
   return "health-bad";
@@ -194,24 +194,27 @@ function healthClass(health: ProjectStatus["health"]) {
         <strong>{{ totalProjects }}</strong>
       </article>
       <article class="card stat-card">
-        <p class="label">Average progress</p>
-        <strong>{{ avgProgress }}%</strong>
+        <p class="label">Open issues</p>
+        <strong>{{ openIssues }}</strong>
       </article>
       <article class="card stat-card">
-        <p class="label">At risk / delayed</p>
-        <strong>{{ atRiskCount }}</strong>
+        <p class="label">Overdue issues</p>
+        <strong>{{ overdueIssues }}</strong>
       </article>
       <article class="card stat-card">
-        <p class="label">Near completion</p>
-        <strong>{{ completedSoon }}</strong>
+        <p class="label">Critical issues</p>
+        <strong>{{ criticalIssues }}</strong>
       </article>
     </section>
+
+    <p v-if="monitoringLoading" class="banner success">Loading Redmine monitoring data…</p>
+    <p v-if="monitoringError" class="banner error">{{ monitoringError }}</p>
 
     <section class="content-grid">
       <article class="card chart-card">
         <header class="card-head">
-          <h2>Weekly delivery velocity</h2>
-          <span class="caption">Story points completed</span>
+          <h2>Monitoring run trend</h2>
+          <span class="caption">Events detected by recent runs</span>
         </header>
 
         <div class="bar-chart" aria-label="Weekly velocity chart">
@@ -230,10 +233,10 @@ function healthClass(health: ProjectStatus["health"]) {
         </header>
 
         <ul class="project-list">
-          <li v-for="project in projects" :key="project.id" class="project-row">
+          <li v-for="project in projectRows" :key="project.id" class="project-row">
             <div class="project-meta">
               <p class="project-name">{{ project.name }}</p>
-              <p class="project-sub">Owner: {{ project.owner }} • ETA: {{ project.completionEta }}</p>
+              <p class="project-sub">{{ project.subtitle }}</p>
             </div>
             <div class="project-progress">
               <span class="health-pill" :class="healthClass(project.health)">{{ project.health }}</span>
