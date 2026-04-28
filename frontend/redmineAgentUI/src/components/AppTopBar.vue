@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Bell, CircleHelp, Search, UserCircle2 } from "@lucide/vue";
+import { Bell, CircleHelp, Search, UserCircle2, Sun, Moon } from "@lucide/vue";
+import { ref, onMounted } from "vue";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -9,6 +10,26 @@ const props = defineProps<{
 
 const roleLabel = props.role === "admin" ? "Admin" : "Project Manager";
 const displayName = props.fullName?.trim() || props.userId || "Unknown user";
+
+const theme = ref<string>((typeof window !== "undefined" && localStorage.getItem("theme")) || "dark");
+
+onMounted(() => {
+  try {
+    document.documentElement.setAttribute("data-theme", theme.value);
+  } catch (e) {
+    /* noop in SSR */
+  }
+});
+
+function toggleTheme() {
+  theme.value = theme.value === "light" ? "dark" : "light";
+  try {
+    document.documentElement.setAttribute("data-theme", theme.value);
+    localStorage.setItem("theme", theme.value);
+  } catch (e) {
+    /* noop */
+  }
+}
 </script>
 
 <template>
@@ -24,6 +45,16 @@ const displayName = props.fullName?.trim() || props.userId || "Unknown user";
       </button>
       <button type="button" class="icon-btn" aria-label="Help">
         <CircleHelp :size="18" />
+      </button>
+
+      <button
+        type="button"
+        class="icon-btn"
+        aria-label="Toggle theme"
+        @click="toggleTheme"
+      >
+        <Sun v-if="theme === 'light'" :size="16" />
+        <Moon v-else :size="16" />
       </button>
 
       <div class="profile-pill" aria-label="Profile">
@@ -95,6 +126,10 @@ const displayName = props.fullName?.trim() || props.userId || "Unknown user";
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.icon-btn svg {
+  display: block;
 }
 
 .icon-btn {
