@@ -57,6 +57,11 @@ function onEnter(event: KeyboardEvent) {
     void submitLogin();
   }
 }
+
+function signInWithRedmine() {
+  const apiBase = import.meta.env.VITE_API_URL || '/api';
+  window.location.href = `${apiBase}/auth/redmine/authorize`;
+}
 </script>
 
 <template>
@@ -92,6 +97,9 @@ function onEnter(event: KeyboardEvent) {
       <button class="primary-btn" type="button" :disabled="isSubmitting" @click="submitLogin">
         {{ isSubmitting ? "Signing in..." : "Sign in" }}
       </button>
+      <!-- <button class="secondary-btn" type="button" @click="signInWithRedmine">
+        Sign in with Redmine
+      </button> -->
     </section>
   </main>
 </template>

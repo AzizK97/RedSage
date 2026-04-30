@@ -4,12 +4,14 @@ import AppSidebar from "./components/AppSidebar.vue";
 import AppTopBar from "./components/AppTopBar.vue";
 import ChatInterface from "./components/ChatInterface.vue";
 import LoginView from "./views/auth/LoginView.vue";
+import RedmineCallback from "./views/auth/RedmineCallback.vue";
 import DashboardView from "./views/dashboard/DashboardView.vue";
 import ProfileView from "./views/profile/ProfileView.vue";
 import { useSession, type PlatformRole } from "./composables/useSession";
 
 const { token, role, fullName, email, userId, isAuthenticated, setSession, clearSession } = useSession();
 const currentView = ref<"dashboard" | "chat" | "profile">("dashboard");
+const isOAuthCallback = window.location.pathname.startsWith("/auth/redmine/callback");
 
 function handleLogin(payload: { token: string; role: PlatformRole; fullName: string }) {
   setSession(payload.token, payload.role, payload.fullName);
@@ -27,7 +29,8 @@ function handleNavigate(view: "dashboard" | "chat" | "profile") {
 </script>
 
 <template>
-  <main v-if="!isAuthenticated" class="app-shell">
+  <RedmineCallback v-if="isOAuthCallback" />
+  <main v-else-if="!isAuthenticated" class="app-shell">
     <LoginView @login="handleLogin" />
   </main>
   <main v-else class="app-shell app-auth-shell">
@@ -43,6 +46,8 @@ function handleNavigate(view: "dashboard" | "chat" | "profile") {
         :role="role === 'admin' ? 'admin' : 'project_manager'"
         :user-id="userId"
         :full-name="fullName"
+        :token="token"
+        @navigate="handleNavigate"
       />
 
       <section class="app-view">

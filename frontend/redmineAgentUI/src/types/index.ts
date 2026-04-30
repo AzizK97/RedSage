@@ -137,6 +137,58 @@ interface MonitoringRunResponse {
     reason?: string;
 }
 
+interface DashboardProject {
+    id: number;
+    name: string;
+    identifier?: string;
+    status?: number;
+}
+
+interface OverdueTicketInsight {
+    issue_id: number;
+    subject: string;
+    project_name: string;
+    project_identifier: string;
+    due_date: string;
+    priority: string;
+    status: string;
+    url: string;
+}
+
+interface AtRiskProjectInsight {
+    project_id: number;
+    project_name: string;
+    project_identifier: string;
+    overdue_count: number;
+    high_priority_open_count: number;
+    reason: string;
+    recommended_action: string;
+    url: string;
+}
+
+// ProjectStatus used by the dashboard view mapping
+interface ProjectStatus {
+    id: string;
+    name: string;
+    owner?: string;
+    progress: number;
+    health: "On track" | "At risk" | "Delayed";
+    completionEta?: string;
+}
+
+interface MonitoringNotification {
+    id: string;
+    created_at: string;
+    title: string;
+    subtitle: string;
+    message: string;
+    severity: "info" | "success" | "warning" | "critical";
+    action_text: string;
+    action_url: string;
+    slack_sent: boolean;
+    status: string;
+}
+
 export type {
     ChatRequest,
     ChatResponse,
@@ -156,5 +208,10 @@ export type {
     MonitoringEvent,
     MonitoringLastRun,
     MonitoringOverview,
-    MonitoringRunResponse
+    MonitoringRunResponse,
+    DashboardProject,
+    OverdueTicketInsight,
+    AtRiskProjectInsight,
+    ProjectStatus,
+    MonitoringNotification,
 }

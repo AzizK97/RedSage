@@ -23,7 +23,7 @@ function roleLabel() {
   <aside :class="{ 'app-sidebar': true, collapsed: isCollapsed }">
     <div class="brand">
       <div v-show="!isCollapsed">
-        <h1>Redmine Assist</h1>
+        <h1>RedSage</h1>
         <p>{{ roleLabel() }}</p>
       </div>
       <button class="collapse-btn" type="button" @click="isCollapsed = !isCollapsed" aria-label="Toggle sidebar">

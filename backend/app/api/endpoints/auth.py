@@ -1,5 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
 from psycopg import Connection
+from urllib.parse import urlencode
+import requests
+
+from app.core.settings import get_settings
 
 from app.core.security import create_access_token
 from app.dependencies.auth import CurrentUser, get_current_user
@@ -66,3 +71,99 @@ def me(current: CurrentUser = Depends(get_current_user)):
         role=current.role.value,
         enabled=current.enabled,
     )
+
+
+# --- Redmine OAuth flow (per-user) ---
+
+
+@router.get("/redmine/authorize")
+def redmine_authorize(request: Request):
+    settings = get_settings()
+    if not settings.REDMINE_OAUTH_CLIENT_ID:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redmine OAuth is not configured")
+
+    authorize_base = settings.REDMINE_OAUTH_AUTHORIZE_URL or f"{settings.REDMINE_URL.rstrip('/')}/oauth/authorize"
+    redirect_uri = (
+        settings.REDMINE_OAUTH_REDIRECT_URI
+        or f"{str(request.base_url).rstrip('/')}{settings.REDMINE_OAUTH_REDIRECT_PATH}"
+    )
+
+    params = {
+        "client_id": settings.REDMINE_OAUTH_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+    }
+    if settings.REDMINE_OAUTH_SCOPES:
+        params["scope"] = " ".join(settings.REDMINE_OAUTH_SCOPES)
+
+    url = f"{authorize_base}?{urlencode(params)}"
+    return RedirectResponse(url)
+
+
+@router.get("/redmine/callback", name="redmine_callback", response_model=LoginResponse)
+def redmine_callback(request: Request, code: str | None = None, db: Connection = Depends(get_db)):
+    settings = get_settings()
+    if not code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing authorization code")
+
+    token_url = settings.REDMINE_OAUTH_TOKEN_URL or f"{settings.REDMINE_URL.rstrip('/')}/oauth/token"
+    redirect_uri = settings.REDMINE_OAUTH_REDIRECT_URI or f"{str(request.base_url).rstrip('/')}{settings.REDMINE_OAUTH_REDIRECT_PATH}"
+
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": settings.REDMINE_OAUTH_CLIENT_ID,
+        "client_secret": settings.REDMINE_OAUTH_CLIENT_SECRET,
+        "redirect_uri": redirect_uri,
+    }
+
+    resp = requests.post(token_url, data=data, timeout=20)
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Token exchange failed: {resp.text}")
+
+    token_payload = resp.json()
+    access_token = token_payload.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No access token returned by Redmine")
+
+    # Fetch current user from Redmine with the received token
+    user_resp = requests.get(f"{settings.REDMINE_URL.rstrip('/')}/users/current.json", headers={"Authorization": f"Bearer {access_token}"}, timeout=20)
+    if user_resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch Redmine user: {user_resp.text}")
+
+    user_obj = user_resp.json().get("user")
+    if not user_obj:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve Redmine user information")
+
+    redmine_user_id = int(user_obj.get("id", 0))
+    email = user_obj.get("mail") or ""
+    full_name = " ".join([user_obj.get("firstname", ""), user_obj.get("lastname", "")]).strip()
+
+    users = UserRepository(db)
+    ents = EntitlementRepository(db)
+    local_user = users.mirror_user_from_redmine(redmine_user_id, email, full_name)
+
+    enabled = ents.is_enabled(local_user["id"])
+    if not enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access disabled by Admin")
+
+    token = create_access_token(
+        {
+            "sub": local_user["id"],
+            "redmine_user_id": local_user["redmine_user_id"],
+            "role": local_user["platform_role"],
+            "email": local_user["email"],
+        }
+    )
+
+    # If frontend redirect is configured, send user back to SPA with token in fragment.
+    frontend = settings.REDMINE_OAUTH_FRONTEND_REDIRECT.strip()
+    if frontend:
+        # Build redirect target: <frontend>/auth/redmine/callback#token=...&full_name=...
+        base = frontend.rstrip("/")
+        fragment = urlencode({"token": token, "full_name": local_user.get("full_name", "")})
+        url = f"{base}/auth/redmine/callback#{fragment}"
+        return RedirectResponse(url)
+
+    # Fallback: return JSON payload
+    return LoginResponse(access_token=token, full_name=local_user["full_name"])

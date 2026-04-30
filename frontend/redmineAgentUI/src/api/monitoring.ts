@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { MonitoringOverview, MonitoringRunResponse } from '../types';
+import type { MonitoringOverview, MonitoringRunResponse, MonitoringLastRun, MonitoringNotification } from '../types';
 
 export const monitoringApi = {
   async getOverview(token: string): Promise<MonitoringOverview> {
@@ -7,6 +7,15 @@ export const monitoringApi = {
   },
 
   async runNow(token: string): Promise<MonitoringRunResponse> {
-    return apiClient.post('/monitoring/run', {}, token);
+    // new endpoint name used by backend
+    return apiClient.post('/monitoring/run-now', {}, token);
+  },
+
+  async getStatus(token: string): Promise<MonitoringLastRun> {
+    return apiClient.get('/monitoring/status', token);
+  },
+
+  async listNotifications(token: string): Promise<{ items: MonitoringNotification[] }> {
+    return apiClient.get('/monitoring/notifications', token);
   },
 };

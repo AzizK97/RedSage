@@ -2,21 +2,28 @@ from fastapi import APIRouter, Depends
 
 from app.core.rbac import Permission
 from app.dependencies.auth import CurrentUser, require_permission
-from app.monitoring.service import MonitoringService
+from app.services.monitoring_service import MonitoringService
 
 router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
-service = MonitoringService()
+monitoring_service = MonitoringService()
 
 
-@router.get("/overview")
-async def get_overview(
-    _: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-):
-    return await service.get_overview()
-
-
-@router.post("/run")
-async def run_monitoring_once(
+@router.post("/run-now")
+def run_monitoring_now(
     _: CurrentUser = Depends(require_permission(Permission.PM_ACCESS_MANAGE)),
 ):
-    return await service.run_once()
+    return monitoring_service.run_once()
+
+
+@router.get("/status")
+def monitoring_status(
+    _: CurrentUser = Depends(require_permission(Permission.PM_ACCESS_MANAGE)),
+):
+    return monitoring_service.last_result()
+
+
+@router.get("/notifications")
+def monitoring_notifications(
+    _: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+):
+    return {"items": monitoring_service.notifications()}

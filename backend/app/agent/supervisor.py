@@ -67,15 +67,6 @@ def create_llm() -> ChatOllama:
         temperature=0
     )
 
-# def create_llm() -> ChatOpenAI:
-#     return ChatOpenAI(
-#         model=os.getenv("MODEL_NAME"),
-#         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-#         openai_api_base="https://openrouter.ai/api/v1",
-#         temperature=0,
-#         max_tokens=800
-#     )
-
 
 llm = create_llm()
 overview_agent  = create_overview_agent(llm)
