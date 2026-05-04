@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { adminApi } from "../../api/admin";
 import { dashboardApi } from "../../api/dashboard";
-import type { AtRiskProjectInsight, DashboardProject, OverdueTicketInsight, PmCandidate } from "../../types";
+import type { AtRiskProjectInsight, DashboardProject, OverdueTicketInsight, PmCandidate, ProjectStatus } from "../../types";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -28,7 +28,7 @@ const projectRows = computed(() => {
   });
 });
 
-const velocityBars = computed(() => []);
+const velocityBars = computed((): { label: string; height: string; value: number }[] => []);
 
 const roleLabel = computed(() =>
   props.role === "admin" ? "Admin overview" : "Project manager overview",
@@ -431,5 +431,265 @@ h1 {
 .chart-card,
 .status-card {
   padding: var(--space-md);
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.caption {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.bar-chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--space-sm);
+  height: 240px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  background: var(--bg-tertiary);
+}
+
+.bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: var(--space-xs);
+}
+
+.bar {
+  width: 28px;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--accent-blue);
+}
+
+.bar-value,
+.bar-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.project-row {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  background: var(--bg-tertiary);
+}
+
+.project-meta {
+  margin-bottom: var(--space-xs);
+}
+
+.project-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.project-sub {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.project-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.health-pill {
+  font-size: var(--text-xs);
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+}
+
+.health-good {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.health-warn {
+  color: var(--accent-yellow);
+  border-color: var(--accent-yellow);
+}
+
+.health-bad {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+}
+
+.progress-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-blue);
+}
+
+.admin-access {
+  padding: var(--space-md);
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.summary-card {
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.banner {
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.banner.error {
+  border: 1px solid var(--accent-red);
+  color: var(--accent-red);
+}
+
+.banner.success {
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+}
+
+.table-wrap {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+}
+
+.pm-table th,
+.pm-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  font-size: var(--text-sm);
+}
+
+.pm-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.empty-cell {
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.status-enabled,
+.status-disabled {
+  font-weight: 600;
+}
+
+.status-enabled {
+  color: var(--accent-green);
+}
+
+.status-disabled {
+  color: var(--accent-red);
+}
+
+.primary-btn,
+.secondary-btn {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 0.5rem 0.8rem;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.primary-btn {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue);
+}
+
+.secondary-btn {
+  border-color: var(--accent-blue);
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-shell {
+    padding: var(--space-md);
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -20,6 +20,9 @@ from langfuse.langchain import CallbackHandler
 
 from openai import OpenAI
 
+from app.agent.provider import ModelProvider
+from app.agent.tools.read import set_session_user, clear_session_user
+
 
 load_dotenv()
 
@@ -61,11 +64,24 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 
     return config
 
+# def create_llm() -> ChatOpenAI:
+#     return ChatOpenAI(
+#         model=os.getenv("MODEL_NAME","openrouter/auto"),
+#         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+#         open_ai_base=os.getenv("OPENROUTER_BASE_URL"),
+#         temperature=0,
+#         max_tokens=800
+#     )
+
+# def create_llm() -> ChatOllama:
+#     return ChatOllama(
+#         model="qwen3:4b-thinking",
+#         temperature=0
+#     )
+
 def create_llm() -> ChatOllama:
-    return ChatOllama(
-        model="qwen3:4b-thinking",
-        temperature=0
-    )
+    provider = ModelProvider.instance()
+    return provider.build()
 
 
 llm = create_llm()
@@ -190,14 +206,19 @@ def delete_thread_memory(thread_id: str)-> None:
         print(f"[DELETE_THREAD] ❌ Error deleting thread_id={thread_id}: {str(e)}")
         raise
 
-def _invoke_chat(question: str, thread_id: str) -> Any:
+def _invoke_chat(question: str, thread_id: str, redmine_user_id: int | None = None, is_admin: bool = False) -> Any:
     app = get_app()
     config = build_invoke_config(thread_id=thread_id, entrypoint="chat")
 
-    return app.invoke(
-        {"messages": [HumanMessage(content=question)]},
-        config=config
-    )
+    # Configure read-tool session to enforce project restrictions for PMs
+    try:
+        set_session_user(redmine_user_id, is_admin=is_admin)
+        return app.invoke(
+            {"messages": [HumanMessage(content=question)]},
+            config=config
+        )
+    finally:
+        clear_session_user()
 
 
 def extract_final_message_content(result: Any) -> str:
@@ -277,7 +298,7 @@ def extract_final_message_content(result: Any) -> str:
     return "No response message produced."
 
 
-def chat(question: str, thread_id: str = "default") -> str:
+def chat(question: str, thread_id: str = "default", redmine_user_id: int | None = None, is_admin: bool = False) -> str:
     """
     Send a message to the supervisor and return the final response.
 
@@ -285,16 +306,16 @@ def chat(question: str, thread_id: str = "default") -> str:
         question:  User's natural language question
         thread_id: Conversation thread ID for memory persistence
     """
-    result = _invoke_chat(question, thread_id)
+    result = _invoke_chat(question, thread_id, redmine_user_id=redmine_user_id, is_admin=is_admin)
     return extract_final_message_content(result)
 
 
-def chat_with_interrupts(question: str, thread_id: str = "default") -> dict[str, Any]:
+def chat_with_interrupts(question: str, thread_id: str = "default", redmine_user_id: int | None = None, is_admin: bool = False) -> dict[str, Any]:
     """
     Send a message to the supervisor and return the raw result with a parsed
     assistant response plus any pending interrupts.
     """
-    result = _invoke_chat(question, thread_id)
+    result = _invoke_chat(question, thread_id, redmine_user_id=redmine_user_id, is_admin=is_admin)
 
     messages = result["messages"]
     interrupts: Any = []
@@ -310,7 +331,7 @@ def chat_with_interrupts(question: str, thread_id: str = "default") -> dict[str,
     }
 
 
-def chat_stream(question: str, thread_id: str = "default"):
+def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int | None = None, is_admin: bool = False):
     """
     Stream the supervisor's response step by step.
     Yields dicts with keys: type, agent, content.
@@ -325,6 +346,7 @@ def chat_stream(question: str, thread_id: str = "default"):
     config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
 
     try:
+        set_session_user(redmine_user_id, is_admin=is_admin)
         for step in app.stream(
             {"messages": [HumanMessage(content=question)]},
             config=config,
@@ -369,6 +391,8 @@ def chat_stream(question: str, thread_id: str = "default"):
             "agent":   "supervisor",
             "content": str(e)
         }
+    finally:
+        clear_session_user()
 
 
 if __name__ == "__main__":

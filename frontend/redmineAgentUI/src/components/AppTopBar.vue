@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { Bell, CircleHelp, Search, UserCircle2, Sun, Moon, AlertCircle, CheckCircle2, Info } from "@lucide/vue";
+import { Bell, Search, UserCircle2, Sun, Moon, AlertCircle, CheckCircle2, Info } from "@lucide/vue";
 import { ref, onBeforeUnmount, onMounted } from "vue";
 import { monitoringApi } from "../api/monitoring";
 import type { MonitoringNotification } from "../types";
+import { debounce } from "../utils";
+import { search } from "../api/search";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -21,6 +23,43 @@ const notificationsError = ref("");
 const notificationsTimer = ref<number | null>(null);
 const unreadCount = ref(0);
 let lastSeenCreatedAt = "";
+
+// Search state
+const query = ref("");
+const showResults = ref(false);
+const results = ref<any[]>([]);
+const loading = ref(false);
+const error = ref("");
+const activeTab = ref<'messages'|'threads'>('messages');
+
+const tokenVal = props.token || '';
+
+const debouncedDoSearch = debounce(async (q: string, tab: 'messages'|'threads') => {
+  if (!q || q.trim().length < 2) {
+    results.value = [];
+    loading.value = false;
+    showResults.value = false;
+    return;
+  }
+
+  loading.value = true;
+  error.value = '';
+  try {
+    const resp = await search(q.trim(), tab, tokenVal, 10, 0);
+    results.value = resp.items || [];
+    showResults.value = true;
+  } catch (err: any) {
+    error.value = err instanceof Error ? err.message : String(err);
+    results.value = [];
+    showResults.value = true;
+  } finally {
+    loading.value = false;
+  }
+}, 300);
+
+function onInput() {
+  debouncedDoSearch(query.value, activeTab.value);
+}
 
 onMounted(() => {
   try {
@@ -42,6 +81,7 @@ onBeforeUnmount(() => {
 
 const emit = defineEmits<{
   (event: "navigate", view: "profile"): void;
+  (event: "navigate", view: "thread", threadId: string): void;
 }>();
 
 function toggleTheme() {
@@ -97,13 +137,43 @@ function timeAgo(isoDate: string): string {
   const days = Math.floor(hours / 24);
   return `${days} d ago`;
 }
+
+function openThread(id: string) {
+  showResults.value = false;
+  query.value = '';
+  emit('navigate', 'thread', id);
+}
 </script>
 
 <template>
   <header class="app-topbar">
     <div class="search-wrap">
       <Search :size="16" class="icon" />
-      <input type="search" placeholder="Search projects, tasks, or conversations..." />
+      <input v-model="query" @input="onInput" type="search" placeholder="Search projects, tasks, or conversations..." />
+      <div v-if="showResults" class="search-results-popover">
+        <div class="tabs">
+          <button :class="{active: activeTab==='messages'}" @click="activeTab='messages'">Messages</button>
+          <button :class="{active: activeTab==='threads'}" @click="activeTab='threads'">Conversations</button>
+        </div>
+        <div class="results">
+          <p v-if="loading">Searching…</p>
+          <p v-else-if="error">{{ error }}</p>
+          <ul v-else>
+            <li
+              v-for="item in results"
+              :key="item.id || item.thread_id"
+              class="result-item clickable"
+              @click="openThread(item.thread_id || item.id)"
+              role="button"
+              tabindex="0"
+            >
+              <div class="result-meta">
+                <strong>{{ item.title || 'Conversation' }}</strong>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="topbar-actions">
@@ -175,6 +245,44 @@ function timeAgo(isoDate: string): string {
   max-width: 620px;
   position: relative;
 }
+
+.search-results-popover {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  width: 620px;
+  max-height: 60vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+  z-index: 40;
+  padding: 10px;
+}
+
+.search-results-popover .tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.search-results-popover .tabs button {
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.search-results-popover .tabs button.active {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+}
+.search-results-popover .results { max-height: 48vh; overflow: auto; }
+.result-item { padding: 8px; border-bottom: 1px solid var(--border-subtle); }
+.result-item.clickable { cursor: pointer; }
+.result-item.clickable:hover { background: var(--bg-tertiary); }
+.result-meta { display:flex; gap:8px; align-items:baseline; }
+.result-meta .ts { color: var(--text-secondary); font-size: 12px; margin-left:auto }
+.snippet { margin: 4px 0 0; color: var(--text-secondary); font-size: 13px }
 
 .search-wrap .icon {
   position: absolute;

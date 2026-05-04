@@ -13,7 +13,8 @@ from app.agent.supervisor import (
     build_invoke_config,
     delete_thread_memory
 )
-from app.core.rbac import Permission
+from app.agent.tools.read import set_session_user, clear_session_user
+from app.core.rbac import Permission, Role
 from app.dependencies.auth import CurrentUser, require_permission
 from app.dependencies.db import get_db
 from app.repositories.thread_message_repository import ThreadMessageRepository
@@ -163,7 +164,12 @@ async def chat_endpoint(
     ensure_thread_tables(db)
     ensure_thread_owner(db, request.thread_id, current.id)
     try:
-        result = chat_with_interrupts(request.message, request.thread_id)
+        result = chat_with_interrupts(
+            request.message,
+            request.thread_id,
+            redmine_user_id=current.redmine_user_id,
+            is_admin=(current.role == Role.ADMIN),
+        )
 
         interrupts = result["interrupts"]
         if interrupts:
@@ -204,7 +210,12 @@ async def chat_stream_endpoint(
     ensure_thread_owner(db, request.thread_id, current.id)
 
     def event_generator():
-        for event in chat_stream(request.message, request.thread_id):
+        for event in chat_stream(
+            request.message,
+            request.thread_id,
+            redmine_user_id=current.redmine_user_id,
+            is_admin=(current.role == Role.ADMIN),
+        ):
             yield f"data: {json.dumps(event)}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -230,6 +241,7 @@ async def approve_endpoint(
     ensure_thread_owner(db, thread_id, current.id)
 
     try:
+        set_session_user(current.redmine_user_id, is_admin=(current.role == Role.ADMIN))
         if request.decision_type == "edit":
             decision = {
                 "type": "edit",
@@ -258,6 +270,8 @@ async def approve_endpoint(
 
     except Exception as e:
         _raise_http_from_exception(e)
+    finally:
+        clear_session_user()
 
 @router.delete("/chat/thread/{thread_id}")
 async def delete_thread_endpoint(

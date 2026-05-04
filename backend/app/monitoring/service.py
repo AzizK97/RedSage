@@ -319,14 +319,14 @@ class MonitoringService:
             )
             events_count = len(stored_events)
 
-            for event in stored_events:
-                repo.record_notification(
-                    event_id=event["id"],
-                    channel="in_app",
-                    status="queued",
-                    response_text="stored",
-                )
-                await self._send_slack(event, repo)
+            # for event in stored_events:
+            #     repo.record_notification(
+            #         event_id=event["id"],
+            #         channel="in_app",
+            #         status="queued",
+            #         response_text="stored",
+            #     )
+            #     await self._send_slack(event, repo)
 
             synced_count = UserSyncService(db).sync_project_managers()
 

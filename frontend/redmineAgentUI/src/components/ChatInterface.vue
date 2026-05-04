@@ -6,12 +6,13 @@ import MessageInput from "./MessageInput.vue";
 import ApprovalDialog from "./ApprovalDialog.vue";
 import { useChat } from "../composables/useChat";
 import type { ApproveRequest } from "../types";
-import { computed, ref } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 
 const props = defineProps<{
   token: string;
   userId: string;
   role: "admin" | "project_manager";
+  openThreadId?: string | null;
 }>();
 
 const {
@@ -33,6 +34,21 @@ const {
   setActiveThread,
   deleteThread,
 } = useChat(props.token, props.userId);
+
+// When parent requests opening a specific thread, set it active
+watch(
+  () => props.openThreadId,
+  async (id) => {
+    if (id) {
+      try {
+        await setActiveThread(id);
+      } catch (e) {
+        console.error("Failed to open thread from navigation:", e);
+      }
+    }
+  },
+  { immediate: true }
+);
 
 const isVirginChat = computed(() => messages.value.length === 0);
 const visibleError = computed(() => error.value || syncError.value);

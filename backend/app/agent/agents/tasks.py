@@ -65,7 +65,7 @@ def create_tasks_agent(llm: ChatOpenAI):
              and all write operations on issues.
     """
     try:
-        compiled_prompt = Langfuse().get_prompt("tasks_agent", label="production").compile()
+        compiled_prompt = Langfuse().get_prompt("tasks_agent", label="latest").compile()
         TASKS_PROMPT = "\n".join(
             m["content"] for m in compiled_prompt if m.get("role") == "system"
         )

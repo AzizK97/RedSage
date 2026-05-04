@@ -28,7 +28,54 @@ class ThreadRepository:
             cur.execute(
                 "ALTER TABLE thread_owners ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()"
             )
+            # Ensure project_identifier exists for threads (nullable)
+            cur.execute("ALTER TABLE thread_owners ADD COLUMN IF NOT EXISTS project_identifier TEXT NULL")
+            # Create trigram index on title if missing (for fuzzy search)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_thread_owners_title_trgm ON thread_owners USING GIN (title gin_trgm_ops)")
         self.db.commit()
+
+    def search_threads(self, query: str, allowed_project_identifiers: list | None = None, limit: int = 20, offset: int = 0) -> dict:
+        """Simple thread search using ILIKE/trigram on title and preview with optional project filtering."""
+        if allowed_project_identifiers is not None and len(allowed_project_identifiers) == 0:
+            return {"total": 0, "items": []}
+
+        like_query = f"%{query}%"
+        with self.db.cursor() as cur:
+            if allowed_project_identifiers is None:
+                cur.execute(
+                    "SELECT COUNT(*) FROM thread_owners WHERE title ILIKE %s OR preview ILIKE %s",
+                    (like_query, like_query),
+                )
+            else:
+                cur.execute(
+                    "SELECT COUNT(*) FROM thread_owners WHERE (title ILIKE %s OR preview ILIKE %s) AND project_identifier = ANY(%s::text[])",
+                    (like_query, like_query, allowed_project_identifiers),
+                )
+            total = cur.fetchone()[0]
+
+            if allowed_project_identifiers is None:
+                cur.execute(
+                    "SELECT thread_id, title, preview, updated_at FROM thread_owners WHERE title ILIKE %s OR preview ILIKE %s ORDER BY updated_at DESC LIMIT %s OFFSET %s",
+                    (like_query, like_query, limit, offset),
+                )
+            else:
+                cur.execute(
+                    "SELECT thread_id, title, preview, updated_at FROM thread_owners WHERE (title ILIKE %s OR preview ILIKE %s) AND project_identifier = ANY(%s::text[]) ORDER BY updated_at DESC LIMIT %s OFFSET %s",
+                    (like_query, like_query, allowed_project_identifiers, limit, offset),
+                )
+            rows = cur.fetchall()
+
+        items = [
+            {
+                "thread_id": r[0],
+                "title": r[1],
+                "preview": r[2],
+                "updated_at": r[3].isoformat() if r[3] else None,
+            }
+            for r in rows
+        ]
+
+        return {"total": total, "items": items}
 
     def get_owner(self, thread_id: str) -> str | None:
         with self.db.cursor() as cur:

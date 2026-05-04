@@ -10,6 +10,7 @@ from app.api.endpoints.admin_users import router as admin_users_router
 from app.api.endpoints.auth import router as auth_router
 from app.api.endpoints.dashboard import router as dashboard_router
 from app.api.endpoints.monitoring import router as monitoring_router, monitoring_service
+from app.api.endpoints.search import router as search_router
 from app.core.settings import settings
 from app.services.user_sync_service import UserSyncService
 
@@ -93,6 +94,7 @@ app.include_router(admin_users_router)
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(monitoring_router)
+app.include_router(search_router)
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────

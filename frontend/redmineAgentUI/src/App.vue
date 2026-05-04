@@ -11,6 +11,7 @@ import { useSession, type PlatformRole } from "./composables/useSession";
 
 const { token, role, fullName, email, userId, isAuthenticated, setSession, clearSession } = useSession();
 const currentView = ref<"dashboard" | "chat" | "profile">("dashboard");
+const selectedThreadId = ref<string | null>(null);
 const isOAuthCallback = window.location.pathname.startsWith("/auth/redmine/callback");
 
 function handleLogin(payload: { token: string; role: PlatformRole; fullName: string }) {
@@ -23,8 +24,15 @@ function handleLogout() {
   currentView.value = "dashboard";
 }
 
-function handleNavigate(view: "dashboard" | "chat" | "profile") {
-  currentView.value = view;
+function handleNavigate(view: "dashboard" | "chat" | "profile" | "thread", threadId?: string) {
+  if (view === 'thread') {
+    selectedThreadId.value = threadId || null;
+    currentView.value = 'chat';
+    return;
+  }
+  currentView.value = view as "dashboard" | "chat" | "profile";
+  // clear any pending thread selection when navigating away from chat
+  if (view !== 'chat') selectedThreadId.value = null;
 }
 </script>
 
@@ -63,6 +71,7 @@ function handleNavigate(view: "dashboard" | "chat" | "profile") {
           :token="token"
           :user-id="userId"
           :role="role === 'admin' ? 'admin' : 'project_manager'"
+          :open-thread-id="selectedThreadId"
         />
 
         <ProfileView
