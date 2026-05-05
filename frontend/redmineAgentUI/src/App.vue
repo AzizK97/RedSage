@@ -4,6 +4,7 @@ import AppSidebar from "./components/AppSidebar.vue";
 import AppTopBar from "./components/AppTopBar.vue";
 import ChatInterface from "./components/ChatInterface.vue";
 import LoginView from "./views/auth/LoginView.vue";
+import LandingView from "./views/auth/LandingView.vue";
 import RedmineCallback from "./views/auth/RedmineCallback.vue";
 import DashboardView from "./views/dashboard/DashboardView.vue";
 import ProfileView from "./views/profile/ProfileView.vue";
@@ -12,16 +13,23 @@ import { useSession, type PlatformRole } from "./composables/useSession";
 const { token, role, fullName, email, userId, isAuthenticated, setSession, clearSession } = useSession();
 const currentView = ref<"dashboard" | "chat" | "profile">("dashboard");
 const selectedThreadId = ref<string | null>(null);
+const authStage = ref<"landing" | "login">("landing");
 const isOAuthCallback = window.location.pathname.startsWith("/auth/redmine/callback");
 
 function handleLogin(payload: { token: string; role: PlatformRole; fullName: string }) {
   setSession(payload.token, payload.role, payload.fullName);
+  authStage.value = "landing";
   currentView.value = "dashboard";
 }
 
 function handleLogout() {
   clearSession();
   currentView.value = "dashboard";
+  authStage.value = "landing";
+}
+
+function startLogin() {
+  authStage.value = "login";
 }
 
 function handleNavigate(view: "dashboard" | "chat" | "profile" | "thread", threadId?: string) {
@@ -39,7 +47,8 @@ function handleNavigate(view: "dashboard" | "chat" | "profile" | "thread", threa
 <template>
   <RedmineCallback v-if="isOAuthCallback" />
   <main v-else-if="!isAuthenticated" class="app-shell">
-    <LoginView @login="handleLogin" />
+    <LandingView v-if="authStage === 'landing'" @start-login="startLogin" />
+    <LoginView v-else @login="handleLogin" @back="authStage = 'landing'" />
   </main>
   <main v-else class="app-shell app-auth-shell">
     <AppSidebar

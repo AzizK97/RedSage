@@ -167,8 +167,38 @@ function openThread(id: string) {
               role="button"
               tabindex="0"
             >
-              <div class="result-meta">
-                <strong>{{ item.title || 'Conversation' }}</strong>
+              <div class="result-row">
+                <div class="result-main">
+                  <strong class="title">{{ item.title || 'Conversation' }}</strong>
+                  <div class="badges">
+                    <a
+                      v-if="item.project_name"
+                      :href="item.project_url"
+                      class="project-badge"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      @click.stop
+                    >
+                      {{ item.project_name }}
+                    </a>
+
+                    <a
+                      v-if="item.issue_id"
+                      :href="item.issue_url"
+                      class="issue-link"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      @click.stop
+                    >
+                      #{{ item.issue_id }}
+                    </a>
+                  </div>
+                </div>
+                <div class="result-meta-row">
+                  <span class="meta-author">{{ item.author_name || 'Unknown' }}</span>
+                  <span class="meta-sep">•</span>
+                  <small class="meta-time">{{ item.created_at ? timeAgo(item.created_at) : '' }}</small>
+                </div>
               </div>
             </li>
           </ul>
@@ -280,6 +310,14 @@ function openThread(id: string) {
 .result-item { padding: 8px; border-bottom: 1px solid var(--border-subtle); }
 .result-item.clickable { cursor: pointer; }
 .result-item.clickable:hover { background: var(--bg-tertiary); }
+.result-row { display:flex; flex-direction:column; gap:6px; }
+.result-main { display:flex; gap:8px; align-items:center; width:100%; }
+.title { font-size: 14px; }
+.badges { display:flex; gap:8px; margin-left:8px; }
+.project-badge { background: var(--bg-secondary); border: 1px solid var(--border-subtle); padding: 4px 8px; border-radius: 999px; color: var(--text-primary); font-size: 12px; text-decoration: none; }
+.issue-link { background: rgba(79,70,229,0.06); border: 1px solid rgba(79,70,229,0.12); padding: 3px 6px; border-radius: 6px; color: #4f46e5; font-size: 12px; text-decoration: none; }
+.result-meta-row { display:flex; gap:6px; align-items:center; color:var(--text-secondary); font-size:12px; }
+.meta-sep { opacity:0.6 }
 .result-meta { display:flex; gap:8px; align-items:baseline; }
 .result-meta .ts { color: var(--text-secondary); font-size: 12px; margin-left:auto }
 .snippet { margin: 4px 0 0; color: var(--text-secondary); font-size: 13px }

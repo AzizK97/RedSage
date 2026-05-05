@@ -5,6 +5,7 @@ import type { PlatformRole } from "../../composables/useSession";
 
 const emit = defineEmits<{
   (event: "login", payload: { token: string; role: PlatformRole; fullName: string }): void;
+  (event: "back"): void;
 }>();
 
 const email = ref("");
@@ -58,10 +59,6 @@ function onEnter(event: KeyboardEvent) {
   }
 }
 
-function signInWithRedmine() {
-  const apiBase = import.meta.env.VITE_API_URL || '/api';
-  window.location.href = `${apiBase}/auth/redmine/authorize`;
-}
 </script>
 
 <template>
@@ -96,6 +93,9 @@ function signInWithRedmine() {
 
       <button class="primary-btn" type="button" :disabled="isSubmitting" @click="submitLogin">
         {{ isSubmitting ? "Signing in..." : "Sign in" }}
+      </button>
+      <button class="secondary-btn" type="button" @click="emit('back')">
+        Back to landing
       </button>
       <!-- <button class="secondary-btn" type="button" @click="signInWithRedmine">
         Sign in with Redmine

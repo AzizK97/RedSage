@@ -6,7 +6,7 @@ import MessageInput from "./MessageInput.vue";
 import ApprovalDialog from "./ApprovalDialog.vue";
 import { useChat } from "../composables/useChat";
 import type { ApproveRequest } from "../types";
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps<{
   token: string;
