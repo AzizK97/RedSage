@@ -1,4 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
   box-sizing: border-box;
@@ -14,7 +19,7 @@ body,
 }
 
 body {
-  font-family: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, "Montserrat", sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
@@ -103,4 +108,126 @@ body {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+/* RedSage Showcase Component Classes */
+@layer components {
+  .gradient-text {
+    background: linear-gradient(135deg, #a1b49e, #7d9a79, #5f815b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-copper {
+    background: linear-gradient(135deg, #e9a66e, #d4692a, #b8501f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-hero {
+    background: linear-gradient(135deg, #c3d1c1, #7d9a79, #e0853f);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-border {
+    position: relative;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, rgba(95, 129, 91, 0.1), rgba(58, 63, 53, 0.05));
+    border: 1px solid rgba(95, 129, 91, 0.15);
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(95, 129, 91, 0.3), transparent, rgba(212, 105, 42, 0.1));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .glass-card {
+    background: rgba(30, 33, 27, 0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(95, 129, 91, 0.12);
+    border-radius: 1rem;
+  }
+
+  .glass-card:hover {
+    border-color: rgba(95, 129, 91, 0.25);
+  }
+
+  .glow-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #7d9a79;
+    box-shadow: 0 0 12px rgba(125, 154, 121, 0.6), 0 0 24px rgba(125, 154, 121, 0.3);
+  }
+
+  .glow-dot-copper {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d4692a;
+    box-shadow: 0 0 12px rgba(212, 105, 42, 0.6), 0 0 24px rgba(212, 105, 42, 0.3);
+  }
+
+  .chat-bubble {
+    position: relative;
+    background: rgba(95, 129, 91, 0.08);
+    border: 1px solid rgba(95, 129, 91, 0.18);
+    border-radius: 1rem 1rem 1rem 0.25rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .chat-bubble-user {
+    background: rgba(212, 105, 42, 0.1);
+    border: 1px solid rgba(212, 105, 42, 0.2);
+    border-radius: 1rem 1rem 0.25rem 1rem;
+  }
+
+  .node-ring {
+    border: 2px solid rgba(95, 129, 91, 0.4);
+    border-radius: 50%;
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .route-path {
+    stroke-dasharray: 8 4;
+    animation: dashMove 2s linear infinite;
+  }
+
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(95, 129, 91, 0.25), transparent);
+  }
+
+  .copper-accent-line {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(212, 105, 42, 0.4), rgba(95, 129, 91, 0.3), transparent);
+  }
+
+  .shimmer-bg {
+    background: linear-gradient(110deg, transparent 30%, rgba(95, 129, 91, 0.05) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: shimmer 4s ease-in-out infinite;
+  }
+}
+
+@keyframes dashMove {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes blink {
+  50% { border-color: transparent; }
 }
