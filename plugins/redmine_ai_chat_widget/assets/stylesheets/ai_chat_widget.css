@@ -1,0 +1,215 @@
+#ai-chat-btn {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  z-index: 9999;
+  width: 60px;
+  height: 60px;
+  border: 0;
+  border-radius: 50%;
+  /* design tokens (see :root below) */
+  background: var(--copper-500);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+#ai-chat-btn .ai-chat-icon {
+  width: 30px;
+  height: 30px;
+  display: block;
+}
+
+#ai-chat-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+}
+
+#ai-chat-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+:root {
+  --sage-50: #f4f7f4;
+  --sage-100: #e0e8df;
+  --sage-200: #c3d1c1;
+  --sage-300: #a1b49e;
+  --sage-400: #7d9a79;
+  --sage-500: #5f815b;
+  --sage-600: #4a6847;
+  --sage-700: #3c5439;
+  --sage-800: #324530;
+  --sage-900: #2a3a28;
+  --sage-950: #141d13;
+
+  --copper-50: #fdf6f0;
+  --copper-100: #f9e6d4;
+  --copper-200: #f2c9a4;
+  --copper-300: #e9a66e;
+  --copper-400: #e0853f;
+  --copper-500: #d4692a;
+  --copper-600: #b8501f;
+  --copper-700: #993d1b;
+  --copper-800: #7d331d;
+  --copper-900: #6a2c1b;
+  --copper-950: #3b150c;
+
+  --surface-50: #f6f7f5;
+  --surface-100: #eef0eb;
+  --surface-200: #dde1d8;
+  --surface-300: #c4cbbf;
+  --surface-400: #a3ad9c;
+  --surface-500: #87907e;
+  --surface-600: #6d7567;
+  --surface-700: #585f53;
+  --surface-800: #3a3f35;
+  --surface-900: #1e211b;
+  --surface-950: #0e100c;
+
+  --bg-app: #050505;
+  --text-app: #e5e5e5;
+}
+
+#ai-chat-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 90px;
+  z-index: 9998;
+  width: 380px;
+  height: 560px;
+  display: none;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--surface-50);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+#ai-chat-panel.active {
+  display: flex;
+}
+
+.ai-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--copper-500);
+  color: #fff;
+}
+
+.ai-chat-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.ai-chat-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.ai-chat-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--surface-50);
+}
+
+.ai-chat-message {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.ai-chat-message.user {
+  justify-content: flex-end;
+}
+
+.ai-chat-message-content {
+  max-width: 75%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-chat-message.user .ai-chat-message-content {
+  background: var(--sage-400);
+  color: #fff;
+}
+
+.ai-chat-message.bot .ai-chat-message-content {
+  background: var(--surface-100);
+  color: var(--surface-900);
+}
+
+.ai-chat-input-area {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--surface-200);
+  background: var(--surface-50);
+}
+
+.ai-chat-input {
+  flex: 1;
+  border: 1px solid var(--surface-200);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.ai-chat-input:focus {
+  outline: none;
+  border-color: var(--sage-400);
+  box-shadow: 0 0 0 3px rgba(125,154,121,0.15);
+}
+
+.ai-chat-send {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--copper-500);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.ai-chat-send:hover {
+  background: var(--copper-600);
+}
+
+.ai-chat-send:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  #ai-chat-panel {
+    width: calc(100% - 24px);
+    height: calc(100vh - 80px);
+    right: 12px;
+    bottom: 80px;
+  }
+}

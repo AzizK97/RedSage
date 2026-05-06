@@ -15,6 +15,14 @@ Each agent has read tools (query Redmine) and write tools (create/modify items).
 
 ## 🚀 Quick Start
 
+This project has 3 parts:
+
+- `backend/` — FastAPI service and AI orchestration
+- `frontend/redmineAgentUI/` — Vue UI used to interact with the assistant
+- `plugins/redmine_ai_chat_widget/` — Redmine plugin that embeds the widget inside Redmine
+
+For the smoothest setup, start the backend first, then the frontend, then install the plugin into Redmine.
+
 ### Option 1: Docker Compose (Recommended)
 
 **One command to run everything:**
@@ -42,38 +50,74 @@ docker compose up -d
 
 See [DOCKER_README.md](DOCKER_README.md) for full Docker guide, custom ports, external Redmine setup, and troubleshooting.
 
-### Option 2: Local Development
+### Option 2: Run locally in development
 
-**Prerequisites:**
-- Python 3.13+
-- Redmine instance (local or remote)
-- OpenRouter API key
-
-**Setup:**
+#### 1) Start the backend
 
 ```bash
-# Navigate to backend
 cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+python -m venv .venv
+source .venv/bin/activate  # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-# Create .env file
-cat > .env << EOF
-OPENROUTER_API_KEY=sk-or-v1-...
-REDMINE_URL=http://localhost:3000
-REDMINE_API_KEY=your-redmine-api-key
-EOF
+Backend API:
 
-# Run the CLI agent
+- `http://localhost:8000`
+- Swagger docs: `http://localhost:8000/docs`
+
+#### 2) Start the frontend
+
+```bash
+cd frontend/redmineAgentUI
+pnpm install
+pnpm dev
+```
+
+Frontend dev server:
+
+- `http://localhost:5173`
+
+#### 3) Install the Redmine plugin
+
+The plugin lives in `plugins/redmine_ai_chat_widget/`. Copy or symlink it into your Redmine installation's `plugins/` folder.
+
+Example:
+
+```bash
+# from your Redmine install directory
+cp -R /path/to/RedmineChatAssist_Test1/plugins/redmine_ai_chat_widget plugins/
+bundle install
+bundle exec rake redmine:plugins:migrate RAILS_ENV=production
+```
+
+Then restart Redmine.
+
+#### 4) Configure the plugin
+
+Open the Redmine plugin settings and set:
+
+- `backend_url` → URL of the backend API, usually `http://localhost:8000`
+- `jwt_secret` → same secret used by the backend
+- `jwt_issuer` → optional issuer value, must match the backend if set
+- `jwt_audience` → optional audience value, must match the backend if set
+
+The backend must also allow the Redmine origin in CORS. The default CORS variables are:
+
+- `CORS_ORIGINS_PLATFORM` for the frontend app
+- `CORS_ORIGINS_PLUGIN` for the Redmine plugin host
+
+If you run Redmine on a different port or host, add that origin to `CORS_ORIGINS_PLUGIN`.
+
+
+### Start the CLI assistant
+
+If you want the command-line assistant instead of the web UI:
+
+```bash
+cd backend
 python -m agent.supervisor
-
-# Or start the API server
-uvicorn routers.chat:app --reload --port 8000
 ```
 
 ## 📚 Usage
@@ -280,6 +324,66 @@ BACKEND_PORT=8000
 REDMINE_PORT=3000
 MYSQL_ROOT_PASSWORD=redmine
 ```
+
+### Verify your environment quickly
+
+Use the included verifier to check that essential environment variables are set. Make the script executable and run it from the repo root:
+
+```bash
+chmod +x scripts/verify_env.sh
+bash scripts/verify_env.sh
+```
+
+If the script reports missing variables, copy the sample files and fill them in:
+
+```bash
+cp backend/.env.sample backend/.env
+cp frontend/redmineAgentUI/.env.sample frontend/redmineAgentUI/.env
+# or copy root-level .env from .env.example
+```
+
+### Windows (PowerShell) notes
+
+If your colleagues use Windows, the steps below work in PowerShell (Developer PowerShell / PowerShell Core):
+
+- Create and activate Python venv (PowerShell):
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+- Create `.env` files by copying the samples:
+
+```powershell
+Copy-Item backend\.env.sample backend\.env
+Copy-Item frontend\redmineAgentUI\.env.sample frontend\redmineAgentUI\.env
+```
+
+- Set environment variables for the current PowerShell session (non-persistent):
+
+```powershell
+$env:REDMINE_URL = 'http://localhost:3000'
+$env:REDMINE_API_KEY = 'your-api-key'
+$env:OPENROUTER_API_KEY = 'sk-or-...'
+```
+
+- To persist variables for your user account (Windows), use `setx`:
+
+```powershell
+setx REDMINE_URL "http://localhost:3000"
+setx REDMINE_API_KEY "your-api-key"
+setx OPENROUTER_API_KEY "sk-or-..."
+```
+
+- Verify env with the PowerShell verifier:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify_env.ps1
+```
+
+Note: `verify_env.ps1` will also load values from `.env` files if present, and returns a non-zero exit code when variables are missing.
 
 ## 📦 Dependencies
 

@@ -58,10 +58,18 @@ class Settings:
     LLM_TOP_P: float = float(os.getenv("LLM_TOP_P", "0.95"))
     LLM_TOP_K: int = int(os.getenv("LLM_TOP_K", "64"))
 
-    CORS_ORIGINS: list[str] = field(
+    CORS_ORIGINS_PLATFORM: list[str] = field(
         default_factory=lambda: [
             o.strip()
-            for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+            for o in os.getenv("CORS_ORIGINS_PLATFORM", "http://localhost:5173").split(",")
+            if o.strip()
+        ]
+    )
+
+    CORS_ORIGINS_PLUGIN: list[str] = field(
+        default_factory=lambda: [
+            o.strip()
+            for o in os.getenv("CORS_ORIGINS_PLUGIN", "http://localhost:3050").split(",")
             if o.strip()
         ]
     )
