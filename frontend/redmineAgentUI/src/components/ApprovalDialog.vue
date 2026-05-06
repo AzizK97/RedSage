@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { AlertTriangle, Check, X, Edit3, Terminal } from "lucide-vue-next";
 
 const props = defineProps<{
   interrupt: Record<string, any> | null;
@@ -89,141 +90,82 @@ function edit() {
 </script>
 
 <template>
-  <section v-if="visible" class="hitl">
-    <h3>Human Approval Required</h3>
-    <pre>{{ interrupt }}</pre>
-
-    <div class="actions">
-      <button :disabled="disabled" @click="approve">Approve</button>
-      <button :disabled="disabled" @click="reject">Reject</button>
+  <section v-if="visible" class="m-6 p-6 rounded-3xl bg-surface-900 border border-copper-500/20 shadow-2xl animate-in zoom-in-95 duration-300">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-xl bg-copper-500/20 flex items-center justify-center text-copper-500">
+        <AlertTriangle :size="20" />
+      </div>
+      <div>
+        <h3 class="text-sm font-black text-white uppercase tracking-widest">Approval Required</h3>
+        <p class="text-xs text-surface-500 font-bold">The agent is requesting permission to execute an action.</p>
+      </div>
     </div>
 
-    <div class="template-editor">
-      <p class="template-title">Edit action template (optional)</p>
-      <input v-model="editName" placeholder="Tool name (e.g. create_issue)" />
-      <textarea v-model="editArgsJson" rows="6" placeholder='{"project_id":"...", "subject":"..."}' />
-      <button :disabled="disabled || !editName.trim()" @click="edit">Submit Edit</button>
+    <div class="space-y-6">
+      <div class="relative group">
+        <div class="absolute top-3 left-3 text-surface-700">
+          <Terminal :size="14" />
+        </div>
+        <pre class="w-full max-h-48 overflow-auto bg-black/40 border border-surface-800 p-8 rounded-2xl text-[10px] sm:text-xs font-mono text-surface-400 custom-scrollbar leading-relaxed">{{ interrupt }}</pre>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button 
+          :disabled="disabled" 
+          @click="approve"
+          class="flex-1 h-12 rounded-xl bg-sage-500 hover:bg-sage-400 text-surface-950 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-30"
+        >
+          <Check :size="16" stroke-width="3" /> Approve Action
+        </button>
+        <button 
+          :disabled="disabled" 
+          @click="reject"
+          class="flex-1 h-12 rounded-xl bg-surface-800 hover:bg-red-500/10 border border-surface-700 hover:border-red-500/20 text-surface-300 hover:text-red-400 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-30"
+        >
+          <X :size="16" stroke-width="3" /> Reject
+        </button>
+      </div>
+
+      <div class="pt-6 border-t border-surface-800/50">
+        <div class="flex items-center gap-2 mb-4 text-surface-500">
+          <Edit3 :size="14" />
+          <span class="text-[10px] font-black uppercase tracking-widest">Fine-tune parameters</span>
+        </div>
+        
+        <div class="grid gap-3">
+          <input 
+            v-model="editName" 
+            placeholder="Tool name (e.g. create_issue)" 
+            class="w-full bg-surface-800 border border-surface-700 p-4 rounded-xl text-xs font-bold text-surface-100 placeholder:text-surface-600 focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all outline-none"
+          />
+          <textarea 
+            v-model="editArgsJson" 
+            rows="5" 
+            placeholder='{"project_id":"...", "subject":"..."}' 
+            class="w-full bg-surface-800 border border-surface-700 p-4 rounded-xl text-xs font-mono text-surface-300 placeholder:text-surface-600 focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all outline-none resize-none custom-scrollbar"
+          />
+          <button 
+            :disabled="disabled || !editName.trim()" 
+            @click="edit"
+            class="h-10 rounded-xl bg-surface-800 hover:bg-surface-700 border border-surface-700 text-surface-300 font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30"
+          >
+            Submit Edited Action
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.hitl {
-  border: 1px solid var(--border-subtle);
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--text-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md) var(--space-lg);
-  margin: var(--space-md);
-  max-width: 900px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
 }
-
-h3 {
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--accent-amber);
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-pre {
-  max-height: 200px;
-  overflow: auto;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  font-size: var(--text-xs);
-  line-height: 1.4;
-}
-
-.actions {
-  display: flex;
-  gap: var(--space-md);
-  margin: var(--space-lg) 0;
-}
-
-.actions button {
-  padding: var(--space-md) var(--space-lg);
-  border-radius: var(--radius-lg);
-  border: none;
-  font-weight: 500;
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.actions button:first-child {
-  background: var(--accent-green);
-  color: white;
-}
-
-.actions button:first-child:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.actions button:nth-child(2) {
-  background: var(--accent-red);
-  color: white;
-}
-
-.actions button:nth-child(2):hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-input,
-textarea {
-  width: 100%;
-  margin-top: var(--space-md);
-  padding: var(--space-md);
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: var(--text-sm);
-}
-
-input:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.template-editor {
-  margin-top: var(--space-lg);
-}
-
-.template-title {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--accent-amber);
-  font-weight: 500;
-}
-
-.template-editor button {
-  margin-top: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
-  border-radius: var(--radius-lg);
-  border: none;
-  background: var(--accent-blue);
-  color: white;
-  font-weight: 500;
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.template-editor button:hover:not(:disabled) {
-  background: var(--accent-blue-hover);
-  transform: translateY(-1px);
-}
-
-.template-editor button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2d29;
+  border-radius: 99px;
 }
 </style>

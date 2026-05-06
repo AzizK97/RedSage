@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Send } from '@lucide/vue';
+import { Send } from 'lucide-vue-next';
 
 const props = defineProps<{
   disabled: boolean;
@@ -34,129 +34,29 @@ function submit() {
 </script>
 
 <template>
-  <form class="input-wrap" @submit.prevent="submit">
-    <div class="composer" :class="{ 'is-disabled': disabled }">
-
+  <form class="flex justify-center w-full px-6 py-4" @submit.prevent="submit">
+    <div 
+      :class="[
+        'flex items-center gap-3 flex-1 max-w-3xl p-1.5 rounded-2xl bg-surface-900 border border-surface-800 shadow-2xl transition-all duration-300 ring-1 ring-white/5',
+        disabled ? 'opacity-60 grayscale cursor-not-allowed' : 'focus-within:border-sage-500/40 focus-within:ring-4 focus-within:ring-sage-500/5'
+      ]"
+    >
       <input
         v-model="text"
         type="text"
         placeholder="How can I help you today?"
         :disabled="disabled"
+        class="flex-1 bg-transparent border-none px-4 py-2 text-surface-100 text-sm outline-none placeholder:text-surface-600"
       />
 
       <button
         type="submit"
-        class="icon-btn send-btn"
         :disabled="disabled || !text.trim()"
+        class="w-10 h-10 rounded-xl bg-gradient-to-br from-sage-600 to-sage-500 text-white flex items-center justify-center shadow-lg shadow-sage-900/30 enabled:hover:scale-105 enabled:active:scale-95 disabled:opacity-30 disabled:grayscale transition-all"
         aria-label="Send message"
       >
-        <Send />
-        <!-- <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 6v12M6 12l6-6 6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
-        </svg> -->
+        <Send :size="18" />
       </button>
     </div>
   </form>
 </template>
-
-<style scoped>
-.input-wrap {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-}
-
-.composer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  flex: 1;
-  max-width: 760px;
-  padding: var(--space-md);
-  border: 1px solid transparent;
-  border-radius: 50px;
-  background: var(--bg-secondary);
-}
-
-.composer:focus-within {
-  border-color: #252525;
-}
-
-.composer.is-disabled {
-  opacity: 0.7;
-}
-
-input {
-  flex: 1;
-  min-width: 0;
-  padding: var(--space-sm) var(--space-xs);
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: var(--text-base);
-  line-height: 1.5;
-}
-
-input:focus {
-  outline: none;
-}
-
-input::placeholder {
-  color: var(--text-secondary);
-}
-
-.model-select,
-.icon-btn {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  height: 2rem;
-  transition: all var(--transition-fast);
-}
-
-.model-select {
-  padding: 0 var(--space-sm);
-  font-size: var(--text-sm);
-}
-
-.icon-btn {
-  cursor: pointer;
-  width: 2rem;
-  padding: 0;
-}
-
-.icon-btn svg,
-.model-select svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.icon-plus {
-  border-color: var(--border-subtle);
-}
-
-.model-select:hover:not(:disabled),
-.icon-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-.send-btn {
-  background: #c03a2a;
-  color: var(--text-primary);
-}
-
-.send-btn:hover:not(:disabled) {
-  background: #d94a3a;
-}
-
-.icon-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-</style>

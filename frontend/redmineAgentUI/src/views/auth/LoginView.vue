@@ -53,50 +53,50 @@ async function submitLogin() {
   }
 }
 
-function onEnter(event: KeyboardEvent) {
-  if (event.key === "Enter") {
-    void submitLogin();
-  }
-}
-
 </script>
 
 <template>
-  <main class="login-shell">
-    <section class="login-card">
-      <h1>RedSage Login</h1>
-      <p class="subtitle">Use your Redmine username/email and password. You will be routed by role.</p>
+  <main class="min-h-screen bg-surface-950 text-surface-200 flex items-center justify-center p-4">
+    <section class="w-full max-w-md glass-card p-8 space-y-6">
+      <div>
+        <h1 class="text-3xl font-bold text-surface-100 mb-2">RedSage Login</h1>
+        <p class="text-surface-400">Use your Redmine username/email and password. You will be routed by role.</p>
+      </div>
 
-      <label class="field">
-        <span>Email or username</span>
-        <input
-          v-model="email"
-          type="text"
-          autocomplete="username"
-          placeholder="you@company.com or your Redmine login"
-          @keydown="onEnter"
-        />
-      </label>
+      <form @submit.prevent="submitLogin" class="space-y-4">
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-300">Email or username</span>
+          <input
+            v-model="email"
+            type="text"
+            autocomplete="username"
+            placeholder="you@company.com or your Redmine login"
+            class="w-full px-4 py-2 bg-surface-900/50 border border-surface-700 rounded-lg text-surface-100 placeholder-surface-500 focus:outline-none focus:border-sage-600 focus:ring-1 focus:ring-sage-600/30 transition-colors"
+            @keydown.enter="submitLogin"
+          />
+        </label>
 
-      <label class="field">
-        <span>Password</span>
-        <input
-          v-model="password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="••••••••"
-          @keydown="onEnter"
-        />
-      </label>
+        <label class="block space-y-2">
+          <span class="text-sm font-medium text-surface-300">Password</span>
+          <input
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            class="w-full px-4 py-2 bg-surface-900/50 border border-surface-700 rounded-lg text-surface-100 placeholder-surface-500 focus:outline-none focus:border-sage-600 focus:ring-1 focus:ring-sage-600/30 transition-colors"
+            @keydown.enter="submitLogin"
+          />
+        </label>
 
-      <p v-if="error" class="error">{{ error }}</p>
+        <p v-if="error" class="p-3 bg-rose-950/30 border border-rose-700/50 rounded-lg text-rose-300 text-sm">{{ error }}</p>
 
-      <button class="primary-btn" type="button" :disabled="isSubmitting" @click="submitLogin">
-        {{ isSubmitting ? "Signing in..." : "Sign in" }}
-      </button>
-      <button class="secondary-btn" type="button" @click="emit('back')">
-        Back to landing
-      </button>
+        <button type="submit" :disabled="isSubmitting" class="w-full px-4 py-2.5 bg-sage-600 hover:bg-sage-700 disabled:bg-surface-700 disabled:cursor-not-allowed text-surface-50 font-semibold rounded-lg transition-colors">
+          {{ isSubmitting ? "Signing in..." : "Sign in" }}
+        </button>
+        <button type="button" @click="emit('back')" class="w-full px-4 py-2.5 bg-surface-800/50 hover:bg-surface-800 text-surface-300 hover:text-surface-200 font-semibold rounded-lg transition-colors border border-surface-700">
+          Back to landing
+        </button>
+      </form>
       <!-- <button class="secondary-btn" type="button" @click="signInWithRedmine">
         Sign in with Redmine
       </button> -->

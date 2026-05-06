@@ -142,6 +142,13 @@ interface DashboardProject {
     name: string;
     identifier?: string;
     status?: number;
+    progress?: number;
+    health?: "On track" | "At risk" | "Delayed";
+    completion_eta?: string;
+    open_issues?: number;
+    closed_issues?: number;
+    overdue_issues?: number;
+    total_issues?: number;
 }
 
 interface OverdueTicketInsight {

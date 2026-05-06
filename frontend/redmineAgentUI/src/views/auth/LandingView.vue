@@ -9,11 +9,13 @@ import BenchmarkSection from './components/BenchmarkSection.vue';
 import GetStartedSection from './components/GetStartedSection.vue';
 import CTASection from './components/CTASection.vue';
 import FooterSection from './components/FooterSection.vue';
+
+const emit = defineEmits<{ (e: 'start-login'): void }>();
 </script>
 
 <template>
   <div class="min-h-screen bg-surface-950 text-surface-200 overflow-x-hidden">
-    <NavBar />
+    <NavBar @start-login="emit('start-login')" />
     <HeroSection />
     <AgentsSection />
     <HowItWorksSection />

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Leaf, Github, Menu, X } from 'lucide-vue-next';
+import { Leaf, LogIn, Menu, X } from 'lucide-vue-next';
+
+const emit = defineEmits<{ (e: 'start-login'): void }>();
 
 const scrolled = ref(false);
 const mobileOpen = ref(false);
@@ -36,10 +38,11 @@ const links = [
       </div>
 
       <div class="hidden md:flex items-center gap-3">
-        <a href="https://github.com/AzizK97/Redmine-Agent" target="_blank" rel="noopener noreferrer"
+        <button @click="emit('start-login')"
           class="flex items-center gap-2 text-sm text-surface-300 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-surface-800/50">
-          <Github :size="16" /> GitHub
-        </a>
+          <LogIn :size="15" />
+          Sign In
+        </button>
         <a href="#get-started"
           class="text-sm font-medium px-4 py-2 rounded-lg bg-copper-600 text-white hover:bg-copper-500 transition-colors shadow-lg shadow-copper-700/25">
           Get Started
@@ -55,10 +58,10 @@ const links = [
     <div v-if="mobileOpen" class="md:hidden bg-surface-950/95 backdrop-blur-xl border-t border-surface-800 px-6 py-4 space-y-3">
       <a v-for="l in links" :key="l.href" :href="l.href" @click="mobileOpen = false"
         class="block text-sm text-surface-400 hover:text-sage-300 py-2">{{ l.label }}</a>
-      <a href="https://github.com/AzizK97/Redmine-Agent" target="_blank" rel="noopener noreferrer"
-        class="flex items-center gap-2 text-sm text-surface-300 py-2">
-        <Github :size="16" /> GitHub
-      </a>
+      <button @click="emit('start-login'); mobileOpen = false"
+        class="flex items-center gap-2 text-sm text-surface-300 hover:text-sage-300 py-2">
+        <LogIn :size="16" /> Sign In
+      </button>
     </div>
   </nav>
 </template>

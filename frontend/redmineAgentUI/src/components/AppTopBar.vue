@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell, Search, UserCircle2, Sun, Moon, AlertCircle, CheckCircle2, Info } from "@lucide/vue";
+import { Bell, Search, UserCircle2, Sun, Moon, AlertCircle, CheckCircle2, Info, X } from "lucide-vue-next";
 import { ref, onBeforeUnmount, onMounted } from "vue";
 import { monitoringApi } from "../api/monitoring";
 import type { MonitoringNotification } from "../types";
@@ -146,428 +146,157 @@ function openThread(id: string) {
 </script>
 
 <template>
-  <header class="app-topbar">
-    <div class="search-wrap">
-      <Search :size="16" class="icon" />
-      <input v-model="query" @input="onInput" type="search" placeholder="Search projects, tasks, or conversations..." />
-      <div v-if="showResults" class="search-results-popover">
-        <div class="tabs">
-          <button :class="{active: activeTab==='messages'}" @click="activeTab='messages'">Messages</button>
-          <button :class="{active: activeTab==='threads'}" @click="activeTab='threads'">Conversations</button>
+  <header class="h-16 border-b border-surface-800 bg-surface-950 px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
+    <div class="flex-1 max-w-2xl relative">
+      <div class="relative group">
+        <Search :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-500 group-focus-within:text-sage-400 transition-colors" />
+        <input 
+          v-model="query" 
+          @input="onInput" 
+          type="search" 
+          placeholder="Search projects, tasks, or conversations..." 
+          class="w-full bg-surface-900 border border-surface-800 text-surface-200 text-sm rounded-xl py-2 pl-10 pr-4 outline-none focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all shadow-inner"
+        />
+      </div>
+
+      <div v-if="showResults" class="absolute top-[calc(100%+12px)] left-0 w-full max-h-[60vh] bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden flex flex-col backdrop-blur-xl">
+        <div class="flex gap-2 p-3 border-b border-surface-800 bg-surface-950/50">
+          <button 
+            v-for="tab in ['messages', 'threads']" :key="tab"
+            @click="activeTab = tab as any"
+            :class="[
+              'px-4 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all border',
+              activeTab === tab 
+                ? 'bg-sage-600/10 text-sage-300 border-sage-500/20' 
+                : 'text-surface-400 border-transparent hover:bg-surface-800'
+            ]"
+          >
+            {{ tab }}
+          </button>
         </div>
-        <div class="results">
-          <p v-if="loading">Searching…</p>
-          <p v-else-if="error">{{ error }}</p>
-          <ul v-else>
+        
+        <div class="flex-1 overflow-auto p-2">
+          <div v-if="loading" class="p-8 flex flex-col items-center gap-3 text-surface-500">
+            <div class="w-5 h-5 border-2 border-sage-500/30 border-t-sage-500 rounded-full animate-spin"></div>
+            <p class="text-xs font-medium">Searching...</p>
+          </div>
+          <p v-else-if="error" class="p-8 text-center text-xs text-red-400 bg-red-400/5 rounded-xl border border-red-400/10">{{ error }}</p>
+          <ul v-else-if="results.length" class="space-y-1">
             <li
               v-for="item in results"
               :key="item.id || item.thread_id"
-              class="result-item clickable"
               @click="openThread(item.thread_id || item.id)"
-              role="button"
-              tabindex="0"
+              class="group p-3 rounded-xl hover:bg-surface-800 transition-all cursor-pointer border border-transparent hover:border-surface-700"
             >
-              <div class="result-row">
-                <div class="result-main">
-                  <strong class="title">{{ item.title || 'Conversation' }}</strong>
-                  <div class="badges">
-                    <a
-                      v-if="item.project_name"
-                      :href="item.project_url"
-                      class="project-badge"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      @click.stop
-                    >
+              <div class="flex flex-col gap-1.5">
+                <div class="flex items-center gap-3">
+                  <strong class="text-sm text-surface-200 group-hover:text-sage-300 transition-colors">{{ item.title || 'Conversation' }}</strong>
+                  <div class="flex gap-2 ml-auto">
+                    <span v-if="item.project_name" class="px-2 py-0.5 rounded-md bg-surface-950 text-[10px] font-bold text-surface-400 border border-surface-800 uppercase tracking-wider">
                       {{ item.project_name }}
-                    </a>
-
-                    <a
-                      v-if="item.issue_id"
-                      :href="item.issue_url"
-                      class="issue-link"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      @click.stop
-                    >
+                    </span>
+                    <span v-if="item.issue_id" class="px-2 py-0.5 rounded-md bg-copper-500/10 text-[10px] font-bold text-copper-400 border border-copper-500/20">
                       #{{ item.issue_id }}
-                    </a>
+                    </span>
                   </div>
                 </div>
-                <div class="result-meta-row">
-                  <span class="meta-author">{{ item.author_name || 'Unknown' }}</span>
-                  <span class="meta-sep">•</span>
-                  <small class="meta-time">{{ item.created_at ? timeAgo(item.created_at) : '' }}</small>
+                <div class="flex items-center gap-2 text-[11px] text-surface-500">
+                  <span class="font-medium text-surface-400">{{ item.author_name || 'Unknown' }}</span>
+                  <span class="opacity-30">•</span>
+                  <span>{{ item.created_at ? timeAgo(item.created_at) : '' }}</span>
                 </div>
               </div>
             </li>
           </ul>
+          <div v-else class="p-12 text-center">
+            <p class="text-sm text-surface-500 font-medium">No results found for "{{ query }}"</p>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="topbar-actions">
-      <button type="button" class="icon-btn bell-btn" aria-label="Notifications" @click="toggleNotificationsPanel">
-        <Bell :size="18" />
-        <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount > 9 ? "9+" : unreadCount }}</span>
-      </button>
-      <div v-if="notificationsOpen" class="notifications-popover">
-        <div class="popover-header">
-          <p class="popover-title">Notifications</p>
-          <button type="button" class="popover-close" @click="notificationsOpen = false">×</button>
+    <div class="flex items-center gap-3">
+      <!-- Notifications -->
+      <div class="relative">
+        <button 
+          @click="toggleNotificationsPanel"
+          class="relative w-10 h-10 flex items-center justify-center rounded-xl border border-surface-800 text-surface-400 hover:text-white hover:bg-surface-800 transition-all"
+        >
+          <Bell :size="18" />
+          <span v-if="unreadCount > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center border-2 border-surface-950 px-1 shadow-lg shadow-red-900/40">
+            {{ unreadCount > 9 ? "9+" : unreadCount }}
+          </span>
+        </button>
+
+        <div v-if="notificationsOpen" class="absolute top-[calc(100%+12px)] right-0 w-[420px] max-h-[80vh] bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden flex flex-col z-50 backdrop-blur-xl animate-scale-in origin-top-right">
+          <div class="flex items-center justify-between p-4 border-b border-surface-800 bg-surface-950/50">
+            <p class="text-sm font-bold text-surface-200">Notifications</p>
+            <button @click="notificationsOpen = false" class="text-surface-500 hover:text-white transition-colors">
+              <X :size="16" />
+            </button>
+          </div>
+          
+          <div class="flex-1 overflow-auto p-3 space-y-2">
+            <p v-if="notificationsError" class="p-4 text-xs text-red-400 font-medium text-center bg-red-400/5 rounded-xl">{{ notificationsError }}</p>
+            <ul v-else-if="notifications.length" class="space-y-2">
+              <li v-for="item in notifications.slice(0, 8)" :key="item.id" class="p-3 bg-surface-950/40 rounded-xl border border-surface-800 hover:border-surface-700 transition-all group">
+                <div class="flex gap-3">
+                  <div 
+                    :class="[
+                      'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-all shadow-sm',
+                      item.severity === 'critical' ? 'bg-red-500/10 text-red-400 border-red-500/20 shadow-red-500/5' :
+                      item.severity === 'warning' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-amber-500/5' :
+                      item.severity === 'success' ? 'bg-sage-600/10 text-sage-400 border-sage-500/20 shadow-sage-900/5' :
+                      'bg-surface-800 text-surface-400 border-surface-700 text-surface-300'
+                    ]"
+                  >
+                    <AlertCircle v-if="item.severity === 'critical' || item.severity === 'warning'" :size="16" />
+                    <CheckCircle2 v-else-if="item.severity === 'success'" :size="16" />
+                    <Info v-else :size="16" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                      <p class="text-[13px] font-bold text-surface-200 leading-snug">{{ item.title }}</p>
+                      <span class="text-[10px] font-bold text-surface-500 whitespace-nowrap uppercase tracking-wider">{{ timeAgo(item.created_at) }}</span>
+                    </div>
+                    <p class="text-xs text-surface-400 leading-relaxed truncate">{{ item.subtitle }}</p>
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <div v-else class="p-12 text-center text-surface-500">
+              <Bell :size="32" class="mx-auto mb-3 opacity-20" />
+              <p class="text-sm font-medium">No notifications yet.</p>
+            </div>
+          </div>
+          <a href="#" class="p-3 text-center text-xs font-bold text-sage-400 hover:text-sage-300 hover:bg-surface-800 transition-all border-t border-surface-800 uppercase tracking-widest bg-surface-950/20">View all notifications</a>
         </div>
-        <p v-if="notificationsError" class="popover-error">{{ notificationsError }}</p>
-        <ul v-else-if="notifications.length" class="popover-list">
-          <li v-for="item in notifications.slice(0, 6)" :key="item.id" class="popover-item">
-            <div class="notif-icon-wrap" :class="`sev-${item.severity}`">
-              <AlertCircle v-if="item.severity === 'critical' || item.severity === 'warning'" :size="14" />
-              <CheckCircle2 v-else-if="item.severity === 'success'" :size="14" />
-              <Info v-else :size="14" />
-            </div>
-            <div class="popover-item-content">
-              <div class="popover-row">
-                <p class="popover-item-title">{{ item.title }}</p>
-                <span class="popover-time">{{ timeAgo(item.created_at) }}</span>
-              </div>
-              <p class="popover-subtitle">{{ item.subtitle }}</p>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="popover-empty">No notifications yet.</p>
-        <a class="popover-footer" href="#">View all notifications</a>
       </div>
 
-      <button
-        type="button"
-        class="icon-btn"
-        aria-label="Toggle theme"
+      <!-- Theme Toggle -->
+      <button 
         @click="toggleTheme"
+        class="w-10 h-10 flex items-center justify-center rounded-xl border border-surface-800 text-surface-400 hover:text-white hover:bg-surface-800 transition-all"
+        title="Toggle Theme"
       >
-        <Sun v-if="theme === 'light'" :size="16" />
-        <Moon v-else :size="16" />
+        <Sun v-if="theme === 'light'" :size="18" />
+        <Moon v-else :size="18" />
       </button>
 
-      <div class="profile-pill" aria-label="Profile" @click="emit('navigate', 'profile')">
-        <UserCircle2 :size="18" />
-        <div class="profile-meta">
-          <span class="user">{{ displayName }}</span>
-          <span class="role">{{ roleLabel }}</span>
+      <!-- Profile -->
+      <button 
+        @click="emit('navigate', 'profile')"
+        class="flex items-center gap-3 px-3 py-1.5 h-10 rounded-xl border border-surface-800 bg-surface-900 hover:bg-surface-800 hover:border-surface-700 transition-all group"
+      >
+        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-sage-500/20 to-copper-500/20 flex items-center justify-center text-surface-300 border border-surface-800 group-hover:border-sage-500/30">
+          <UserCircle2 :size="18" class="group-hover:text-white transition-colors" />
         </div>
-      </div>
+        <div class="flex flex-col text-left lg:block hidden">
+          <p class="text-[11px] font-bold text-surface-200 leading-none mb-0.5">{{ displayName }}</p>
+          <p class="text-[9px] font-bold text-surface-500 uppercase tracking-widest leading-none">{{ roleLabel }}</p>
+        </div>
+      </button>
     </div>
   </header>
 </template>
 
-<style scoped>
-.app-topbar {
-  height: 64px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-primary);
-  padding: var(--space-sm) var(--space-lg);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-}
-
-.search-wrap {
-  flex: 1;
-  max-width: 620px;
-  position: relative;
-}
-
-.search-results-popover {
-  position: absolute;
-  top: 46px;
-  left: 0;
-  width: 620px;
-  max-height: 60vh;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.12);
-  z-index: 40;
-  padding: 10px;
-}
-
-.search-results-popover .tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.search-results-popover .tabs button {
-  border: none;
-  background: transparent;
-  padding: 6px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.search-results-popover .tabs button.active {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
-}
-.search-results-popover .results { max-height: 48vh; overflow: auto; }
-.result-item { padding: 8px; border-bottom: 1px solid var(--border-subtle); }
-.result-item.clickable { cursor: pointer; }
-.result-item.clickable:hover { background: var(--bg-tertiary); }
-.result-row { display:flex; flex-direction:column; gap:6px; }
-.result-main { display:flex; gap:8px; align-items:center; width:100%; }
-.title { font-size: 14px; }
-.badges { display:flex; gap:8px; margin-left:8px; }
-.project-badge { background: var(--bg-secondary); border: 1px solid var(--border-subtle); padding: 4px 8px; border-radius: 999px; color: var(--text-primary); font-size: 12px; text-decoration: none; }
-.issue-link { background: rgba(79,70,229,0.06); border: 1px solid rgba(79,70,229,0.12); padding: 3px 6px; border-radius: 6px; color: #4f46e5; font-size: 12px; text-decoration: none; }
-.result-meta-row { display:flex; gap:6px; align-items:center; color:var(--text-secondary); font-size:12px; }
-.meta-sep { opacity:0.6 }
-.result-meta { display:flex; gap:8px; align-items:baseline; }
-.result-meta .ts { color: var(--text-secondary); font-size: 12px; margin-left:auto }
-.snippet { margin: 4px 0 0; color: var(--text-secondary); font-size: 13px }
-
-.search-wrap .icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-secondary);
-}
-
-.search-wrap input {
-  width: 100%;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-radius: 999px;
-  padding: 0.6rem 0.85rem 0.6rem 2.2rem;
-  font-size: var(--text-sm);
-}
-
-.search-wrap input:focus {
-  outline: none;
-  border-color: var(--accent-blue);
-}
-
-.topbar-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.bell-btn {
-  position: relative;
-}
-
-.notif-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: var(--accent-red);
-  color: white;
-  font-size: 10px;
-  line-height: 16px;
-  text-align: center;
-  padding: 0 4px;
-}
-
-.notifications-popover {
-  position: absolute;
-  top: 44px;
-  right: 118px;
-  width: min(460px, 75vw);
-  max-height: 360px;
-  overflow: auto;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  padding: 10px;
-  z-index: 20;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-}
-
-.popover-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.popover-title {
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.popover-close {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.popover-error {
-  margin: 0;
-  color: var(--accent-red);
-  font-size: var(--text-xs);
-}
-
-.popover-empty {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-}
-
-.popover-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.popover-item {
-  display: flex;
-  gap: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-tertiary);
-  padding: 10px;
-}
-
-.notif-icon-wrap {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.notif-icon-wrap.sev-critical,
-.notif-icon-wrap.sev-warning {
-  color: #dc2626;
-  background: rgba(220, 38, 38, 0.1);
-}
-
-.notif-icon-wrap.sev-success {
-  color: #16a34a;
-  background: rgba(22, 163, 74, 0.1);
-}
-
-.notif-icon-wrap.sev-info {
-  color: #4f46e5;
-  background: rgba(79, 70, 229, 0.1);
-}
-
-.popover-item-content {
-  min-width: 0;
-  width: 100%;
-}
-
-.popover-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.popover-item-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.popover-subtitle {
-  margin: 2px 0 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.popover-time {
-  color: var(--text-secondary);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.popover-footer {
-  display: block;
-  margin-top: 8px;
-  text-align: center;
-  color: #4f46e5;
-  font-size: 13px;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.icon-btn,
-.support-btn {
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.icon-btn {
-  width: 36px;
-}
-
-.support-btn {
-  gap: var(--space-xs);
-  padding: 0 var(--space-sm);
-  font-size: var(--text-sm);
-}
-
-.profile-pill {
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  padding: 0.35rem 0.55rem;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--text-primary);
-}
-
-.profile-pill:hover {
-  background: var(--bg-tertiary);
-}
-
-.profile-meta {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.user {
-  font-size: var(--text-xs);
-}
-
-.role {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-
-@media (max-width: 980px) {
-  .support-btn,
-  .profile-meta {
-    display: none;
-  }
-
-  .profile-pill {
-    width: 36px;
-    height: 36px;
-    justify-content: center;
-    padding: 0;
-  }
-}
-</style>

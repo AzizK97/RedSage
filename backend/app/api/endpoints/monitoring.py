@@ -22,6 +22,13 @@ def monitoring_status(
     return monitoring_service.last_result()
 
 
+@router.get("/overview")
+def monitoring_overview(
+    _: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+):
+    return monitoring_service.get_overview()
+
+
 @router.get("/notifications")
 def monitoring_notifications(
     _: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),

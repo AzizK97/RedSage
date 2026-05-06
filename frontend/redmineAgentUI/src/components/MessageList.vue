@@ -16,13 +16,6 @@ const md = new MarkDownIt({
   breaks: true,
 });
 
-// function formatTime(ts: number) {
-//   return new Date(ts).toLocaleTimeString("en-US", {
-//     hour: "2-digit",
-//     minute: "2-digit",
-//   });
-// }
-
 function renderMarkdown(text: string) {
   const raw = md.render(text || "");
   return DOMPurify.sanitize(raw);
@@ -45,182 +38,92 @@ watch(
 onMounted(() => {
   scrollToBottom();
 });
-
-
 </script>
 
 <template>
-  <div id="chat-container" ref="listRef" class="list">
-    <div
-      v-for="(msg, idx) in messages"
-      :key="idx"
-      class="row"
-      :class="msg.role === 'user' ? 'user' : 'assistant'"
-    >
-      <div class="bubble">
-        <p v-if="msg.role === 'user'" class="text">{{ msg.content }}</p>
-        <div v-else class="md-content" v-html="renderMarkdown(msg.content)"></div>
-        
-        <!-- <small>{{ formatTime(msg.timestamp) }}</small> -->
+  <div id="chat-container" ref="listRef" class="h-full overflow-y-auto px-4 sm:px-0 py-8 space-y-8 scroll-smooth custom-scrollbar">
+    <div class="max-w-5xl mx-auto w-full space-y-8">
+      <div
+        v-for="(msg, idx) in messages"
+        :key="idx"
+        :class="[
+          'flex gap-4 sm:gap-6 group animate-in fade-in slide-in-from-bottom-2 duration-300',
+          msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+        ]"
+      >
+
+        <!-- Content -->
+        <div 
+          :class="[
+            'flex flex-col max-w-[85%] sm:max-w-[100%]',
+            msg.role === 'user' ? 'items-end' : 'items-start'
+          ]"
+        >
+          <div 
+            :class="[
+              'px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm transition-all',
+              msg.role === 'user' 
+                ? 'bg-surface-800 text-surface-100 rounded-tr-none border border-surface-700/50' 
+                : 'text-surface-300 rounded-tl-none'
+            ]"
+          >
+            <p v-if="msg.role === 'user'" class="whitespace-pre-wrap">{{ msg.content }}</p>
+            <div 
+              v-else 
+              class="prose dark:prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-surface-900 prose-pre:border prose-pre:border-surface-800 prose-code:text-sage-400 prose-code:bg-surface-900 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-th:text-surface-200 prose-td:text-surface-400" 
+              v-html="renderMarkdown(msg.content)"
+            ></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.list {
-  flex: 1;
-  overflow-y: auto;
-  padding-inline: 30vh;
-  background: var(--bg-primary);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  margin: 0 auto;
-  width: 100%;
-  min-width: 760px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2d29;
+  border-radius: 99px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3c5439;
 }
 
-.row {
-  display: flex;
-  animation: slideIn 200ms ease-out;
-}
-
-.row.user {
-  justify-content: flex-end;
-}
-
-.row.assistant {
-  justify-content: flex-start;
-}
-
-.bubble {
-  max-width: 100%;
-  padding: var(--space-md) var(--space-lg);
-  word-wrap: break-word;
-}
-
-.row.user .bubble {
-  background: #252525;
-  border-radius: 20px;
-  color: white;
-}
-
-.row.assistant .bubble {
-  width: 100%;
-  color: var(--text-primary);
-}
-
-small {
-  display: block;
-  margin-top: var(--space-sm);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-}
-
-.text {
-  white-space: pre-wrap;
-  margin: 0;
-  line-height: 1.6;
-}
-
-:deep(.md-content) {
-  font-size: var(--text-base);
-  line-height: 1.6;
-}
-
-:deep(.md-content p) {
-  margin: var(--space-sm) 0;
-}
-
-:deep(.md-content h1),
-:deep(.md-content h2),
-:deep(.md-content h3) {
-  margin: var(--space-md) 0 var(--space-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-:deep(.md-content ul),
-:deep(.md-content ol) {
-  margin: var(--space-sm) 0;
-  padding-left: var(--space-lg);
-}
-
-:deep(.md-content li) {
-  margin: var(--space-xs) 0;
-}
-
-:deep(.md-content table) {
+/* Custom Markdown Content Styles */
+:deep(.prose table) {
   width: 100%;
   border-collapse: collapse;
-  margin: var(--space-md) 0;
-  background: var(--bg-primary);
-  border-radius: var(--radius-md);
+  margin: 1.5rem 0;
+  font-size: 0.8rem;
+  background: rgba(15, 15, 15, 0.4);
+  border-radius: 0.75rem;
   overflow: hidden;
-  font-size: var(--text-xs);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-:deep(.md-content th) {
-  background: var(--bg-tertiary);
-  padding: var(--space-md);
+:deep(.prose th) {
+  background: rgba(42, 45, 41, 0.4);
+  padding: 0.75rem 1rem;
   text-align: left;
-  font-weight: 600;
-  border-bottom: 1px solid var(--bg-tertiary);
-  color: var(--text-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-:deep(.md-content td) {
-  padding: var(--space-md);
-  border: 1px solid var(--bg-tertiary);
-  color: var(--text-primary);
+:deep(.prose td) {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-:deep(.md-content code) {
-  background: var(--bg-secondary);
-  color: var(--accent-green);
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
-  font-family: 'Montserrat', 'Courier New', monospace;
-  font-size: 0.85em;
-}
-
-:deep(.md-content pre) {
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  overflow-x: auto;
-  font-size: var(--text-xs);
-  line-height: 1.4;
-}
-
-:deep(.md-content blockquote) {
-  margin: var(--space-md) 0;
-  padding: var(--space-md) var(--space-lg);
-  border-left: 3px solid var(--accent-blue);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (max-width: 768px) {
-  .list {
-    padding: var(--space-md);
-  }
-  
-  .bubble {
-    max-width: 85%;
-  }
+:deep(.prose pre) {
+  border-radius: 1rem;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
 }
 </style>

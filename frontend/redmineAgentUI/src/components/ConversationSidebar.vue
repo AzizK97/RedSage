@@ -3,9 +3,12 @@ import { ref } from "vue";
 import type { ConversationSummary } from "../composables/useThreads";
 import { 
   MoreVertical, 
-  Trash, 
-  Plus
-} from '@lucide/vue';
+  Trash2, 
+  Plus,
+  MessageSquare,
+  Clock,
+  Edit2
+} from 'lucide-vue-next';
 
 const props = defineProps<{
   conversations: ConversationSummary[];
@@ -62,323 +65,115 @@ function handleDelete(threadId: string) {
 }
 
 function handleRename(threadId: string) {
-  // Placeholder for rename functionality
   console.log("Rename conversation:", threadId);
   openMenu.value = null;
 }
 </script>
 
 <template>
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="header-content">
-        <h2>All chats</h2>
+  <aside class="w-72 min-w-[288px] h-full bg-surface-950 border-r border-surface-800 flex flex-col z-30">
+    <div class="p-6 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-2 text-surface-200">
+        <MessageSquare :size="18" class="text-sage-400" />
+        <h2 class="text-sm font-bold tracking-tight">Conversations</h2>
       </div>
-      <div class="header-actions">
-        <button class="new-btn" @click="emit('new')" aria-label="Create new conversation">
-          <Plus/>
-        </button>
-      </div>
+      <button 
+        @click="emit('new')" 
+        class="w-9 h-9 rounded-xl bg-sage-500 hover:bg-sage-400 text-surface-950 flex items-center justify-center transition-all shadow-lg shadow-sage-900/20 active:scale-95"
+        aria-label="New conversation"
+      >
+        <Plus :size="20" stroke-width="2.5" />
+      </button>
     </div>
 
-    <div class="conversation-list">
+    <div class="flex-1 overflow-auto px-4 pb-6 space-y-8 custom-scrollbar">
       <template v-for="(group, key) in groupConversationsByTime(props.conversations)" :key="key">
-        <div v-if="group.length > 0" class="conversation-group">
-          <div class="group-label">
-            <span v-if="key === 'today'">Today</span>
-            <span v-else-if="key === 'sevenDays'">Previous 7 days</span>
-            <span v-else-if="key === 'thirtyDays'">Previous 30 days</span>
-            <span v-else>Older</span>
+        <div v-if="group.length > 0" class="flex flex-col gap-1.5">
+          <div class="flex items-center gap-2 px-3 mb-2">
+            <Clock :size="10" class="text-surface-600" />
+            <span class="text-[10px] font-bold text-surface-500 uppercase tracking-widest">
+              {{ key === 'today' ? 'Today' : key === 'sevenDays' ? 'Previous 7 days' : key === 'thirtyDays' ? 'Previous 30 days' : 'Older' }}
+            </span>
           </div>
 
           <div
             v-for="conversation in group"
             :key="conversation.id"
-            class="conversation-item"
-            :class="{ active: conversation.id === props.activeThreadId }"
+            :class="[
+              'group relative flex items-center gap-2 rounded-xl transition-all duration-200 border cursor-pointer h-12',
+              conversation.id === props.activeThreadId 
+                ? 'bg-surface-800/60 border-surface-700 text-white' 
+                : 'border-transparent text-surface-400 hover:bg-surface-900 hover:text-surface-200'
+            ]"
           >
             <button
-              class="conversation-select"
+              class="flex-1 px-4 py-3 h-full text-left min-w-0"
               type="button"
               @click="emit('select', conversation.id)"
             >
-              <div class="conversation-title">{{ conversation.title }}</div>
+              <p class="text-xs font-semibold truncate">{{ conversation.title || 'Untitled Chat' }}</p>
             </button>
 
-            <div class="menu-container">
+            <div class="px-2">
               <button
-                class="menu-btn"
+                class="w-8 h-8 rounded-lg flex items-center justify-center text-surface-600 hover:text-white hover:bg-surface-800 transition-all opacity-0 group-hover:opacity-100"
                 type="button"
-                @click="toggleMenu(conversation.id)"
-                aria-label="Options"
+                @click.stop="toggleMenu(conversation.id)"
               >
-                <MoreVertical :size="16" />
+                <MoreVertical :size="14" />
               </button>
 
-              <div v-if="openMenu === conversation.id" class="menu-dropdown">
+              <div v-if="openMenu === conversation.id" class="absolute right-2 top-10 w-48 bg-surface-900 border border-surface-800 rounded-xl shadow-2xl z-50 overflow-hidden py-1 backdrop-blur-xl animate-scale-in origin-top-right">
                 <button
                   type="button"
-                  class="menu-item"
-                  @click="handleRename(conversation.id)"
+                  class="w-full text-left px-4 py-2.5 text-xs font-bold text-surface-300 hover:bg-surface-800 hover:text-white transition-all flex items-center gap-3"
+                  @click.stop="handleRename(conversation.id)"
                 >
-                  Rename
+                  <Edit2 :size="14" /> Rename
                 </button>
                 <button
                   type="button"
-                  class="menu-item delete-item"
-                  @click="handleDelete(conversation.id)"
+                  class="w-full text-left px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-3"
+                  @click.stop="handleDelete(conversation.id)"
                 >
-                    <Trash :size="15"/>
-                    Delete
+                  <Trash2 :size="14" /> Delete
                 </button>
               </div>
             </div>
           </div>
         </div>
       </template>
+      
+      <div v-if="props.conversations.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
+        <div class="w-12 h-12 rounded-2xl bg-surface-900 flex items-center justify-center mb-4 border border-surface-800">
+          <MessageSquare :size="20" class="text-surface-600 opacity-30" />
+        </div>
+        <p class="text-xs font-bold text-surface-600 uppercase tracking-widest">No conversations</p>
+      </div>
     </div>
-
   </aside>
 </template>
 
-<style scoped>
-.sidebar {
-  position: relative;
-  width: 280px;
-  min-width: 280px;
-  height: 100%;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-right: 1px solid var(--border-subtle);
+<style>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
 }
-
-.sidebar-header {
-  padding: var(--space-md);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.header-content {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  transition: max-width 240ms ease, opacity 180ms ease, transform 240ms ease;
-}
-
-h2 {
-  margin: 0;
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.dropdown-toggle {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color var(--transition-fast);
-}
-
-.dropdown-toggle:hover {
-  color: var(--text-primary);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.new-btn {
-  border: none;
-  background: #d94a3a;
-  width: 36px;
-  height: 36px;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 180ms ease, background-color 180ms ease, opacity 180ms ease;
-}
-
-.new-btn:hover {
-  background: #e85844;
-}
-
-.conversation-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 0 var(--space-md);
-}
-
-.conversation-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  margin-top: var(--space-lg);
-}
-
-.conversation-group:first-child {
-  margin-top: 0;
-}
-
-.group-label {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  padding: var(--space-sm) var(--space-md);
-  text-transform: capitalize;
-  font-weight: 500;
-}
-
-.conversation-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-radius: var(--radius-md);
-  transition: background-color 180ms ease, transform 180ms ease, padding 180ms ease;
-  padding: var(--space-sm);
-}
-
-.conversation-item:hover {
-  background: var(--bg-tertiary);
-}
-
-.conversation-item.active {
-  background: var(--bg-tertiary);
-}
-
-.conversation-select {
-  flex: 1;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: inherit;
-  padding: var(--space-xs) var(--space-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--text-sm);
-  transition: gap 240ms ease, padding 240ms ease, opacity 180ms ease, transform 240ms ease;
-  min-width: 0;
-}
-
-.conversation-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-weight: 400;
-  transition: opacity 180ms ease, transform 240ms ease, max-width 240ms ease;
-}
-
-.menu-container {
-  position: relative;
-}
-
-.menu-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: var(--space-xs);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  transition: opacity 180ms ease, transform 180ms ease, background-color 180ms ease, color 180ms ease;
-}
-
-.menu-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-.menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  min-width: 120px;
-  margin-top: var(--space-xs);
-  overflow: hidden;
-}
-
-.menu-item {
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  padding: var(--space-sm) var(--space-md);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  transition: all var(--transition-fast);
-}
-
-.menu-item:hover {
-  background: var(--bg-tertiary);
-}
-
-.menu-item.delete-item {
-  color: var(--accent-red);
-}
-
-.menu-item.delete-item:hover {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-subtle);
-  border-radius: 3px;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2a2d29;
+  border-radius: 99px;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #3c5439;
 }
-
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 1000;
-    transform: translateX(-100%);
-  }
-
-  .sidebar {
-    transform: translateX(0);
-  }
+@keyframes scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
-
+.animate-scale-in {
+  animation: scale-in 0.15s ease-out;
+}
 </style>
+

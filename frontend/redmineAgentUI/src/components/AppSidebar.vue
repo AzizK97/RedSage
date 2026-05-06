@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut } from "@lucide/vue";
+import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut, Leaf } from "lucide-vue-next";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -20,192 +20,66 @@ function roleLabel() {
 </script>
 
 <template>
-  <aside :class="{ 'app-sidebar': true, collapsed: isCollapsed }">
-    <div class="brand">
-      <div v-show="!isCollapsed">
-        <h1>RedSage</h1>
-        <p>{{ roleLabel() }}</p>
+  <aside 
+    :class="[
+      'h-full bg-surface-950 border-r border-surface-800 px-4 py-6 flex flex-col gap-8 transition-all duration-300 ease-in-out z-40',
+      isCollapsed ? 'w-20' : 'w-64'
+    ]"
+  >
+    <div class="flex items-center justify-between gap-3">
+      <div v-show="!isCollapsed" class="flex items-center gap-2.5 overflow-hidden">
+        <div class="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-sage-400 to-copper-500 flex items-center justify-center shadow-lg shadow-sage-900/40">
+          <Leaf :size="18" class="text-white" />
+        </div>
+        <div class="flex flex-col leading-tight">
+          <span class="font-bold text-white tracking-tight">RedSage</span>
+          <span class="text-[10px] text-surface-500 uppercase tracking-widest font-semibold">{{ roleLabel() }}</span>
+        </div>
       </div>
-      <button class="collapse-btn" type="button" @click="isCollapsed = !isCollapsed" aria-label="Toggle sidebar">
-        <ChevronsLeft :class="{ rotated: isCollapsed }" />
+      <button 
+        class="w-8 h-8 rounded-lg flex items-center justify-center text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
+        type="button" 
+        @click="isCollapsed = !isCollapsed" 
+        aria-label="Toggle sidebar"
+      >
+        <ChevronsLeft :class="['transition-transform duration-300', isCollapsed ? 'rotate-180' : '']" :size="18" />
       </button>
     </div>
 
-    <nav class="nav-links">
+    <nav class="flex flex-col gap-1.5 flex-1">
       <button
-        class="nav-btn"
-        :class="{ active: currentView === 'dashboard' }"
+        v-for="item in [
+          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+          { id: 'chat', label: 'Chatbot', icon: Bot },
+          { id: 'profile', label: 'Profile', icon: User },
+        ]"
+        :key="item.id"
+        :class="[
+          'group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium h-11 overflow-hidden',
+          currentView === item.id 
+            ? 'bg-sage-500/10 text-sage-300 border border-sage-500/20' 
+            : 'text-surface-400 hover:text-surface-200 hover:bg-surface-900 border border-transparent'
+        ]"
         type="button"
-        @click="emit('navigate', 'dashboard')"
+        @click="emit('navigate', item.id as any)"
+        :title="isCollapsed ? item.label : ''"
       >
-        <span class="nav-item" :class="{ collapsed: isCollapsed }">
-          <LayoutDashboard class="nav-icon" :size="16" />
-          <span v-show="!isCollapsed" class="nav-label">Dashboard</span>
-        </span>
-      </button>
-      <button
-        class="nav-btn"
-        :class="{ active: currentView === 'chat' }"
-        type="button"
-        @click="emit('navigate', 'chat')"
-      >
-        <span class="nav-item" :class="{ collapsed: isCollapsed }">
-          <Bot class="nav-icon" :size="16" />
-          <span v-show="!isCollapsed" class="nav-label">Chatbot</span>
-        </span>
-      </button>
-      <button
-        class="nav-btn"
-        :class="{ active: currentView === 'profile' }"
-        type="button"
-        @click="emit('navigate', 'profile')"
-      >
-        <span class="nav-item" :class="{ collapsed: isCollapsed }">
-          <User class="nav-icon" :size="16" />
-          <span v-show="!isCollapsed" class="nav-label">Profile</span>
-        </span>
+        <component :is="item.icon" :size="18" :class="['shrink-0', currentView === item.id ? 'text-sage-400' : 'group-hover:text-sage-400']" />
+        <span v-show="!isCollapsed" class="whitespace-nowrap">{{ item.label }}</span>
       </button>
     </nav>
 
-    <div class="sidebar-footer">
-      <button class="logout-btn" type="button" @click="emit('logout')">
-        <span class="nav-item" :class="{ collapsed: isCollapsed }">
-          <LogOut class="nav-icon" :size="16" />
-          <span v-show="!isCollapsed" class="nav-label">Log out</span>
-        </span>
+    <div class="mt-auto pt-4 border-t border-surface-800">
+      <button 
+        class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-surface-400 hover:text-red-400 hover:bg-red-500/5 transition-all text-sm font-medium w-full h-11 overflow-hidden" 
+        type="button" 
+        @click="emit('logout')"
+        :title="isCollapsed ? 'Log out' : ''"
+      >
+        <LogOut :size="18" class="shrink-0 group-hover:text-red-400" />
+        <span v-show="!isCollapsed">Log out</span>
       </button>
     </div>
   </aside>
 </template>
 
-<style scoped>
-.app-sidebar {
-  width: 230px;
-  min-width: 230px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  padding: var(--space-md);
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-subtle);
-  transition: width 220ms ease, min-width 220ms ease;
-}
-
-.app-sidebar.collapsed {
-  width: 78px;
-  min-width: 78px;
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: var(--text-lg);
-  color: var(--text-primary);
-}
-
-.brand p {
-  margin: var(--space-xs) 0 0;
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-
-.brand {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-sm);
-}
-
-.collapse-btn {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: var(--radius-md);
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.collapse-btn:hover {
-  color: var(--text-primary);
-}
-
-.collapse-btn svg {
-  transition: transform 220ms ease;
-}
-
-.collapse-btn .rotated {
-  transform: rotate(180deg);
-}
-
-.nav-links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.nav-btn,
-.logout-btn {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  padding: 0.6rem 0.75rem;
-  text-align: left;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.nav-btn,
-.logout-btn,
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.nav-btn,
-.logout-btn {
-  width: 100%;
-}
-
-.nav-item {
-  width: 100%;
-  justify-content: flex-start;
-}
-
-.nav-item.collapsed {
-  justify-content: center;
-  gap: 0;
-}
-
-.nav-icon {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-}
-
-.nav-btn:hover,
-.logout-btn:hover {
-  background: var(--bg-tertiary);
-}
-
-.nav-btn.active {
-  background: var(--bg-tertiary);
-}
-
-.sidebar-footer {
-  margin-top: auto;
-}
-
-.logout-btn {
-  width: 100%;
-}
-
-.nav-label {
-  line-height: 1;
-}
-</style>

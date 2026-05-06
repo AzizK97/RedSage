@@ -2,8 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { adminApi } from "../../api/admin";
 import { dashboardApi } from "../../api/dashboard";
-import type { AtRiskProjectInsight, DashboardProject, OverdueTicketInsight, PmCandidate, ProjectStatus } from "../../types";
-import { Info } from "@lucide/vue";
+import { monitoringApi } from "../../api/monitoring";
+import type { AtRiskProjectInsight, DashboardProject, MonitoringOverview, OverdueTicketInsight, PmCandidate, ProjectStatus } from "../../types";
+import { Info, TrendingUp, AlertTriangle, CheckCircle, Clock, ChevronRight } from "lucide-vue-next";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -15,6 +16,8 @@ const projectsError = ref("");
 const topOverdueTickets = ref<OverdueTicketInsight[]>([]);
 const atRiskProjects = ref<AtRiskProjectInsight[]>([]);
 const insightsError = ref("");
+const monitoringOverview = ref<MonitoringOverview | null>(null);
+const monitoringError = ref("");
 
 const projectRows = computed(() => {
   const rows = projects.value ?? [];
@@ -30,12 +33,18 @@ const projectRows = computed(() => {
   });
 });
 
-const velocityBars = computed((): { label: string; height: string; value: number }[] => {
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const base = Math.max(8, Math.min(20, projects.value.length + 2));
-  return labels.map((label, index) => {
-    const value = Math.round(base * (0.8 + index * 0.06));
-    return { label, height: `${Math.max(60, value * 5)}px`, value };
+const runTrendBars = computed((): { label: string; height: string; value: number }[] => {
+  const trend = monitoringOverview.value?.run_trend ?? [];
+  if (!trend.length) return [];
+
+  const values = trend.map((item) => Number(item.events_count || 0));
+  const maxValue = Math.max(1, ...values);
+
+  return trend.map((item) => {
+    const events = Number(item.events_count || 0);
+    const label = new Date(item.started_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const height = Math.max(24, Math.round((events / maxValue) * 160));
+    return { label, value: events, height: `${height}px` };
   });
 });
 
@@ -91,16 +100,18 @@ async function loadProjects() {
 }
 
 function mapDashboardProject(project: DashboardProject): ProjectStatus {
-  const seed = Number(project.id || 0);
-  const progress = Math.max(8, Math.min(98, 25 + (seed % 70)));
-  const health: ProjectStatus["health"] = progress < 40 ? "Delayed" : progress < 65 ? "At risk" : "On track";
+  const progress = Number.isFinite(project.progress as number) ? Math.max(0, Math.min(100, project.progress ?? 0)) : 0;
+  const health: ProjectStatus["health"] =
+    project.health ?? (progress === 0 ? "At risk" : progress < 40 ? "Delayed" : progress < 65 ? "At risk" : "On track");
+  const openIssues = project.open_issues ?? 0;
+  const closedIssues = project.closed_issues ?? 0;
   return {
     id: String(project.id),
     name: project.name,
     owner: "Redmine team",
     progress,
     health,
-    completionEta: "TBD",
+    completionEta: project.completion_eta ?? (openIssues === 0 && closedIssues === 0 ? "No issues yet" : `${openIssues} open / ${closedIssues} closed`),
   };
 }
 
@@ -116,6 +127,21 @@ async function loadInsights() {
     atRiskProjects.value = response.at_risk_projects;
   } catch (error) {
     insightsError.value = error instanceof Error ? error.message : "Failed to load dashboard insights.";
+  }
+}
+
+async function loadMonitoringOverview() {
+  if (!props.token.trim()) {
+    monitoringError.value = "Missing authentication token.";
+    return;
+  }
+
+  try {
+    monitoringError.value = "";
+    monitoringOverview.value = await monitoringApi.getOverview(props.token.trim());
+  } catch (error) {
+    monitoringError.value = error instanceof Error ? error.message : "Failed to load monitoring overview.";
+    monitoringOverview.value = null;
   }
 }
 
@@ -175,6 +201,7 @@ async function togglePmAccess(pm: PmCandidate, enabled: boolean) {
 onMounted(async () => {
   await loadProjects();
   await loadInsights();
+  await loadMonitoringOverview();
   if (!isAdmin.value) return;
   await loadPmRows();
   pmPollTimer = window.setInterval(() => {
@@ -187,191 +214,306 @@ onBeforeUnmount(() => {
     window.clearInterval(pmPollTimer);
   }
 });
-
-function healthClass(health: "On track" | "At risk" | "Delayed") {
-  if (health === "On track") return "health-good";
-  if (health === "At risk") return "health-warn";
-  return "health-bad";
-}
 </script>
 
 <template>
-  <main class="dashboard-shell">
-    <section class="dashboard-header">
-      <div>
-        <p class="kicker">Dashboard</p>
-        <h1>Projects status & advancement</h1>
-        <p class="subtitle">{{ roleLabel }} • Snapshot of delivery health, progress, and sprint momentum.</p>
+  <main class="min-h-full bg-surface-950 px-8 py-10 flex flex-col gap-10">
+    <!-- Header -->
+    <header class="flex items-start justify-between">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2 text-sage-400 font-bold text-[10px] uppercase tracking-widest">
+          <TrendingUp :size="14" /> {{ roleLabel }}
+        </div>
+        <h1 class="text-3xl font-extrabold text-white tracking-tight">Project Health & Advancement</h1>
+        <p class="text-surface-500 text-sm">Real-time snapshot of delivery momentum and risk indicators.</p>
+      </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div v-for="stat in [
+        { label: 'Total projects', value: projects.length, color: 'text-sage-400', bg: 'bg-sage-400/5', border: 'border-sage-500/20' },
+        { label: 'Open issues', value: openIssuesCount, color: 'text-blue-400', bg: 'bg-blue-400/5', border: 'border-blue-500/20' },
+        { label: 'Overdue issues', value: overdueIssuesCount, color: 'text-amber-400', bg: 'bg-amber-400/5', border: 'border-amber-500/20' },
+        { label: 'Critical issues', value: criticalIssuesCount, color: 'text-red-400', bg: 'bg-red-400/5', border: 'border-red-500/20' }
+      ]" :key="stat.label" 
+      :class="['p-5 rounded-2xl border bg-surface-900 shadow-sm transition-all hover:scale-[1.02]', stat.border]">
+        <p class="text-[11px] font-bold text-surface-500 uppercase tracking-widest mb-1">{{ stat.label }}</p>
+        <div class="flex items-baseline gap-2">
+          <span :class="['text-3xl font-black tracking-tighter', stat.color]">{{ stat.value }}</span>
+          <div v-if="stat.value > 0" :class="['w-1.5 h-1.5 rounded-full animate-pulse', stat.bg.replace('/5', '/40')]" />
+        </div>
       </div>
     </section>
 
-    <section class="stats-grid">
-      <article class="card stat-card accent-card">
-        <p class="label">Total projects</p>
-        <strong>{{ projects.length }}</strong>
-      </article>
-      <article class="card stat-card">
-        <p class="label">Open issues</p>
-        <strong>{{ openIssuesCount }}</strong>
-      </article>
-      <article class="card stat-card">
-        <p class="label">Overdue issues</p>
-        <strong>{{ overdueIssuesCount }}</strong>
-      </article>
-      <article class="card stat-card">
-        <p class="label">Critical issues</p>
-        <strong>{{ criticalIssuesCount }}</strong>
-      </article>
-    </section>
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <!-- Run Trend Chart -->
+      <section class="xl:col-span-1 p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl overflow-hidden relative group">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-sage-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-sage-500/10 transition-all" />
+        <header class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-sm font-bold text-white mb-0.5">Monitoring Run Trend</h2>
+            <p class="text-[10px] text-surface-500 uppercase font-semibold">Recent monitoring run events</p>
+          </div>
+          <div class="relative group/info outline-none">
+            <button
+              type="button"
+              class="text-surface-600 hover:text-sage-400 transition-colors cursor-help"
+              aria-label="How the Monitoring Run Trend card is calculated"
+            >
+              <Info :size="16" />
+            </button>
 
-    <section class="content-grid">
-      <article class="card chart-card">
-        <header class="card-head">
-          <h2>Monitoring run trend</h2>
-          <span class="caption">Events detected by recent runs</span>
-          <Info color="#000000" />
+            <div
+              class="pointer-events-none absolute right-0 top-6 z-20 w-72 rounded-xl border border-surface-700 bg-surface-950/95 p-3 text-[11px] leading-relaxed text-surface-300 shadow-2xl opacity-0 translate-y-1 transition-all duration-200 group-hover/info:opacity-100 group-hover/info:translate-y-0 group-focus-within/info:opacity-100 group-focus-within/info:translate-y-0"
+            >
+              <p class="font-bold text-surface-100 mb-1">What this card shows</p>
+              <p class="mb-2">
+                Actual monitoring runs from the backend overview feed.
+              </p>
+              <p>
+                Each bar represents the number of events produced by one successful monitoring run.
+                Higher bars mean more issues or changes were detected during that run.
+              </p>
+            </div>
+          </div>
         </header>
 
-        <div class="bar-chart" aria-label="Weekly velocity chart">
-          <div v-for="bar in velocityBars" :key="bar.label" class="bar-wrap">
-            <div class="bar" :style="{ height: bar.height }" />
-            <span class="bar-value">{{ bar.value }}</span>
-            <span class="bar-label">{{ bar.label }}</span>
+        <div v-if="monitoringError" class="mb-4 text-[10px] text-red-400 font-bold bg-red-400/5 px-2 py-1 rounded border border-red-500/10">{{ monitoringError }}</div>
+
+        <div v-if="runTrendBars.length" class="flex items-end justify-between h-48 px-2">
+          <div v-for="bar in runTrendBars" :key="bar.label + bar.value" class="flex flex-col items-center gap-3 flex-1 group/bar">
+            <div class="relative w-full flex justify-center">
+              <div 
+                class="w-6 sm:w-8 rounded-lg bg-gradient-to-t from-sage-600/20 to-sage-400 group-hover/bar:to-sage-300 transition-all duration-500 shadow-lg shadow-sage-900/40 relative" 
+                :style="{ height: bar.height }"
+              >
+                <div class="absolute inset-x-0 top-0 h-px bg-white/20 rounded-t-lg" />
+              </div>
+              <span class="absolute -top-6 text-[10px] font-bold text-sage-400 opacity-0 group-hover/bar:opacity-100 transition-opacity">{{ bar.value }}</span>
+            </div>
+            <span class="text-[10px] font-bold text-surface-500 uppercase tracking-tighter">{{ bar.label }}</span>
           </div>
         </div>
-      </article>
 
-      <article class="card status-card">
-        <header class="card-head">
-          <h2>Project status</h2>
-          <span class="caption">Live progress by stream</span>
-        </header>
-        <p v-if="projectsError" class="banner error">{{ projectsError }}</p>
-
-        <ul class="project-list">
-          <li v-for="project in projectRows" :key="project.id" class="project-row">
-            <div class="project-meta">
-              <p class="project-name">{{ project.name }}</p>
-              <p class="project-sub">{{ project.subtitle }}</p>
-            </div>
-            <div class="project-status-row">
-              <span class="status-chip" :class="healthClass(project.health)">{{ project.statusLabel }}</span>
-              <span class="progress-label">{{ project.progress }}%</span>
-            </div>
-            <div class="progress-track">
-              <div class="progress-fill" :style="{ width: `${project.progress}%` }" />
-            </div>
-          </li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="content-grid">
-      <article class="card status-card">
-        <header class="card-head">
-          <h2>Top overdue tickets</h2>
-          <span class="caption">Requires immediate follow-up</span>
-        </header>
-        <p v-if="insightsError" class="banner error">{{ insightsError }}</p>
-        <ul class="project-list">
-          <li v-if="topOverdueTickets.length === 0" class="empty-cell">No overdue tickets in your current scope.</li>
-          <li v-for="ticket in topOverdueTickets.slice(0, 5)" :key="ticket.issue_id" class="project-row">
-            <div class="project-meta">
-              <p class="project-name">
-                #{{ ticket.issue_id }} {{ ticket.subject }}
-              </p>
-              <p class="project-sub">
-                {{ ticket.project_name }} • Due {{ ticket.due_date }} • {{ ticket.priority || "Normal" }}
-              </p>
-            </div>
-            <a class="secondary-btn" :href="ticket.url" target="_blank" rel="noreferrer">Open ticket</a>
-          </li>
-        </ul>
-      </article>
-
-      <article class="card status-card">
-        <header class="card-head">
-          <h2>At-risk projects</h2>
-          <span class="caption">Risk reason + recommended action</span>
-        </header>
-        <p v-if="insightsError" class="banner error">{{ insightsError }}</p>
-        <ul class="project-list">
-          <li v-if="atRiskProjects.length === 0" class="empty-cell">No at-risk projects detected right now.</li>
-          <li v-for="project in atRiskProjects.slice(0, 5)" :key="project.project_id" class="project-row">
-            <div class="project-meta">
-              <p class="project-name">{{ project.project_name }}</p>
-              <p class="project-sub">
-                {{ project.reason }} • Action: {{ project.recommended_action }}
-              </p>
-            </div>
-            <a class="secondary-btn" :href="project.url" target="_blank" rel="noreferrer">Open project</a>
-          </li>
-        </ul>
-      </article>
-    </section>
-
-    <section v-if="isAdmin" class="admin-access card">
-      <header class="card-head">
-        <h2>Project manager access</h2>
-        <span class="caption">Auto refreshed every minute</span>
-      </header>
-
-      <section class="summary-row">
-        <article class="summary-card">
-          <span class="label">Total PMs</span>
-          <strong>{{ pmRows.length }}</strong>
-        </article>
-        <article class="summary-card">
-          <span class="label">Enabled</span>
-          <strong>{{ enabledPmCount }}</strong>
-        </article>
-        <article class="summary-card">
-          <span class="label">Last sync</span>
-          <strong>{{ lastPmRefreshAt || "—" }}</strong>
-        </article>
+        <div v-else class="h-48 flex items-center justify-center text-surface-600 text-sm italic">
+          No monitoring runs yet.
+        </div>
       </section>
 
-      <p v-if="pmError" class="banner error">{{ pmError }}</p>
-      <p v-if="pmSuccess" class="banner success">{{ pmSuccess }}</p>
+      <!-- Project Status List -->
+      <section class="xl:col-span-2 p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl flex flex-col">
+        <header class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-sm font-bold text-white mb-0.5" id="project-status">Project Streams</h2>
+            <p class="text-[10px] text-surface-500 uppercase font-semibold tracking-wider">Live progress tracking</p>
+          </div>
+          <div v-if="projectsError" class="text-[10px] text-red-400 font-bold bg-red-400/5 px-2 py-1 rounded border border-red-500/10">{{ projectsError }}</div>
+        </header>
 
-      <div class="table-wrap">
-        <table class="pm-table">
+        <div class="flex-1 overflow-auto max-h-[320px] pr-2 space-y-3 custom-scrollbar">
+          <div v-for="project in projectRows" :key="project.id" class="group p-4 rounded-xl bg-surface-950/50 border border-surface-800 hover:border-surface-700 hover:bg-surface-800 transition-all">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-bold text-surface-200 group-hover:text-white transition-colors">{{ project.name }}</h3>
+                  <span 
+                    :class="[
+                      'text-[9px] font-black uppercase px-2 py-0.5 rounded-md border tracking-widest',
+                      project.health === 'On track' ? 'bg-sage-600/10 text-sage-400 border-sage-500/20' :
+                      project.health === 'At risk' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                      'bg-red-500/10 text-red-500 border-red-500/20'
+                    ]"
+                  >
+                    {{ project.statusLabel }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-surface-500 font-medium">{{ project.subtitle }}</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-lg font-black text-white px-2 py-1 bg-surface-900 rounded-lg border border-surface-800">{{ project.progress }}%</span>
+              </div>
+            </div>
+            <!-- Progress Bar -->
+            <div class="h-2 w-full bg-surface-900 rounded-full overflow-hidden border border-surface-800">
+              <div 
+                class="h-full bg-gradient-to-r from-sage-600 to-sage-400 transition-all duration-1000 shadow-[0_0_8px_rgba(125,154,121,0.4)]" 
+                :style="{ width: `${project.progress}%` }" 
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Insights Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Overdue Tickets -->
+      <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl overflow-hidden relative">
+        <header class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-2">
+            <Clock :size="18" class="text-amber-500" />
+            <div>
+              <h2 class="text-sm font-bold text-white mb-0.5">Overdue Tickets</h2>
+              <p class="text-[10px] text-surface-500 uppercase font-semibold">Action required</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="space-y-3">
+          <div v-if="topOverdueTickets.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">No overdue tickets detected.</div>
+          <div v-for="ticket in topOverdueTickets.slice(0, 5)" :key="ticket.issue_id" class="p-4 bg-surface-950/40 rounded-xl border border-surface-800 hover:border-amber-500/30 transition-all group flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-surface-200 line-clamp-1 mb-1">#{{ ticket.issue_id }} {{ ticket.subject }}</p>
+              <div class="flex items-center gap-2 text-[10px] text-surface-500 font-bold uppercase tracking-wider">
+                <span class="text-sage-400">{{ ticket.project_name }}</span>
+                <span class="opacity-30">•</span>
+                <span class="text-red-400">Due {{ ticket.due_date }}</span>
+              </div>
+            </div>
+            <a :href="ticket.url" target="_blank" class="w-8 h-8 rounded-lg bg-surface-900 border border-surface-800 flex items-center justify-center text-surface-400 hover:text-white hover:border-sage-400 transition-all shrink-0">
+              <ChevronRight :size="16" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- At-Risk Strategy -->
+      <section class="p-6 rounded-2xl border border-surface-800 bg-surface-900 shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl -mr-16 -mt-16" />
+        <header class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-2">
+            <AlertTriangle :size="18" class="text-red-500" />
+            <div>
+              <h2 class="text-sm font-bold text-white mb-0.5">Project Risks</h2>
+              <p class="text-[10px] text-surface-500 uppercase font-semibold">Recommended Mitigation</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="space-y-3">
+          <div v-if="atRiskProjects.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">All projects within safe parameters.</div>
+          <div v-for="project in atRiskProjects.slice(0, 5)" :key="project.project_id" class="p-4 bg-red-500/5 rounded-xl border border-red-500/10 hover:border-red-500/30 transition-all flex items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-bold text-surface-200 mb-1">{{ project.project_name }}</p>
+              <p class="text-[11px] text-red-300 font-medium mb-3 leading-relaxed">{{ project.reason }}</p>
+              <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10 w-fit text-[10px] font-black uppercase text-red-400 border border-red-500/20">
+                Action: {{ project.recommended_action }}
+              </div>
+            </div>
+            <a :href="project.url" target="_blank" class="w-8 h-8 rounded-lg bg-surface-900 border border-surface-800 flex items-center justify-center text-surface-400 hover:text-white hover:border-red-400 transition-all shrink-0 mt-1">
+              <ChevronRight :size="16" />
+            </a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Admin Panel: PM Access -->
+    <section v-if="isAdmin" class="p-8 rounded-2xl border border-surface-800 bg-surface-900 shadow-2xl relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-br from-sage-500/[0.02] via-transparent to-transparent pointer-events-none" />
+      
+      <header class="flex items-end justify-between mb-10 relative">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-sage-500 animate-pulse" />
+            <h2 class="text-lg font-extrabold text-white">Project Manager Operations</h2>
+          </div>
+          <p class="text-xs text-surface-500 font-medium">Automatic reconciliation with Redmine user directory.</p>
+        </div>
+        
+        <div class="flex items-center gap-6">
+          <div class="flex flex-col items-end">
+            <span class="text-[9px] uppercase font-black text-surface-500 tracking-widest leading-none">Last Sync</span>
+            <span class="text-sm font-black text-sage-400 leading-tight">{{ lastPmRefreshAt || "—" }}</span>
+          </div>
+          <div class="flex -space-x-2">
+            <div v-for="i in 3" :key="i" class="w-8 h-8 rounded-full border-2 border-surface-900 bg-surface-800 flex items-center justify-center text-[10px] font-bold text-surface-400">
+              {{ i }}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div v-for="stat in [
+          { label: 'Total Candidates', value: pmRows.length },
+          { label: 'Enabled Access', value: enabledPmCount },
+          { label: 'Platform Ready', value: pmRows.filter(r => r.credentials_ready).length }
+        ]" :key="stat.label" class="p-4 rounded-xl bg-surface-950/50 border border-surface-800">
+          <p class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-1">{{ stat.label }}</p>
+          <span class="text-2xl font-black text-white italic tracking-tighter">{{ stat.value }}</span>
+        </div>
+      </div>
+
+      <div v-if="pmError || pmSuccess" class="mb-6 animate-fade-in">
+        <div v-if="pmError" class="p-4 rounded-xl bg-red-400/5 border border-red-500/20 text-red-400 text-xs font-bold">{{ pmError }}</div>
+        <div v-if="pmSuccess" class="p-4 rounded-xl bg-sage-600/10 border border-sage-500/20 text-sage-400 text-xs font-bold flex items-center gap-2">
+          <CheckCircle :size="14" /> {{ pmSuccess }}
+        </div>
+      </div>
+
+      <div class="overflow-hidden rounded-2xl border border-surface-800 bg-surface-950/30">
+        <table class="w-full text-left border-collapse">
           <thead>
-            <tr>
-              <th>Redmine ID</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Credentials</th>
-              <th>Access status</th>
-              <th>Action</th>
+            <tr class="bg-surface-950/50 border-b border-surface-800">
+              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest">PM Identity</th>
+              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest">Credentials</th>
+              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest text-center">Status</th>
+              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest text-right">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-surface-800">
             <tr v-if="pmRows.length === 0">
-              <td colspan="7" class="empty-cell">No PM found yet. Table refreshes automatically.</td>
+              <td colspan="4" class="px-6 py-20 text-center text-surface-600 text-sm font-medium italic">Fetching PM candidates from Redmine...</td>
             </tr>
-            <tr v-for="pm in pmRows" :key="pm.redmine_user_id">
-              <td>{{ pm.redmine_user_id }}</td>
-              <td>{{ pm.full_name }}</td>
-              <td>{{ pm.email }}</td>
-              <td>
-                <span :class="pm.credentials_ready ? 'status-enabled' : 'status-disabled'">
-                  {{ pm.credentials_ready ? 'Ready' : 'Missing' }}
-                </span>
+            <tr v-for="pm in pmRows" :key="pm.redmine_user_id" class="hover:bg-surface-800/30 transition-colors group">
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-xl bg-surface-800 flex items-center justify-center text-xs font-black text-surface-400 group-hover:bg-sage-600/20 group-hover:text-sage-400 transition-all">
+                    {{ pm.full_name.charAt(0) }}
+                  </div>
+                  <div>
+                    <p class="text-[13px] font-bold text-surface-200">{{ pm.full_name }}</p>
+                    <p class="text-[10px] text-surface-500 font-medium">{{ pm.email }}</p>
+                  </div>
+                </div>
               </td>
-              <td>
-                <span :class="pm.enabled ? 'status-enabled' : 'status-disabled'">
-                  {{ pm.enabled ? "Enabled" : "Disabled" }}
-                </span>
-              </td>
-              <td>
-                <button
-                  class="primary-btn"
-                  type="button"
-                  :disabled="rowLoading[pm.redmine_user_id]"
-                  @click="togglePmAccess(pm, !pm.enabled)"
+              <td class="px-6 py-4">
+                <span 
+                  :class="[
+                    'px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border',
+                    pm.credentials_ready 
+                      ? 'bg-sage-600/10 text-sage-400 border-sage-500/10' 
+                      : 'bg-surface-900 text-surface-600 border-surface-800'
+                  ]"
                 >
-                  {{ rowLoading[pm.redmine_user_id] ? "Saving..." : (pm.enabled ? "Revoke" : "Grant access") }}
+                  {{ pm.credentials_ready ? 'Available' : 'Pending' }}
+                </span>
+              </td>
+              <td class="px-6 py-4">
+                <div class="flex justify-center">
+                  <div 
+                    :class="[
+                      'w-2 h-2 rounded-full',
+                      pm.enabled ? 'bg-sage-400 shadow-[0_0_8px_rgba(125,154,121,0.6)]' : 'bg-surface-700'
+                    ]" 
+                  />
+                </div>
+              </td>
+              <td class="px-6 py-4 text-right">
+                <button
+                  @click="togglePmAccess(pm, !pm.enabled)"
+                  :disabled="rowLoading[pm.redmine_user_id]"
+                  :class="[
+                    'px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                    pm.enabled 
+                      ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 text-white hover:border-transparent' 
+                      : 'bg-sage-400 text-surface-950 hover:bg-sage-300 shadow-lg shadow-sage-900/20'
+                  ]"
+                >
+                  {{ rowLoading[pm.redmine_user_id] ? "Processing..." : (pm.enabled ? "Revoke Access" : "Grant Access") }}
                 </button>
               </td>
             </tr>
@@ -382,365 +524,19 @@ function healthClass(health: "On track" | "At risk" | "Delayed") {
   </main>
 </template>
 
-<style scoped>
-.dashboard-shell {
-  min-height: 100%;
-  padding: var(--space-lg) var(--space-xl);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
+<style>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
 }
-
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.kicker {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent-blue);
-  font-size: var(--text-xs);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3c5439;
+  border-radius: 99px;
 }
-
-h1 {
-  margin: var(--space-xs) 0;
-  font-size: var(--text-2xl);
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-md);
-}
-
-.card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-}
-
-.stat-card {
-  padding: var(--space-md);
-}
-
-.label {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
- .accent-card {
-   border-color: rgba(96, 165, 250, 0.35);
-   background: linear-gradient(180deg, rgba(59,130,246,0.12), var(--bg-secondary));
- }
- .accent-card strong {
-   color: var(--accent-blue);
- }
- .project-status-row {
-   display: flex;
-   align-items: center;
-   gap: 10px;
-   margin-bottom: 10px;
- }
- .status-chip {
-   display: inline-flex;
-   align-items: center;
-   padding: 0.25rem 0.65rem;
-   border-radius: 999px;
-   font-size: 0.75rem;
-   font-weight: 600;
-   letter-spacing: 0.01em;
- }
- .project-row .status-chip {
-   border: 1px solid transparent;
- }
- .progress-fill {
-   transition: width 0.35s ease;
- }
- .project-row:hover {
-   transform: translateY(-1px);
-   box-shadow: 0 12px 30px rgba(0,0,0,0.08);
- }
- .project-row {
-   transition: transform 0.2s ease, box-shadow 0.2s ease;
- }
-
-.content-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: var(--space-md);
-  min-height: 0;
-}
-
-.chart-card,
-.status-card {
-  padding: var(--space-md);
-}
-
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-md);
-}
-
-h2 {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-
-.caption {
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-}
-
-.bar-chart {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  align-items: end;
-  gap: var(--space-sm);
-  height: 240px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm);
-  background: var(--bg-tertiary);
-}
-
-.bar-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-  gap: var(--space-xs);
-}
-
-.bar {
-  width: 28px;
-  max-width: 100%;
-  border-radius: var(--radius-sm);
-  background: var(--accent-blue);
-}
-
-.bar-value,
-.bar-label {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-
-.project-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.project-row {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm);
-  background: var(--bg-tertiary);
-}
-
-.project-meta {
-  margin-bottom: var(--space-xs);
-}
-
-.project-name {
-  margin: 0;
-  font-weight: 600;
-}
-
-.project-sub {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-}
-
-.project-progress {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-xs);
-}
- .project-row .project-name {
-   display: flex;
-   align-items: center;
-   gap: 10px;
- }
-
-.health-good {
-  color: var(--accent-green);
-  border-color: var(--accent-green);
-}
-
-.health-warn {
-  color: var(--accent-yellow);
-  border-color: var(--accent-yellow);
-}
-
-.health-bad {
-  color: var(--accent-red);
-  border-color: var(--accent-red);
-}
-
-.progress-label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.progress-track {
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bg-secondary);
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent-blue);
-}
-
-.admin-access {
-  padding: var(--space-md);
-}
-
-.summary-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
-}
-
-.summary-card {
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.banner {
-  border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-md);
-  margin: 0 0 var(--space-md);
-  font-size: var(--text-sm);
-}
-
-.banner.error {
-  border: 1px solid var(--accent-red);
-  color: var(--accent-red);
-}
-
-.banner.success {
-  border: 1px solid var(--accent-green);
-  color: var(--accent-green);
-}
-
-.table-wrap {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.pm-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--bg-secondary);
-}
-
-.pm-table th,
-.pm-table td {
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border-subtle);
-  text-align: left;
-  font-size: var(--text-sm);
-}
-
-.pm-table th {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.empty-cell {
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-.status-enabled,
-.status-disabled {
-  font-weight: 600;
-}
-
-.status-enabled {
-  color: var(--accent-green);
-}
-
-.status-disabled {
-  color: var(--accent-red);
-}
-
-.primary-btn,
-.secondary-btn {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  padding: 0.5rem 0.8rem;
-  font-size: var(--text-sm);
-  cursor: pointer;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.primary-btn {
-  border-color: var(--accent-blue);
-  background: var(--accent-blue);
-}
-
-.secondary-btn {
-  border-color: var(--accent-blue);
-}
-
-button:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-@media (max-width: 1100px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .content-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 700px) {
-  .dashboard-shell {
-    padding: var(--space-md);
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .summary-row {
-    grid-template-columns: 1fr;
-  }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #5f815b;
 }
 </style>
+

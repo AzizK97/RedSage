@@ -4,6 +4,10 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Any
 
+import psycopg
+
+from app.core.settings import settings
+from app.monitoring.repository import MonitoringRepository
 from app.monitoring.workflow import run_monitoring_workflow
 
 
@@ -60,3 +64,15 @@ class MonitoringService:
     def notifications(self) -> list[dict[str, Any]]:
         with self._lock:
             return list(self._notification_feed)
+
+    def get_overview(self) -> dict[str, Any]:
+        if not settings.PLATFORM_POSTGRES_URL:
+            raise RuntimeError("PLATFORM_POSTGRES_URL is not configured")
+
+        db = psycopg.connect(settings.PLATFORM_POSTGRES_URL)
+        try:
+            repo = MonitoringRepository(db)
+            repo.ensure_tables()
+            return repo.get_overview()
+        finally:
+            db.close()
