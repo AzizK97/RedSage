@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut, Leaf } from "lucide-vue-next";
+import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut, LampCeiling } from "lucide-vue-next";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -29,7 +29,7 @@ function roleLabel() {
     <div class="flex items-center justify-between gap-3">
       <div v-show="!isCollapsed" class="flex items-center gap-2.5 overflow-hidden">
         <div class="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-sage-400 to-copper-500 flex items-center justify-center shadow-lg shadow-sage-900/40">
-          <Leaf :size="18" class="text-white" />
+          <LampCeiling :size="18" class="text-white" />
         </div>
         <div class="flex flex-col leading-tight">
           <span class="font-bold text-white tracking-tight">RedSage</span>
