@@ -1,523 +1,237 @@
-# Redmine Chat Assistant
+# Redmine Chat Assist
 
-A multi-agent AI system for intelligent Redmine project management. Route natural language queries to specialized agents that handle tasks, planning, overview, and reporting.
+Redmine Chat Assist is a three-part system for AI-assisted Redmine workflows:
 
-## 🎯 Overview
+- a **backend** API that handles chat, monitoring, authentication, and Redmine integration
+- a **frontend** web app for the chat and dashboard experience
+- a **Redmine plugin** that embeds the assistant inside Redmine
 
-**Redmine Chat Assistant** uses a supervisor agent pattern to delegate user queries to four specialized agents:
+This README focuses on the current architecture and the exact steps to clone and start each part.
 
-- **Overview Agent** — Project summaries, team info, general status
-- **Tasks Agent** — Task listing, filtering, creation, updates, time logging
-- **Planning Agent** — Sprint management, milestone tracking, risk analysis
-- **Report Agent** — Complete project health reports with metrics
+## Architecture
 
-Each agent has read tools (query Redmine) and write tools (create/modify items). Write operations require human approval via HITL (Human-in-the-Loop) middleware.
+### Backend
 
-## 🚀 Quick Start
+The backend lives in `backend/` and is a FastAPI application.
 
-This project has 3 parts:
+What it does:
 
-- `backend/` — FastAPI service and AI orchestration
-- `frontend/redmineAgentUI/` — Vue UI used to interact with the assistant
-- `plugins/redmine_ai_chat_widget/` — Redmine plugin that embeds the widget inside Redmine
+- exposes chat, auth, dashboard, search, and monitoring endpoints
+- talks to Redmine through the REST API
+- runs background jobs for project-manager sync and monitoring
+- provides CORS access for the frontend and the Redmine plugin
 
-For the smoothest setup, start the backend first, then the frontend, then install the plugin into Redmine.
+Main entry point:
 
-### Option 1: Docker Compose (Recommended)
+- `backend/app/main.py`
 
-**One command to run everything:**
+Key configuration:
 
-```bash
-# Clone the repo
-git clone <repo-url>
-cd RedmineChatAssist_Test1
+- `backend/.env` for backend runtime settings
+- `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`
+- `CORS_ORIGINS_PLATFORM`
+- `CORS_ORIGINS_PLUGIN`
 
-# Copy environment template
-cp .env.example .env
+### Frontend
 
-# Edit .env and set your API keys
-OPENROUTER_API_KEY=sk-or-v1-...
-REDMINE_API_KEY=your-redmine-api-key
+The frontend lives in `frontend/redmineAgentUI/` and is a Vue 3 + Vite + TypeScript app.
 
-# Start all services (backend, Redmine, MySQL)
-docker compose up -d
+What it does:
 
-# Services are now running:
-# - Backend API: http://localhost:8000
-# - Redmine: http://localhost:3000
-# - API Docs: http://localhost:8000/docs
+- provides the main user interface for chat, dashboard, and monitoring views
+- calls the backend API over HTTP
+- uses Vue Router so views survive refreshes
+
+Main commands:
+
+- `pnpm dev` for local development
+- `pnpm build` for production build checks
+
+### Redmine Plugin
+
+The plugin lives in `plugins/redmine_ai_chat_widget/` and is installed inside a Redmine instance.
+
+What it does:
+
+- injects the assistant widget into Redmine pages
+- passes user context and a signed widget token to the frontend
+- reads its settings from Redmine's plugin settings page
+
+Important plugin settings:
+
+- `backend_url`
+- `jwt_secret`
+- `jwt_issuer`
+- `jwt_audience`
+
+The plugin does not run as a separate server. Redmine loads it as part of the Redmine application.
+
+## Repository layout
+
+```text
+backend/                     FastAPI backend and agents
+frontend/redmineAgentUI/     Vue frontend
+plugins/redmine_ai_chat_widget/  Redmine plugin
+scripts/                     Helper scripts
+docker-compose.yml           Local full-stack setup
+Dockerfile                   Container image for the backend stack
 ```
 
-See [DOCKER_README.md](DOCKER_README.md) for full Docker guide, custom ports, external Redmine setup, and troubleshooting.
+## Clone the repository
 
-### Option 2: Run locally in development
+```bash
+git clone <repo-url>
+cd RedmineChatAssist_Test1
+```
 
-#### 1) Start the backend
+## Start the backend
+
+The backend is the API that the frontend and plugin both depend on.
+
+### 1) Configure environment variables
+
+Create `backend/.env` from the sample file:
+
+```bash
+cp backend/.env.sample backend/.env
+```
+
+Fill in at least these values:
+
+- `OPENROUTER_API_KEY`
+- `REDMINE_URL`
+- `REDMINE_API_KEY`
+- `JWT_SECRET`
+- `CORS_ORIGINS_PLATFORM`
+- `CORS_ORIGINS_PLUGIN`
+
+### 2) Install dependencies
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend API:
-
-- `http://localhost:8000`
-- Swagger docs: `http://localhost:8000/docs`
-
-#### 2) Start the frontend
-
-```bash
-cd frontend/redmineAgentUI
-pnpm install
-pnpm dev
-```
-
-Frontend dev server:
-
-- `http://localhost:5173`
-
-#### 3) Install the Redmine plugin
-
-The plugin lives in `plugins/redmine_ai_chat_widget/`. Copy or symlink it into your Redmine installation's `plugins/` folder.
-
-Example:
-
-```bash
-# from your Redmine install directory
-cp -R /path/to/RedmineChatAssist_Test1/plugins/redmine_ai_chat_widget plugins/
-bundle install
-bundle exec rake redmine:plugins:migrate RAILS_ENV=production
-```
-
-Then restart Redmine.
-
-#### 4) Configure the plugin
-
-Open the Redmine plugin settings and set:
-
-- `backend_url` → URL of the backend API, usually `http://localhost:8000`
-- `jwt_secret` → same secret used by the backend
-- `jwt_issuer` → optional issuer value, must match the backend if set
-- `jwt_audience` → optional audience value, must match the backend if set
-
-The backend must also allow the Redmine origin in CORS. The default CORS variables are:
-
-- `CORS_ORIGINS_PLATFORM` for the frontend app
-- `CORS_ORIGINS_PLUGIN` for the Redmine plugin host
-
-If you run Redmine on a different port or host, add that origin to `CORS_ORIGINS_PLUGIN`.
-
-
-### Start the CLI assistant
-
-If you want the command-line assistant instead of the web UI:
-
-```bash
-cd backend
-python -m agent.supervisor
-```
-
-## 📚 Usage
-
-### CLI Interactive Mode
-
-```bash
-cd backend
-python -m agent.supervisor
-```
-
-Example conversation:
-```
-You : What projects do we have?
-Agent: [routing] Delegating to overview_agent
-[tool] Calling tool: get_projects
-Final: We have 3 projects: ai-platform-project, e-commerce-platform, internal-tools
-
-You : List open issues in ai-platform-project
-Agent: [tool] Calling tool: get_issues
-Final: Found 12 open issues...
-
-You : exit
-Bye!
-```
-
-### API Endpoint
-
-**Chat endpoint:**
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "What projects do we have?",
-    "thread_id": "session-1"
-  }'
-```
-
-**Response:**
-```json
-{
-  "response": "We have 3 projects...",
-  "requires_human": false,
-  "interrupts": {}
-}
-```
-
-**Write operations (require approval):**
-
-```bash
-# Step 1: Request write action (returns pending)
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Create sprint Sprint 5 in ai-platform-project due 2026-06-01",
-    "thread_id": "session-1"
-  }'
-
-# Response: requires_human=true, with action details
-
-# Step 2: Approve
-curl -X POST http://localhost:8000/approve/session-1?decision_type=approve
-
-# Or reject
-curl -X POST "http://localhost:8000/approve/session-1?decision_type=reject&message=Not ready yet"
-```
-
-### API Documentation
-
-Interactive API docs available at: **http://localhost:8000/docs**
-
-## 🧪 Testing
-
-### Run Benchmarks
-
-Validate agent routing, latency, and accuracy:
-
-```bash
-cd backend
-python -m benchmarks
-```
-
-Output:
-```
-================================================================================
-                    SUPERVISOR AGENT BENCHMARK REPORT
-================================================================================
-
-OVERALL RESULTS:
-  Total Cases:              9
-  Passed:                   8 ✅
-  Failed:                   1 ❌
-  Pass Rate:                88.9%
-
-LATENCY STATISTICS:
-  Average:                  2341.50ms
-  Min:                      1245.23ms
-  Max:                      4123.67ms
-
-RESULTS BY AGENT TYPE:
-  overview_agent:
-    Pass Rate:              100.0% (2/2)
-    Avg Latency:            1523.45ms
-  tasks_agent:
-    Pass Rate:              83.3% (5/6)
-    Avg Latency:            2341.50ms
-  planning_agent:
-    Pass Rate:              100.0% (2/2)
-    Avg Latency:            2789.12ms
-...
-```
-
-Add test cases in `backend/benchmarks/cases.py`.
-
-## 🏗️ Architecture
-
-```
-backend/
-├── agent/
-│   ├── supervisor.py          # Multi-agent orchestrator
-│   ├── agents/
-│   │   ├── overview.py        # Project overview agent
-│   │   ├── tasks.py           # Task management agent
-│   │   ├── planning.py        # Sprint planning agent
-│   │   └── report.py          # Report generation agent
-│   └── tools/
-│       ├── read.py            # Redmine read operations (GET)
-│       └── write.py           # Redmine write operations (POST/PUT)
-├── routers/
-│   └── chat.py                # FastAPI endpoints
-├── benchmarks/
-│   ├── cases.py               # Test case definitions
-│   ├── runner.py              # Benchmark execution
-│   └── report.py              # Results aggregation
-└── main.py                    # App entry (optional)
-
-Dockerfile                      # Container build
-docker-compose.yml             # Local stack (backend + Redmine + MySQL)
-.env.example                   # Environment template
-requirements.txt               # Python dependencies
-```
-
-## 🔌 Integration with Redmine
-
-The agents connect to Redmine via REST API using an API key.
-
-**Setup required in Redmine:**
-
-1. Create a Redmine user account
-2. Enable API access (Administration → Settings → Enable REST API)
-3. Generate API key (My Account → API access key)
-4. Set in `.env`:
-   ```
-   REDMINE_URL=http://your-redmine-instance.com
-   REDMINE_API_KEY=your-api-key
-   ```
-
-## 🤖 Agent Routing Rules
-
-The supervisor uses these rules to delegate queries:
-
-| Intent | Agent | Example |
-|--------|-------|---------|
-| General project info | `overview_agent` | "What projects exist?" |
-| Task listing & filtering | `tasks_agent` | "List open issues" |
-| Task creation/modification | `tasks_agent` | "Create ticket 'Bug fix'" |
-| Sprint management | `planning_agent` | "Create sprint", "Analyze sprint 2" |
-| Full project report | `report_agent` | "Generate health report" |
-
-## 🛡️ Human-in-the-Loop (HITL)
-
-Write operations are suspended for approval before execution:
-
-**Write tools that trigger HITL:**
-- `create_issue`
-- `update_issue_status`
-- `reassign_issue`
-- `add_comment_to_issue`
-- `update_issue_dates`
-- `log_time`
-- `create_version`
-- `update_version_dates`
-
-**Workflow:**
-1. User requests write → API returns `requires_human=true`
-2. Human reviews action details
-3. Human approves/rejects via `/approve/{thread_id}`
-4. On approval: tool executes; on reject: operation cancelled
-
-## 🔐 Environment Variables
-
-Create a `.env` file (copy from `.env.example`):
-
-```
-# OpenRouter (LLM provider)
-OPENROUTER_API_KEY=sk-or-v1-...
-
-# Redmine connection
-REDMINE_URL=http://localhost:3000
-REDMINE_API_KEY=your-api-key
-
-# Docker Compose
-BACKEND_PORT=8000
-REDMINE_PORT=3000
-MYSQL_ROOT_PASSWORD=redmine
-```
-
-### Verify your environment quickly
-
-Use the included verifier to check that essential environment variables are set. Make the script executable and run it from the repo root:
-
-```bash
-chmod +x scripts/verify_env.sh
-bash scripts/verify_env.sh
-```
-
-If the script reports missing variables, copy the sample files and fill them in:
-
-```bash
-cp backend/.env.sample backend/.env
-cp frontend/redmineAgentUI/.env.sample frontend/redmineAgentUI/.env
-# or copy root-level .env from .env.example
-```
-
-### Windows (PowerShell) notes
-
-If your colleagues use Windows, the steps below work in PowerShell (Developer PowerShell / PowerShell Core):
-
-- Create and activate Python venv (PowerShell):
+On Windows PowerShell:
 
 ```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-- Create `.env` files by copying the samples:
-
-```powershell
-Copy-Item backend\.env.sample backend\.env
-Copy-Item frontend\redmineAgentUI\.env.sample frontend\redmineAgentUI\.env
-```
-
-- Set environment variables for the current PowerShell session (non-persistent):
-
-```powershell
-$env:REDMINE_URL = 'http://localhost:3000'
-$env:REDMINE_API_KEY = 'your-api-key'
-$env:OPENROUTER_API_KEY = 'sk-or-...'
-```
-
-- To persist variables for your user account (Windows), use `setx`:
-
-```powershell
-setx REDMINE_URL "http://localhost:3000"
-setx REDMINE_API_KEY "your-api-key"
-setx OPENROUTER_API_KEY "sk-or-..."
-```
-
-- Verify env with the PowerShell verifier:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify_env.ps1
-```
-
-Note: `verify_env.ps1` will also load values from `.env` files if present, and returns a non-zero exit code when variables are missing.
-
-## 📦 Dependencies
-
-- **LLM**: OpenRouter (OpenAI-compatible API)
-- **Agents**: LangChain + LangGraph
-- **API**: FastAPI + Uvicorn
-- **Redmine Client**: requests
-- **Other**: pydantic, python-dotenv
-
-See `backend/requirements.txt` for pinned versions.
-
-## 🐳 Docker
-
-Full Docker Compose setup included:
+### 3) Start the backend server
 
 ```bash
-# Start everything
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Run benchmarks inside container
-docker compose exec backend python -m benchmarks
-
-# Interactive CLI
-docker compose exec -it backend python -m agent.supervisor
-
-# Stop all
-docker compose down
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-See [DOCKER_README.md](DOCKER_README.md) for advanced Docker usage.
+Backend URLs:
 
-## 🧑‍💻 Development
+- API: `http://localhost:8000`
+- docs: `http://localhost:8000/docs`
 
-### Add a New Test Case
+## Start the frontend
 
-Edit `backend/benchmarks/cases.py`:
+The frontend is the browser UI for the assistant.
 
-```python
-CASES = [
-    # ... existing cases
-    BenchmarkCase(
-        id="my-test",
-        query="Your test question here",
-        expected_agent="tasks_agent",
-        accept_fn=lambda result: "expected_word" in result.lower(),
-        description="Test description",
-        tags=["read", "tasks"]
-    ),
-]
-```
+### 1) Configure environment variables
 
-Run: `python -m benchmarks`
+Create `frontend/redmineAgentUI/.env` from the sample file:
 
-### Modify Agent Prompt
-
-Edit the corresponding agent in `backend/agent/agents/`:
-
-```python
-# E.g., backend/agent/agents/tasks.py
-TASKS_PROMPT = """
-Your updated prompt here...
-"""
-```
-
-Changes auto-reload in development mode.
-
-### Add a New Tool
-
-1. Define tool function in `backend/agent/tools/read.py` or `write.py`
-2. Add `@tool` decorator
-3. Include in agent's `tools` list
-4. Update agent prompt with tool description
-
-## 🐛 Troubleshooting
-
-### Backend can't connect to Redmine
 ```bash
-# Check REDMINE_URL and REDMINE_API_KEY in .env
-# Verify Redmine is accessible
-curl -I http://localhost:3000
+cp frontend/redmineAgentUI/.env.sample frontend/redmineAgentUI/.env
 ```
 
-### "User not found" from OpenRouter
+The most important value is:
+
+- `VITE_API_BASE_URL` — usually `http://localhost:8000`
+
+### 2) Install dependencies
+
 ```bash
-# Verify API key is correct
-# Check OPENROUTER_API_KEY in .env
-# Regenerate key if needed
+cd frontend/redmineAgentUI
+pnpm install
 ```
 
-### Port already in use
+### 3) Start the frontend dev server
+
 ```bash
-# Change port in .env or docker-compose
-BACKEND_PORT=8080
-REDMINE_PORT=3001
+pnpm dev
 ```
 
-### Benchmark tests failing
+Frontend URL:
+
+- `http://localhost:5173`
+
+### 4) Optional production build check
+
 ```bash
-# Check Redmine has data (projects, issues, sprints)
-# View detailed logs: docker compose logs backend
-# Run single case for debugging
+pnpm build
 ```
 
-## 📖 Documentation
+## Install and start the Redmine plugin
 
-- [DOCKER_README.md](DOCKER_README.md) — Complete Docker guide
-- [Architecture diagram](k3s/namespace.yaml) — K3s deployment reference
-- Agent prompts — See `backend/agent/agents/*.py`
-- API docs — Hosted at http://localhost:8000/docs
+The plugin is how the assistant appears inside Redmine.
 
-## 🤝 Contributing
+### 1) Copy the plugin into Redmine
 
-1. Fork the repo
-2. Create feature branch: `git checkout -b feature/my-feature`
-3. Make changes focus on one agent or tool
-4. Run benchmarks to validate
-5. Commit + push
-6. Submit PR
+From your Redmine installation directory, copy the plugin folder into `plugins/`:
 
-## 📄 License
+```bash
+cp -R /path/to/RedmineChatAssist_Test1/plugins/redmine_ai_chat_widget /path/to/redmine/plugins/
+```
 
-[Add your license here]
+You can also symlink it during development if that is easier.
 
-## 🙋 Support
+### 2) Install plugin dependencies and migrate
 
-For issues or questions:
-- Check [DOCKER_README.md](DOCKER_README.md) for Docker problems
-- Review agent prompts in `backend/agent/agents/`
-- Check Redmine API key and connectivity
-- Review logs: `docker compose logs -f` or `python -m agent.supervisor`
+From the Redmine root:
 
----
+```bash
+bundle install
+bundle exec rake redmine:plugins:migrate RAILS_ENV=production
+```
 
-**Happy project managing! 🚀**
+If you are developing locally, use the appropriate environment instead of `production`.
+
+### 3) Restart Redmine
+
+Restart the Redmine application so it loads the plugin.
+
+### 4) Configure the plugin in Redmine
+
+Open the Redmine plugin settings and set:
+
+- `backend_url` to the backend address, usually `http://localhost:8000`
+- `jwt_secret` to the same secret used by the backend
+- `jwt_issuer` if you use issuer validation
+- `jwt_audience` if you use audience validation
+
+The plugin expects the backend to allow the Redmine origin through CORS.
+
+## How the parts work together
+
+1. The **backend** serves the API and generates/validates the assistant tokens.
+2. The **frontend** provides the standalone web UI for the assistant.
+3. The **Redmine plugin** embeds the assistant inside Redmine and points to the backend.
+
+In practice, you usually start them in this order:
+
+1. backend
+2. frontend
+3. Redmine with the plugin enabled
+
+## Useful scripts
+
+- `scripts/verify_env.sh` — checks common environment variables on Linux/macOS
+- `scripts/verify_env.ps1` — checks common environment variables on Windows PowerShell
+
+## Troubleshooting
+
+- If the frontend cannot reach the backend, confirm `VITE_API_BASE_URL` and CORS settings.
+- If the Redmine plugin cannot reach the backend, confirm `backend_url` and `CORS_ORIGINS_PLUGIN`.
+- If authentication fails, confirm `JWT_SECRET`, `JWT_ISSUER`, and `JWT_AUDIENCE` match between backend and plugin.
