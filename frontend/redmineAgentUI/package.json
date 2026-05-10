@@ -10,10 +10,12 @@
     "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
+    "@motionone/vue": "^10.16.4",
     "dompurify": "^3.3.3",
     "dotenv": "^17.3.1",
     "lucide-vue-next": "^1.0.0",
     "markdown-it": "^14.1.1",
+    "motion": "^12.38.0",
     "vue": "^3.5.30",
     "vue-router": "4.5.1"
   },

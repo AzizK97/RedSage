@@ -1,5 +1,33 @@
 <script setup lang="ts">
 import AnimatedSection from './AnimatedSection.vue';
+import { computed } from 'vue';
+import { useTheme } from '../../../composables/useTheme';
+
+const { isDark } = useTheme();
+
+const descriptionTextClass = computed(() =>
+  isDark.value
+    ? 'text-surface-400'
+    : 'text-surface-600'
+);
+
+const metricLabelClass = computed(() =>
+  isDark.value
+    ? 'text-white'
+    : 'text-sage-900'
+);
+
+const metricDescClass = computed(() =>
+  isDark.value
+    ? 'text-surface-500'
+    : 'text-surface-700'
+);
+
+const cardBorderClass = computed(() =>
+  isDark.value
+    ? 'hover:border-sage-500/25'
+    : 'hover:border-sage-400/40'
+);
 
 const metrics = [
   { label: 'Routing Accuracy', value: '95%+', desc: 'Correct agent selection' },
@@ -23,12 +51,12 @@ const metrics = [
         </h2>
       </AnimatedSection>
 
-      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <AnimatedSection v-for="(m, i) in metrics" :key="m.label" :delay="i * 100">
-          <div class="glass-card p-6 text-center hover:border-sage-500/25 transition-all">
+          <div :class="['glass-card p-6 text-center transition-all', cardBorderClass]">
             <div class="text-3xl font-extrabold gradient-text-copper mb-1">{{ m.value }}</div>
-            <div class="text-sm font-semibold text-white mb-1">{{ m.label }}</div>
-            <div class="text-xs text-surface-500">{{ m.desc }}</div>
+            <div :class="['text-sm font-semibold mb-1', metricLabelClass]">{{ m.label }}</div>
+            <div :class="['text-xs', metricDescClass]">{{ m.desc }}</div>
           </div>
         </AnimatedSection>
       </div>

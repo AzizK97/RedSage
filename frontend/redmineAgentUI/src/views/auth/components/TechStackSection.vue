@@ -1,6 +1,58 @@
 <script setup lang="ts">
 import { Cpu, Zap, Bot, Container, Database, GitBranch, Terminal, Activity } from 'lucide-vue-next';
 import AnimatedSection from './AnimatedSection.vue';
+import { computed } from 'vue';
+import { useTheme } from '../../../composables/useTheme';
+
+const { isDark } = useTheme();
+
+const descriptionTextClass = computed(() =>
+  isDark.value
+    ? 'text-surface-400'
+    : 'text-surface-600'
+);
+
+const cardBg = computed(() =>
+  isDark.value
+    ? 'bg-sage-500/10'
+    : 'bg-sage-200/20'
+);
+
+const cardBgHover = computed(() =>
+  isDark.value
+    ? 'group-hover:bg-sage-500/15'
+    : 'group-hover:bg-sage-200/30'
+);
+
+const cardBorder = computed(() =>
+  isDark.value
+    ? 'border-sage-500/15'
+    : 'border-sage-300/30'
+);
+
+const cardBorderHover = computed(() =>
+  isDark.value
+    ? 'group-hover:border-sage-500/25'
+    : 'group-hover:border-sage-400/40'
+);
+
+const itemNameClass = computed(() =>
+  isDark.value
+    ? 'text-white'
+    : 'text-sage-900'
+);
+
+const itemDescClass = computed(() =>
+  isDark.value
+    ? 'text-surface-500'
+    : 'text-surface-700'
+);
+
+const glassCardBorder = computed(() =>
+  isDark.value
+    ? 'border-surface-800'
+    : 'border-sage-200/30'
+);
 
 const techItems = [
   { icon: Cpu, name: 'LangChain + LangGraph', desc: 'Agent orchestration & routing' },
@@ -26,21 +78,21 @@ const techItems = [
         <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6">
           Built with <span class="gradient-text">Modern Stack</span>
         </h2>
-        <p class="text-lg text-surface-400 max-w-2xl mx-auto">
+        <p :class="['text-lg max-w-2xl mx-auto', descriptionTextClass]">
           Production-grade technologies chosen for reliability, performance, and developer experience.
         </p>
       </AnimatedSection>
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnimatedSection v-for="(item, i) in techItems" :key="item.name" :delay="i * 80">
-          <div class="group glass-card p-5 hover:border-sage-500/25 transition-all duration-300 hover:-translate-y-0.5">
+          <div :class="['group glass-card p-5 transition-all duration-300 hover:-translate-y-0.5 border', glassCardBorder, isDark.value ? 'hover:border-sage-500/25' : 'hover:border-sage-400/40']">
             <div class="flex items-center gap-3 mb-3">
-              <div class="w-9 h-9 rounded-lg bg-sage-500/10 border border-sage-500/15 flex items-center justify-center group-hover:bg-sage-500/15 group-hover:border-sage-500/25 transition-colors">
+              <div :class="['w-9 h-9 rounded-lg border flex items-center justify-center transition-colors', cardBg, cardBorder, cardBgHover, cardBorderHover]">
                 <component :is="item.icon" :size="18" class="text-sage-400" />
               </div>
-              <h4 class="text-sm font-bold text-white">{{ item.name }}</h4>
+              <h4 :class="['text-sm font-bold', itemNameClass]">{{ item.name }}</h4>
             </div>
-            <p class="text-xs text-surface-500 leading-relaxed">{{ item.desc }}</p>
+            <p :class="['text-xs leading-relaxed', itemDescClass]">{{ item.desc }}</p>
           </div>
         </AnimatedSection>
       </div>

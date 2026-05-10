@@ -18,10 +18,14 @@ const atRiskProjects = ref<AtRiskProjectInsight[]>([]);
 const insightsError = ref("");
 const monitoringOverview = ref<MonitoringOverview | null>(null);
 const monitoringError = ref("");
+const selectedProjectId = ref<string | null>(null);
 
 const projectRows = computed(() => {
   const rows = projects.value ?? [];
-  return rows.map((row) => {
+  const filtered = selectedProjectId.value
+    ? rows.filter((p) => p.id === selectedProjectId.value)
+    : rows;
+  return filtered.map((row) => {
     return {
       id: row.id,
       name: row.name,
@@ -49,16 +53,28 @@ const runTrendBars = computed((): { label: string; height: string; value: number
 });
 
 const openIssuesCount = computed(() => {
-  if (topOverdueTickets.value.length > 0) {
-    return topOverdueTickets.value.length * 4;
+  const filtered = selectedProjectId.value
+    ? topOverdueTickets.value.filter((t) => String(t.project_id) === selectedProjectId.value)
+    : topOverdueTickets.value;
+  if (filtered.length > 0) {
+    return filtered.length * 4;
   }
-  return projects.value.length * 3;
+  const projectCount = selectedProjectId.value ? 1 : projects.value.length;
+  return projectCount * 3;
 });
 
-const overdueIssuesCount = computed(() => Math.max(0, topOverdueTickets.value.length));
+const overdueIssuesCount = computed(() => {
+  const filtered = selectedProjectId.value
+    ? topOverdueTickets.value.filter((t) => String(t.project_id) === selectedProjectId.value)
+    : topOverdueTickets.value;
+  return Math.max(0, filtered.length);
+});
 
 const criticalIssuesCount = computed(() => {
-  const criticalFromRisk = atRiskProjects.value.reduce((sum, item) => sum + (item.high_priority_open_count || 0), 0);
+  const filtered = selectedProjectId.value
+    ? atRiskProjects.value.filter((p) => String(p.project_id) === selectedProjectId.value)
+    : atRiskProjects.value;
+  const criticalFromRisk = filtered.reduce((sum, item) => sum + (item.high_priority_open_count || 0), 0);
   return Math.max(0, criticalFromRisk);
 });
 
@@ -67,6 +83,77 @@ const roleLabel = computed(() =>
 );
 
 const isAdmin = computed(() => props.role === "admin");
+
+const filteredOverdueTickets = computed(() =>
+  selectedProjectId.value
+    ? topOverdueTickets.value.filter((t) => String(t.project_id) === selectedProjectId.value)
+    : topOverdueTickets.value,
+);
+
+const filteredAtRiskProjects = computed(() =>
+  selectedProjectId.value
+    ? atRiskProjects.value.filter((p) => String(p.project_id) === selectedProjectId.value)
+    : atRiskProjects.value,
+);
+
+// Project Health Score calculation (0-100)
+const projectHealthScore = computed(() => {
+  if (projectRows.value.length === 0) return 100;
+  const avgProgress = projectRows.value.reduce((sum, p) => sum + p.progress, 0) / projectRows.value.length;
+  const healthCounts = projectRows.value.reduce(
+    (acc, p) => {
+      if (p.health === "On track") acc.onTrack++;
+      else if (p.health === "At risk") acc.atRisk++;
+      else acc.delayed++;
+      return acc;
+    },
+    { onTrack: 0, atRisk: 0, delayed: 0 }
+  );
+  const healthScore = (healthCounts.onTrack / projectRows.value.length) * 60 + (avgProgress / 100) * 40;
+  return Math.round(healthScore);
+});
+
+const projectHealthStatus = computed(() => {
+  const score = projectHealthScore.value;
+  if (score >= 75) return { label: "Healthy", color: "text-sage-400", bg: "bg-sage-500/10", border: "border-sage-500/20" };
+  if (score >= 50) return { label: "At Risk", color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" };
+  return { label: "Critical", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
+});
+
+// Milestone slippage calculation
+const milestoneSlippage = computed(() => {
+  const totalProjects = projectRows.value.length;
+  if (totalProjects === 0) return 0;
+  const slippedProjects = projectRows.value.filter((p) => p.health !== "On track").length;
+  return Math.round((slippedProjects / totalProjects) * 100);
+});
+
+// Resource capacity insights
+const teamWorkloadInsight = computed(() => {
+  const criticalCount = criticalIssuesCount.value;
+  const overdueCount = overdueIssuesCount.value;
+  if (criticalCount > 5 || overdueCount > 10) return "⚠️ High workload detected. Consider task redistribution.";
+  if (criticalCount > 0) return "🟡 Monitor critical tasks closely.";
+  return "✅ Team capacity is balanced.";
+});
+
+// Velocity trend (simplified - uses project progress as proxy)
+const velocityTrend = computed(() => {
+  const avgProgress = projectRows.value.length > 0
+    ? projectRows.value.reduce((sum, p) => sum + p.progress, 0) / projectRows.value.length
+    : 0;
+  if (avgProgress > 70) return "Accelerating";
+  if (avgProgress > 40) return "Steady";
+  return "Behind Schedule";
+});
+
+// Risk matrix data (maps at-risk projects to risk level)
+const riskMatrixData = computed(() => {
+  const high = filteredAtRiskProjects.value.filter((p) => (p.high_priority_open_count || 0) > 5).length;
+  const medium = filteredAtRiskProjects.value.filter((p) => (p.high_priority_open_count || 0) >= 2 && (p.high_priority_open_count || 0) <= 5).length;
+  const low = filteredAtRiskProjects.value.filter((p) => (p.high_priority_open_count || 0) < 2).length;
+  return { high, medium, low };
+});
 
 const lastPmRefreshAt = ref<string>("");
 const rowLoading = ref<Record<number, boolean>>({});
@@ -220,19 +307,84 @@ onBeforeUnmount(() => {
   <main class="min-h-full bg-surface-950 px-8 py-10 flex flex-col gap-10">
     <!-- Header -->
     <header class="flex items-start justify-between">
-      <div class="space-y-1">
+      <div class="space-y-1 flex-1">
         <div class="flex items-center gap-2 text-sage-400 font-bold text-[10px] uppercase tracking-widest">
           <TrendingUp :size="14" /> {{ roleLabel }}
         </div>
         <h1 class="text-3xl font-extrabold text-white tracking-tight">Project Health & Advancement</h1>
         <p class="text-surface-500 text-sm">Real-time snapshot of delivery momentum and risk indicators.</p>
       </div>
+
+      <!-- Project Selector -->
+      <div class="ml-8">
+        <label class="block text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-2">View</label>
+        <select 
+          v-model="selectedProjectId"
+          class="px-3 py-2 rounded-lg bg-surface-900 border border-surface-700 text-surface-200 text-sm font-medium focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all outline-none cursor-pointer hover:border-surface-600"
+        >
+          <option :value="null">All Projects</option>
+          <option v-for="project in projects" :key="project.id" :value="project.id">
+            {{ project.name }}
+          </option>
+        </select>
+      </div>
     </header>
 
-    <!-- Stats Grid -->
+    <!-- North Star KPI: Project Health Score -->
+    <section class="p-8 rounded-3xl bg-gradient-to-br from-surface-900 via-surface-900 to-sage-500/5 border border-sage-500/20 shadow-2xl">
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+        <div class="flex-1">
+          <p class="text-sm font-bold text-surface-500 uppercase tracking-widest mb-2">Portfolio Health Status</p>
+          <h2 class="text-4xl lg:text-5xl font-black text-white mb-4 tracking-tight">{{ projectHealthScore }}<span class="text-2xl text-surface-500">/100</span></h2>
+          <p class="text-lg font-semibold mb-1" :class="projectHealthStatus.color">{{ projectHealthStatus.label }}</p>
+          <p class="text-sm text-surface-400 max-w-lg">Overall project portfolio health based on schedule adherence, team capacity, and risk indicators. Use this as your primary decision lever.</p>
+        </div>
+        
+        <div class="flex flex-col gap-4 w-full lg:w-auto">
+          <div class="p-4 rounded-2xl bg-surface-950/50 border border-surface-800">
+            <p class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-2">Milestone Health</p>
+            <div class="flex items-end gap-3">
+              <span class="text-3xl font-black text-sage-400">{{ 100 - milestoneSlippage }}%</span>
+              <span class="text-sm text-surface-500 pb-1">On Schedule</span>
+            </div>
+          </div>
+          <div class="p-4 rounded-2xl bg-surface-950/50 border border-surface-800">
+            <p class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-2">Velocity</p>
+            <span class="text-base font-bold" :class="velocityTrend === 'Accelerating' ? 'text-sage-400' : velocityTrend === 'Steady' ? 'text-amber-400' : 'text-red-400'">{{ velocityTrend }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI-Driven Insights -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Team Workload Insight -->
+      <div class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
+        <p class="text-xs font-bold text-surface-500 uppercase tracking-widest mb-3">AI Insight: Team Capacity</p>
+        <p class="text-sm font-semibold text-surface-200 leading-relaxed">{{ teamWorkloadInsight }}</p>
+        <div class="mt-4 pt-4 border-t border-surface-800">
+          <p class="text-[10px] text-surface-600 font-medium">Recommendation: {{ criticalIssuesCount > 5 ? 'Redistribute critical tasks across team members to prevent burnout.' : 'Continue monitoring; current pace is sustainable.' }}</p>
+        </div>
+      </div>
+
+      <!-- Schedule Insight -->
+      <div class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
+        <p class="text-xs font-bold text-surface-500 uppercase tracking-widest mb-3">AI Insight: Schedule Health</p>
+        <p class="text-sm font-semibold text-surface-200 leading-relaxed">
+          {{ milestoneSlippage > 30 ? '🚨 Critical: Over 30% of projects are slipping.' : milestoneSlippage > 10 ? '⚠️ Caution: Some schedule drift detected.' : '✅ Schedule adherence is strong.' }}
+        </p>
+        <div class="mt-4 pt-4 border-t border-surface-800">
+          <p class="text-[10px] text-surface-600 font-medium">
+            {{ milestoneSlippage > 30 ? 'Immediate action required: Review critical path and reallocate resources to at-risk milestones.' : 'Continue with current execution strategy.' }}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Enhanced Metrics Row -->
     <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <div v-for="stat in [
-        { label: 'Total projects', value: projects.length, color: 'text-sage-400', bg: 'bg-sage-400/5', border: 'border-sage-500/20' },
+        { label: selectedProjectId ? 'Selected Project' : 'Total projects', value: selectedProjectId ? 1 : projects.length, color: 'text-sage-400', bg: 'bg-sage-400/5', border: 'border-sage-500/20' },
         { label: 'Open issues', value: openIssuesCount, color: 'text-blue-400', bg: 'bg-blue-400/5', border: 'border-blue-500/20' },
         { label: 'Overdue issues', value: overdueIssuesCount, color: 'text-amber-400', bg: 'bg-amber-400/5', border: 'border-amber-500/20' },
         { label: 'Critical issues', value: criticalIssuesCount, color: 'text-red-400', bg: 'bg-red-400/5', border: 'border-red-500/20' }
@@ -246,8 +398,82 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <!-- Risk & Quality Control Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Risk Heat Matrix (simplified) -->
+      <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
+        <header class="mb-6">
+          <h2 class="text-sm font-bold text-white mb-0.5">Risk Landscape</h2>
+          <p class="text-[10px] text-surface-500 uppercase font-semibold">Risk severity distribution across projects</p>
+        </header>
+        
+        <div class="grid grid-cols-3 gap-3">
+          <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+            <p class="text-[10px] font-bold text-red-400 uppercase mb-2">Critical</p>
+            <p class="text-2xl font-black text-red-400">{{ riskMatrixData.high }}</p>
+            <p class="text-[10px] text-red-300 mt-1">{{riskMatrixData.high > 0 ? 'Projects at high risk' : 'All clear'}}</p>
+          </div>
+          <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <p class="text-[10px] font-bold text-amber-400 uppercase mb-2">Medium</p>
+            <p class="text-2xl font-black text-amber-400">{{ riskMatrixData.medium }}</p>
+            <p class="text-[10px] text-amber-300 mt-1">Monitor closely</p>
+          </div>
+          <div class="p-4 rounded-xl bg-sage-500/10 border border-sage-500/20">
+            <p class="text-[10px] font-bold text-sage-400 uppercase mb-2">Low</p>
+            <p class="text-2xl font-black text-sage-400">{{ riskMatrixData.low }}</p>
+            <p class="text-[10px] text-sage-300 mt-1">Within threshold</p>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-6 border-t border-surface-800">
+          <p class="text-[10px] font-bold text-surface-500 uppercase mb-2">Recommendation</p>
+          <p class="text-sm text-surface-300">
+            {{ riskMatrixData.high > 0 ? '🚨 Focus immediately on ' + riskMatrixData.high + ' high-risk project(s). Escalate to leadership.' : '✅ Risk profile is healthy. Maintain current mitigation strategies.' }}
+          </p>
+        </div>
+      </section>
+
+      <!-- Quality & Throughput -->
+      <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
+        <header class="mb-6">
+          <h2 class="text-sm font-bold text-white mb-0.5">Throughput & Quality</h2>
+          <p class="text-[10px] text-surface-500 uppercase font-semibold">Work flow efficiency</p>
+        </header>
+
+        <div class="space-y-4">
+          <div>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-surface-300">Completion Rate</span>
+              <span class="text-lg font-black text-sage-400">
+                {{ projects.length > 0 ? Math.round((projectRows.filter((p) => p.progress >= 90).length / projects.length) * 100) : 0 }}%
+              </span>
+            </div>
+            <div class="h-2 bg-surface-800 rounded-full overflow-hidden">
+              <div 
+                class="h-full bg-gradient-to-r from-sage-600 to-sage-400 transition-all"
+                :style="{ width: (projects.length > 0 ? Math.round((projectRows.filter((p) => p.progress >= 90).length / projects.length) * 100) : 0) + '%' }"
+              />
+            </div>
+            <p class="text-[10px] text-surface-500 mt-2">Projects > 90% complete</p>
+          </div>
+
+          <div class="pt-4 border-t border-surface-800">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-surface-300">Quality Index</span>
+              <span class="text-lg font-black" :class="overdueIssuesCount === 0 ? 'text-sage-400' : overdueIssuesCount < 5 ? 'text-amber-400' : 'text-red-400'">
+                {{ Math.max(0, 100 - (overdueIssuesCount * 5)) }}/100
+              </span>
+            </div>
+            <p class="text-[10px] text-surface-500">Based on overdue ticket ratio</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Execution Tracking & Monitoring -->
+    <section>
+      <h2 class="text-xl font-bold text-white mb-6">Execution Tracking & Monitoring</h2>
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <!-- Run Trend Chart -->
       <section class="xl:col-span-1 p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl overflow-hidden relative group">
         <div class="absolute top-0 right-0 w-32 h-32 bg-sage-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-sage-500/10 transition-all" />
@@ -346,9 +572,12 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
+    </section>
 
-    <!-- Insights Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Tactical Insights: Tickets & Issues -->
+    <section>
+      <h2 class="text-xl font-bold text-white mb-6">Tactical Insights: Tickets & Issues</h2>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Overdue Tickets -->
       <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl overflow-hidden relative">
         <header class="flex items-center justify-between mb-6">
@@ -362,8 +591,8 @@ onBeforeUnmount(() => {
         </header>
 
         <div class="space-y-3">
-          <div v-if="topOverdueTickets.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">No overdue tickets detected.</div>
-          <div v-for="ticket in topOverdueTickets.slice(0, 5)" :key="ticket.issue_id" class="p-4 bg-surface-950/40 rounded-xl border border-surface-800 hover:border-amber-500/30 transition-all group flex items-center justify-between gap-4">
+          <div v-if="filteredOverdueTickets.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">No overdue tickets detected.</div>
+          <div v-for="ticket in filteredOverdueTickets.slice(0, 5)" :key="ticket.issue_id" class="p-4 bg-surface-950/40 rounded-xl border border-surface-800 hover:border-amber-500/30 transition-all group flex items-center justify-between gap-4">
             <div class="min-w-0">
               <p class="text-sm font-bold text-surface-200 line-clamp-1 mb-1">#{{ ticket.issue_id }} {{ ticket.subject }}</p>
               <div class="flex items-center gap-2 text-[10px] text-surface-500 font-bold uppercase tracking-wider">
@@ -393,8 +622,8 @@ onBeforeUnmount(() => {
         </header>
 
         <div class="space-y-3">
-          <div v-if="atRiskProjects.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">All projects within safe parameters.</div>
-          <div v-for="project in atRiskProjects.slice(0, 5)" :key="project.project_id" class="p-4 bg-red-500/5 rounded-xl border border-red-500/10 hover:border-red-500/30 transition-all flex items-start gap-4">
+          <div v-if="filteredAtRiskProjects.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">All projects within safe parameters.</div>
+          <div v-for="project in filteredAtRiskProjects.slice(0, 5)" :key="project.project_id" class="p-4 bg-red-500/5 rounded-xl border border-red-500/10 hover:border-red-500/30 transition-all flex items-start gap-4">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-bold text-surface-200 mb-1">{{ project.project_name }}</p>
               <p class="text-[11px] text-red-300 font-medium mb-3 leading-relaxed">{{ project.reason }}</p>
@@ -409,6 +638,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
+    </section>
 
     <!-- Admin Panel: PM Access -->
     <section v-if="isAdmin" class="p-8 rounded-2xl border border-surface-800 bg-surface-900 shadow-2xl relative overflow-hidden">

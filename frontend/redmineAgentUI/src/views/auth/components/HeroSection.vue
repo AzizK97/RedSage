@@ -1,8 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Bot, Cpu, Route, MessageSquare, Sparkles, ShieldCheck, Zap, Container, ArrowRight, Github, ChevronDown } from 'lucide-vue-next';
+import { useTheme } from '../../../composables/useTheme';
 
-const chatLines = [
+type ChatLine = {
+  role: 'user' | 'agent';
+  text: string;
+};
+
+const { isDark } = useTheme();
+
+const subtextClass = computed(() => (isDark.value ? 'text-surface-400' : 'text-surface-600'));
+const detailTextClass = computed(() => (isDark.value ? 'text-surface-500' : 'text-surface-700'));
+const bubbleBodyClass = computed(() => (isDark.value ? 'text-surface-200' : 'text-surface-800'));
+const glassCardClass = computed(() => (isDark.value ? 'bg-surface-900/50 border-surface-800' : 'bg-white/70 border-sage-200/30'));
+const secondaryButtonClass = computed(() =>
+  isDark.value
+    ? 'bg-surface-900/50 border-surface-700 text-surface-300 hover:border-sage-500/40 hover:text-white'
+    : 'bg-white/70 border-sage-300/40 text-sage-900 hover:border-sage-500/60 hover:text-sage-900'
+);
+
+const chatLines: ChatLine[] = [
   { role: 'user', text: 'What projects do we have?' },
   { role: 'agent', text: 'Found 3 projects: AI Platform, Backend API, and Mobile App. The AI Platform project has 24 open issues across 3 sprints.' },
   { role: 'user', text: 'List open issues in AI Platform assigned to me' },
@@ -17,14 +35,16 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 function tick() {
   if (visibleLines.value < chatLines.length) {
     timer = setTimeout(() => {
-      visibleLines.value++;
+      visibleLines.value += 1;
       tick();
     }, 1200);
   }
 }
 
 onMounted(() => tick());
-onUnmounted(() => { if (timer) clearTimeout(timer); });
+onUnmounted(() => {
+  if (timer) clearTimeout(timer);
+});
 </script>
 
 <template>
@@ -34,7 +54,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer); });
       <div class="absolute bottom-1/3 right-1/4 w-80 h-80 bg-copper-600/6 rounded-full blur-3xl animate-pulse-slow" style="animation-delay: 2s" />
       <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-sage-500/3 rounded-full blur-3xl" />
       <div class="absolute inset-0 opacity-[0.025]"
-        :style="{ backgroundImage: 'linear-gradient(rgba(125,154,121,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(125,154,121,0.3) 1px, transparent 1px)', backgroundSize: '60px 60px' }" />
+        :style="{ backgroundImage: isDark ? 'linear-gradient(rgba(125,154,121,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(125,154,121,0.3) 1px, transparent 1px)' : 'linear-gradient(rgba(95,129,91,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(95,129,91,0.15) 1px, transparent 1px)', backgroundSize: '60px 60px' }" />
     </div>
 
     <div class="relative max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-16 items-center">
@@ -49,7 +69,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer); });
           </h1>
         </div>
 
-        <p class="animate-slide-up-delayed text-lg text-surface-400 leading-relaxed max-w-xl">
+        <p :class="['animate-slide-up-delayed text-lg leading-relaxed max-w-xl', subtextClass]">
           A supervisor-driven multi-agent system that routes your queries to specialized AI agents.
           Ask questions, create tickets, plan sprints, and generate reports — all through a simple chat interface.
         </p>
@@ -60,12 +80,12 @@ onUnmounted(() => { if (timer) clearTimeout(timer); });
             Get Started <ArrowRight :size="16" class="group-hover:translate-x-0.5 transition-transform" />
           </a>
           <a href="https://github.com/AzizK97/Redmine-Agent" target="_blank" rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-surface-700 text-surface-300 font-semibold hover:border-sage-500/40 hover:text-white transition-all bg-surface-900/50">
+            :class="['inline-flex items-center gap-2 px-6 py-3 rounded-xl border font-semibold transition-all', secondaryButtonClass]">
             <Github :size="16" /> View on GitHub
           </a>
         </div>
 
-        <div class="animate-slide-up-delayed-3 flex items-center gap-6 text-sm text-surface-500">
+        <div :class="['animate-slide-up-delayed-3 flex items-center gap-6 text-sm', detailTextClass]">
           <span class="flex items-center gap-1.5"><ShieldCheck :size="16" class="text-sage-500" /> Human-in-the-Loop</span>
           <span class="flex items-center gap-1.5"><Zap :size="16" class="text-copper-500" /> FastAPI + LangGraph</span>
           <span class="flex items-center gap-1.5"><Container :size="16" class="text-sage-500" /> Docker Ready</span>
@@ -73,11 +93,11 @@ onUnmounted(() => { if (timer) clearTimeout(timer); });
       </div>
 
       <div class="animate-fade-in relative">
-        <div class="glass-card p-6 space-y-4 shadow-2xl shadow-sage-900/10">
-          <div class="flex items-center gap-2 pb-3 border-b border-surface-800">
+        <div :class="['glass-card p-6 space-y-4 shadow-2xl shadow-sage-900/10 border', glassCardClass]">
+          <div :class="['flex items-center gap-2 pb-3 border-b', isDark ? 'border-surface-800' : 'border-sage-200/30']">
             <div class="glow-dot" />
-            <span class="text-sm font-medium text-surface-300">RedSage Chat</span>
-            <span class="ml-auto text-xs text-surface-500 font-mono">supervisor</span>
+            <span :class="['text-sm font-medium', isDark ? 'text-surface-300' : 'text-sage-900']">RedSage Chat</span>
+            <span :class="['ml-auto text-xs font-mono', isDark ? 'text-surface-500' : 'text-surface-600']">supervisor</span>
           </div>
 
           <div class="space-y-3 min-h-[320px]">
@@ -87,9 +107,9 @@ onUnmounted(() => { if (timer) clearTimeout(timer); });
                 <div class="flex items-center gap-1.5 mb-1">
                   <Bot v-if="line.role === 'agent'" :size="12" class="text-sage-400" />
                   <MessageSquare v-else :size="12" class="text-copper-400" />
-                  <span class="text-[10px] uppercase tracking-wider font-semibold text-surface-500">{{ line.role }}</span>
+                  <span :class="['text-[10px] uppercase tracking-wider font-semibold', isDark ? 'text-surface-500' : 'text-surface-600']">{{ line.role }}</span>
                 </div>
-                <p class="text-sm text-surface-200 leading-relaxed">{{ line.text }}</p>
+                <p :class="['text-sm leading-relaxed', bubbleBodyClass]">{{ line.text }}</p>
               </div>
             </div>
             <div v-if="visibleLines < chatLines.length" class="flex items-center gap-1.5 pl-2">
@@ -109,7 +129,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer); });
       </div>
     </div>
 
-    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-surface-500 animate-bounce">
+    <div :class="['absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce', isDark ? 'text-surface-500' : 'text-surface-600']">
       <span class="text-xs">Scroll to explore</span>
       <ChevronDown :size="16" />
     </div>

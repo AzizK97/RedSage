@@ -1,6 +1,22 @@
 <script setup lang="ts">
 import { Play, ArrowRight, Github, Flame } from 'lucide-vue-next';
 import AnimatedSection from './AnimatedSection.vue';
+import { computed } from 'vue';
+import { useTheme } from '../../../composables/useTheme';
+
+const { isDark } = useTheme();
+
+const descriptionTextClass = computed(() =>
+  isDark.value
+    ? 'text-surface-400'
+    : 'text-surface-600'
+);
+
+const secondaryButtonClass = computed(() =>
+  isDark.value
+    ? 'bg-surface-900/50 border-surface-700 text-surface-300 hover:border-sage-500/40 hover:text-white'
+    : 'bg-white/70 border-sage-300/40 text-sage-900 hover:border-sage-500/60 hover:text-sage-900'
+);
 </script>
 
 <template>
@@ -18,7 +34,7 @@ import AnimatedSection from './AnimatedSection.vue';
         <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6">
           Transform Your<br /><span class="gradient-text-hero">Redmine Workflow</span>
         </h2>
-        <p class="text-lg text-surface-400 max-w-xl mx-auto mb-10">
+        <p :class="['text-lg max-w-xl mx-auto mb-10', descriptionTextClass]">
           Stop clicking through menus. Start asking questions. Let AI agents handle the heavy lifting while you stay in control.
         </p>
         <div class="flex flex-wrap justify-center gap-4">
@@ -27,7 +43,7 @@ import AnimatedSection from './AnimatedSection.vue';
             <Play :size="20" /> Get Started <ArrowRight :size="20" class="group-hover:translate-x-0.5 transition-transform" />
           </a>
           <a href="https://github.com/AzizK97/Redmine-Agent" target="_blank" rel="noopener noreferrer"
-            class="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl border border-surface-700 text-surface-300 font-bold text-lg hover:border-sage-500/40 hover:text-white transition-all bg-surface-900/50">
+            :class="['inline-flex items-center gap-2.5 px-8 py-4 rounded-xl border font-bold text-lg transition-all', secondaryButtonClass]">
             <Github :size="20" /> Star on GitHub
           </a>
         </div>
