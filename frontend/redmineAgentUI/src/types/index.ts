@@ -177,6 +177,7 @@ interface AtRiskProjectInsight {
 interface ProjectStatus {
     id: string;
     name: string;
+    identifier?: string;
     owner?: string;
     progress: number;
     health: "On track" | "At risk" | "Delayed";

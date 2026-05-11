@@ -5,12 +5,6 @@ import { useTheme } from '../../../composables/useTheme';
 
 const { isDark } = useTheme();
 
-const descriptionTextClass = computed(() =>
-  isDark.value
-    ? 'text-surface-400'
-    : 'text-surface-600'
-);
-
 const metricLabelClass = computed(() =>
   isDark.value
     ? 'text-white'

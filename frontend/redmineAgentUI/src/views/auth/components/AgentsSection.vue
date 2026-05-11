@@ -81,11 +81,11 @@ const agents = [
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <AnimatedSection v-for="(agent, i) in agents" :key="agent.name" :delay="i * 100">
-          <div :class="['group glass-card p-6 h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-sage-900/10 shimmer-bg', glassCardBorder, isDark.value ? 'hover:border-sage-500/25' : 'hover:border-sage-400/40']">
+          <div :class="['group glass-card p-6 h-full transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-sage-900/10 shimmer-bg', glassCardBorder, isDark ? 'hover:border-sage-500/25' : 'hover:border-sage-400/40']">
             <div :class="['w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300', agent.gradient, agent.shadowColor]">
               <component :is="agent.icon" :size="24" class="text-white" />
             </div>
-            <h3 :class="['text-lg font-bold mb-2', isDark.value ? 'text-white' : 'text-sage-900']">{{ agent.name }}</h3>
+            <h3 :class="['text-lg font-bold mb-2', isDark ? 'text-white' : 'text-sage-900']">{{ agent.name }}</h3>
             <p :class="['text-sm mb-5 leading-relaxed', agentDescriptionClass]">{{ agent.description }}</p>
             <div class="space-y-2">
               <div v-for="ex in agent.examples" :key="ex" :class="['flex items-start gap-2 text-xs', exampleTextClass]">

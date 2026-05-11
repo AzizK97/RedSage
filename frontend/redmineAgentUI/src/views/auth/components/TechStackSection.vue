@@ -85,7 +85,7 @@ const techItems = [
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <AnimatedSection v-for="(item, i) in techItems" :key="item.name" :delay="i * 80">
-          <div :class="['group glass-card p-5 transition-all duration-300 hover:-translate-y-0.5 border', glassCardBorder, isDark.value ? 'hover:border-sage-500/25' : 'hover:border-sage-400/40']">
+          <div :class="['group glass-card p-5 transition-all duration-300 hover:-translate-y-0.5 border', glassCardBorder, isDark ? 'hover:border-sage-500/25' : 'hover:border-sage-400/40']">
             <div class="flex items-center gap-3 mb-3">
               <div :class="['w-9 h-9 rounded-lg border flex items-center justify-center transition-colors', cardBg, cardBorder, cardBgHover, cardBorderHover]">
                 <component :is="item.icon" :size="18" class="text-sage-400" />

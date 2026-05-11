@@ -99,7 +99,7 @@ const writeOps = [
 
           <div :class="['flex items-center gap-3 text-sm', mutedTextClass]">
             <Terminal :size="16" class="text-copper-500" />
-            <code :class="['font-mono', isDark.value ? 'text-copper-300' : 'text-copper-600']">POST /approve/&#123;thread_id&#125;</code>
+            <code :class="['font-mono', isDark ? 'text-copper-300' : 'text-copper-600']">POST /approve/&#123;thread_id&#125;</code>
           </div>
         </AnimatedSection>
 
@@ -129,7 +129,7 @@ const writeOps = [
               <button class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-sage-600 text-white text-sm font-semibold hover:bg-sage-500 transition-colors shadow-lg shadow-sage-700/20">
                 <ThumbsUp :size="16" /> Approve
               </button>
-              <button :class="['flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors', isDark.value ? 'bg-surface-800 border-surface-700 text-surface-300 hover:border-red-500/30 hover:text-red-400' : 'bg-white border-sage-200/40 text-sage-800 hover:border-red-400/40 hover:text-red-500']">
+              <button :class="['flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-semibold transition-colors', isDark ? 'bg-surface-800 border-surface-700 text-surface-300 hover:border-red-500/30 hover:text-red-400' : 'bg-white border-sage-200/40 text-sage-800 hover:border-red-400/40 hover:text-red-500']">
                 <ThumbsDown :size="16" /> Reject
               </button>
             </div>

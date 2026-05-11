@@ -16,7 +16,6 @@ const emit = defineEmits<{ (e: 'start-login'): void }>();
 const { isDark } = useTheme();
 
 const bgClass = computed(() => isDark.value ? 'bg-surface-950 text-surface-200' : 'bg-surface-50 text-sage-900');
-const lightClass = computed(() => !isDark.value);
 </script>
 
 <template>

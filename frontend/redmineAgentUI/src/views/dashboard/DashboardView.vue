@@ -20,6 +20,11 @@ const monitoringOverview = ref<MonitoringOverview | null>(null);
 const monitoringError = ref("");
 const selectedProjectId = ref<string | null>(null);
 
+const selectedProjectIdentifier = computed(() => {
+  if (!selectedProjectId.value) return null;
+  return projects.value.find((project) => String(project.id) === selectedProjectId.value)?.identifier ?? selectedProjectId.value;
+});
+
 const projectRows = computed(() => {
   const rows = projects.value ?? [];
   const filtered = selectedProjectId.value
@@ -53,8 +58,8 @@ const runTrendBars = computed((): { label: string; height: string; value: number
 });
 
 const openIssuesCount = computed(() => {
-  const filtered = selectedProjectId.value
-    ? topOverdueTickets.value.filter((t) => String(t.project_id) === selectedProjectId.value)
+  const filtered = selectedProjectIdentifier.value
+    ? topOverdueTickets.value.filter((t) => t.project_identifier === selectedProjectIdentifier.value)
     : topOverdueTickets.value;
   if (filtered.length > 0) {
     return filtered.length * 4;
@@ -64,15 +69,15 @@ const openIssuesCount = computed(() => {
 });
 
 const overdueIssuesCount = computed(() => {
-  const filtered = selectedProjectId.value
-    ? topOverdueTickets.value.filter((t) => String(t.project_id) === selectedProjectId.value)
+  const filtered = selectedProjectIdentifier.value
+    ? topOverdueTickets.value.filter((t) => t.project_identifier === selectedProjectIdentifier.value)
     : topOverdueTickets.value;
   return Math.max(0, filtered.length);
 });
 
 const criticalIssuesCount = computed(() => {
-  const filtered = selectedProjectId.value
-    ? atRiskProjects.value.filter((p) => String(p.project_id) === selectedProjectId.value)
+  const filtered = selectedProjectIdentifier.value
+    ? atRiskProjects.value.filter((p) => p.project_identifier === selectedProjectIdentifier.value)
     : atRiskProjects.value;
   const criticalFromRisk = filtered.reduce((sum, item) => sum + (item.high_priority_open_count || 0), 0);
   return Math.max(0, criticalFromRisk);
@@ -85,14 +90,14 @@ const roleLabel = computed(() =>
 const isAdmin = computed(() => props.role === "admin");
 
 const filteredOverdueTickets = computed(() =>
-  selectedProjectId.value
-    ? topOverdueTickets.value.filter((t) => String(t.project_id) === selectedProjectId.value)
+  selectedProjectIdentifier.value
+    ? topOverdueTickets.value.filter((t) => t.project_identifier === selectedProjectIdentifier.value)
     : topOverdueTickets.value,
 );
 
 const filteredAtRiskProjects = computed(() =>
-  selectedProjectId.value
-    ? atRiskProjects.value.filter((p) => String(p.project_id) === selectedProjectId.value)
+  selectedProjectIdentifier.value
+    ? atRiskProjects.value.filter((p) => p.project_identifier === selectedProjectIdentifier.value)
     : atRiskProjects.value,
 );
 
@@ -195,6 +200,7 @@ function mapDashboardProject(project: DashboardProject): ProjectStatus {
   return {
     id: String(project.id),
     name: project.name,
+    identifier: project.identifier,
     owner: "Redmine team",
     progress,
     health,
@@ -304,453 +310,423 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="min-h-full bg-surface-950 px-8 py-10 flex flex-col gap-10">
-    <!-- Header -->
-    <header class="flex items-start justify-between">
-      <div class="space-y-1 flex-1">
-        <div class="flex items-center gap-2 text-sage-400 font-bold text-[10px] uppercase tracking-widest">
-          <TrendingUp :size="14" /> {{ roleLabel }}
-        </div>
-        <h1 class="text-3xl font-extrabold text-white tracking-tight">Project Health & Advancement</h1>
-        <p class="text-surface-500 text-sm">Real-time snapshot of delivery momentum and risk indicators.</p>
-      </div>
-
-      <!-- Project Selector -->
-      <div class="ml-8">
-        <label class="block text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-2">View</label>
-        <select 
-          v-model="selectedProjectId"
-          class="px-3 py-2 rounded-lg bg-surface-900 border border-surface-700 text-surface-200 text-sm font-medium focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all outline-none cursor-pointer hover:border-surface-600"
-        >
-          <option :value="null">All Projects</option>
-          <option v-for="project in projects" :key="project.id" :value="project.id">
-            {{ project.name }}
-          </option>
-        </select>
-      </div>
-    </header>
-
-    <!-- North Star KPI: Project Health Score -->
-    <section class="p-8 rounded-3xl bg-gradient-to-br from-surface-900 via-surface-900 to-sage-500/5 border border-sage-500/20 shadow-2xl">
-      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
-        <div class="flex-1">
-          <p class="text-sm font-bold text-surface-500 uppercase tracking-widest mb-2">Portfolio Health Status</p>
-          <h2 class="text-4xl lg:text-5xl font-black text-white mb-4 tracking-tight">{{ projectHealthScore }}<span class="text-2xl text-surface-500">/100</span></h2>
-          <p class="text-lg font-semibold mb-1" :class="projectHealthStatus.color">{{ projectHealthStatus.label }}</p>
-          <p class="text-sm text-surface-400 max-w-lg">Overall project portfolio health based on schedule adherence, team capacity, and risk indicators. Use this as your primary decision lever.</p>
-        </div>
-        
-        <div class="flex flex-col gap-4 w-full lg:w-auto">
-          <div class="p-4 rounded-2xl bg-surface-950/50 border border-surface-800">
-            <p class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-2">Milestone Health</p>
-            <div class="flex items-end gap-3">
-              <span class="text-3xl font-black text-sage-400">{{ 100 - milestoneSlippage }}%</span>
-              <span class="text-sm text-surface-500 pb-1">On Schedule</span>
-            </div>
-          </div>
-          <div class="p-4 rounded-2xl bg-surface-950/50 border border-surface-800">
-            <p class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-2">Velocity</p>
-            <span class="text-base font-bold" :class="velocityTrend === 'Accelerating' ? 'text-sage-400' : velocityTrend === 'Steady' ? 'text-amber-400' : 'text-red-400'">{{ velocityTrend }}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- AI-Driven Insights -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Team Workload Insight -->
-      <div class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
-        <p class="text-xs font-bold text-surface-500 uppercase tracking-widest mb-3">AI Insight: Team Capacity</p>
-        <p class="text-sm font-semibold text-surface-200 leading-relaxed">{{ teamWorkloadInsight }}</p>
-        <div class="mt-4 pt-4 border-t border-surface-800">
-          <p class="text-[10px] text-surface-600 font-medium">Recommendation: {{ criticalIssuesCount > 5 ? 'Redistribute critical tasks across team members to prevent burnout.' : 'Continue monitoring; current pace is sustainable.' }}</p>
-        </div>
-      </div>
-
-      <!-- Schedule Insight -->
-      <div class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
-        <p class="text-xs font-bold text-surface-500 uppercase tracking-widest mb-3">AI Insight: Schedule Health</p>
-        <p class="text-sm font-semibold text-surface-200 leading-relaxed">
-          {{ milestoneSlippage > 30 ? '🚨 Critical: Over 30% of projects are slipping.' : milestoneSlippage > 10 ? '⚠️ Caution: Some schedule drift detected.' : '✅ Schedule adherence is strong.' }}
-        </p>
-        <div class="mt-4 pt-4 border-t border-surface-800">
-          <p class="text-[10px] text-surface-600 font-medium">
-            {{ milestoneSlippage > 30 ? 'Immediate action required: Review critical path and reallocate resources to at-risk milestones.' : 'Continue with current execution strategy.' }}
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Enhanced Metrics Row -->
-    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div v-for="stat in [
-        { label: selectedProjectId ? 'Selected Project' : 'Total projects', value: selectedProjectId ? 1 : projects.length, color: 'text-sage-400', bg: 'bg-sage-400/5', border: 'border-sage-500/20' },
-        { label: 'Open issues', value: openIssuesCount, color: 'text-blue-400', bg: 'bg-blue-400/5', border: 'border-blue-500/20' },
-        { label: 'Overdue issues', value: overdueIssuesCount, color: 'text-amber-400', bg: 'bg-amber-400/5', border: 'border-amber-500/20' },
-        { label: 'Critical issues', value: criticalIssuesCount, color: 'text-red-400', bg: 'bg-red-400/5', border: 'border-red-500/20' }
-      ]" :key="stat.label" 
-      :class="['p-5 rounded-2xl border bg-surface-900 shadow-sm transition-all hover:scale-[1.02]', stat.border]">
-        <p class="text-[11px] font-bold text-surface-500 uppercase tracking-widest mb-1">{{ stat.label }}</p>
-        <div class="flex items-baseline gap-2">
-          <span :class="['text-3xl font-black tracking-tighter', stat.color]">{{ stat.value }}</span>
-          <div v-if="stat.value > 0" :class="['w-1.5 h-1.5 rounded-full animate-pulse', stat.bg.replace('/5', '/40')]" />
-        </div>
-      </div>
-    </section>
-
-    <!-- Risk & Quality Control Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Risk Heat Matrix (simplified) -->
-      <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
-        <header class="mb-6">
-          <h2 class="text-sm font-bold text-white mb-0.5">Risk Landscape</h2>
-          <p class="text-[10px] text-surface-500 uppercase font-semibold">Risk severity distribution across projects</p>
-        </header>
-        
-        <div class="grid grid-cols-3 gap-3">
-          <div class="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-            <p class="text-[10px] font-bold text-red-400 uppercase mb-2">Critical</p>
-            <p class="text-2xl font-black text-red-400">{{ riskMatrixData.high }}</p>
-            <p class="text-[10px] text-red-300 mt-1">{{riskMatrixData.high > 0 ? 'Projects at high risk' : 'All clear'}}</p>
-          </div>
-          <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <p class="text-[10px] font-bold text-amber-400 uppercase mb-2">Medium</p>
-            <p class="text-2xl font-black text-amber-400">{{ riskMatrixData.medium }}</p>
-            <p class="text-[10px] text-amber-300 mt-1">Monitor closely</p>
-          </div>
-          <div class="p-4 rounded-xl bg-sage-500/10 border border-sage-500/20">
-            <p class="text-[10px] font-bold text-sage-400 uppercase mb-2">Low</p>
-            <p class="text-2xl font-black text-sage-400">{{ riskMatrixData.low }}</p>
-            <p class="text-[10px] text-sage-300 mt-1">Within threshold</p>
-          </div>
-        </div>
-
-        <div class="mt-6 pt-6 border-t border-surface-800">
-          <p class="text-[10px] font-bold text-surface-500 uppercase mb-2">Recommendation</p>
-          <p class="text-sm text-surface-300">
-            {{ riskMatrixData.high > 0 ? '🚨 Focus immediately on ' + riskMatrixData.high + ' high-risk project(s). Escalate to leadership.' : '✅ Risk profile is healthy. Maintain current mitigation strategies.' }}
-          </p>
-        </div>
-      </section>
-
-      <!-- Quality & Throughput -->
-      <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl">
-        <header class="mb-6">
-          <h2 class="text-sm font-bold text-white mb-0.5">Throughput & Quality</h2>
-          <p class="text-[10px] text-surface-500 uppercase font-semibold">Work flow efficiency</p>
-        </header>
-
-        <div class="space-y-4">
-          <div>
-            <div class="flex justify-between items-center mb-2">
-              <span class="text-sm font-semibold text-surface-300">Completion Rate</span>
-              <span class="text-lg font-black text-sage-400">
-                {{ projects.length > 0 ? Math.round((projectRows.filter((p) => p.progress >= 90).length / projects.length) * 100) : 0 }}%
-              </span>
-            </div>
-            <div class="h-2 bg-surface-800 rounded-full overflow-hidden">
-              <div 
-                class="h-full bg-gradient-to-r from-sage-600 to-sage-400 transition-all"
-                :style="{ width: (projects.length > 0 ? Math.round((projectRows.filter((p) => p.progress >= 90).length / projects.length) * 100) : 0) + '%' }"
-              />
-            </div>
-            <p class="text-[10px] text-surface-500 mt-2">Projects > 90% complete</p>
-          </div>
-
-          <div class="pt-4 border-t border-surface-800">
-            <div class="flex justify-between items-center mb-2">
-              <span class="text-sm font-semibold text-surface-300">Quality Index</span>
-              <span class="text-lg font-black" :class="overdueIssuesCount === 0 ? 'text-sage-400' : overdueIssuesCount < 5 ? 'text-amber-400' : 'text-red-400'">
-                {{ Math.max(0, 100 - (overdueIssuesCount * 5)) }}/100
-              </span>
-            </div>
-            <p class="text-[10px] text-surface-500">Based on overdue ticket ratio</p>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Execution Tracking & Monitoring -->
-    <section>
-      <h2 class="text-xl font-bold text-white mb-6">Execution Tracking & Monitoring</h2>
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      <!-- Run Trend Chart -->
-      <section class="xl:col-span-1 p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl overflow-hidden relative group">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-sage-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-sage-500/10 transition-all" />
-        <header class="flex items-center justify-between mb-8">
-          <div>
-            <h2 class="text-sm font-bold text-white mb-0.5">Monitoring Run Trend</h2>
-            <p class="text-[10px] text-surface-500 uppercase font-semibold">Recent monitoring run events</p>
-          </div>
-          <div class="relative group/info outline-none">
-            <button
-              type="button"
-              class="text-surface-600 hover:text-sage-400 transition-colors cursor-help"
-              aria-label="How the Monitoring Run Trend card is calculated"
-            >
-              <Info :size="16" />
-            </button>
-
-            <div
-              class="pointer-events-none absolute right-0 top-6 z-20 w-72 rounded-xl border border-surface-700 bg-surface-950/95 p-3 text-[11px] leading-relaxed text-surface-300 shadow-2xl opacity-0 translate-y-1 transition-all duration-200 group-hover/info:opacity-100 group-hover/info:translate-y-0 group-focus-within/info:opacity-100 group-focus-within/info:translate-y-0"
-            >
-              <p class="font-bold text-surface-100 mb-1">What this card shows</p>
-              <p class="mb-2">
-                Actual monitoring runs from the backend overview feed.
-              </p>
-              <p>
-                Each bar represents the number of events produced by one successful monitoring run.
-                Higher bars mean more issues or changes were detected during that run.
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <div v-if="monitoringError" class="mb-4 text-[10px] text-red-400 font-bold bg-red-400/5 px-2 py-1 rounded border border-red-500/10">{{ monitoringError }}</div>
-
-        <div v-if="runTrendBars.length" class="flex items-end justify-between h-48 px-2">
-          <div v-for="bar in runTrendBars" :key="bar.label + bar.value" class="flex flex-col items-center gap-3 flex-1 group/bar">
-            <div class="relative w-full flex justify-center">
-              <div 
-                class="w-6 sm:w-8 rounded-lg bg-gradient-to-t from-sage-600/20 to-sage-400 group-hover/bar:to-sage-300 transition-all duration-500 shadow-lg shadow-sage-900/40 relative" 
-                :style="{ height: bar.height }"
-              >
-                <div class="absolute inset-x-0 top-0 h-px bg-white/20 rounded-t-lg" />
-              </div>
-              <span class="absolute -top-6 text-[10px] font-bold text-sage-400 opacity-0 group-hover/bar:opacity-100 transition-opacity">{{ bar.value }}</span>
-            </div>
-            <span class="text-[10px] font-bold text-surface-500 uppercase tracking-tighter">{{ bar.label }}</span>
-          </div>
-        </div>
-
-        <div v-else class="h-48 flex items-center justify-center text-surface-600 text-sm italic">
-          No monitoring runs yet.
-        </div>
-      </section>
-
-      <!-- Project Status List -->
-      <section class="xl:col-span-2 p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl flex flex-col">
-        <header class="flex items-center justify-between mb-6">
-          <div>
-            <h2 class="text-sm font-bold text-white mb-0.5" id="project-status">Project Streams</h2>
-            <p class="text-[10px] text-surface-500 uppercase font-semibold tracking-wider">Live progress tracking</p>
-          </div>
-          <div v-if="projectsError" class="text-[10px] text-red-400 font-bold bg-red-400/5 px-2 py-1 rounded border border-red-500/10">{{ projectsError }}</div>
-        </header>
-
-        <div class="flex-1 overflow-auto max-h-[320px] pr-2 space-y-3 custom-scrollbar">
-          <div v-for="project in projectRows" :key="project.id" class="group p-4 rounded-xl bg-surface-950/50 border border-surface-800 hover:border-surface-700 hover:bg-surface-800 transition-all">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-bold text-surface-200 group-hover:text-white transition-colors">{{ project.name }}</h3>
-                  <span 
-                    :class="[
-                      'text-[9px] font-black uppercase px-2 py-0.5 rounded-md border tracking-widest',
-                      project.health === 'On track' ? 'bg-sage-600/10 text-sage-400 border-sage-500/20' :
-                      project.health === 'At risk' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                      'bg-red-500/10 text-red-500 border-red-500/20'
-                    ]"
-                  >
-                    {{ project.statusLabel }}
-                  </span>
-                </div>
-                <p class="text-[11px] text-surface-500 font-medium">{{ project.subtitle }}</p>
-              </div>
-              <div class="flex items-center gap-3">
-                <span class="text-lg font-black text-white px-2 py-1 bg-surface-900 rounded-lg border border-surface-800">{{ project.progress }}%</span>
-              </div>
-            </div>
-            <!-- Progress Bar -->
-            <div class="h-2 w-full bg-surface-900 rounded-full overflow-hidden border border-surface-800">
-              <div 
-                class="h-full bg-gradient-to-r from-sage-600 to-sage-400 transition-all duration-1000 shadow-[0_0_8px_rgba(125,154,121,0.4)]" 
-                :style="{ width: `${project.progress}%` }" 
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-    </section>
-
-    <!-- Tactical Insights: Tickets & Issues -->
-    <section>
-      <h2 class="text-xl font-bold text-white mb-6">Tactical Insights: Tickets & Issues</h2>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Overdue Tickets -->
-      <section class="p-6 rounded-2xl bg-surface-900 border border-surface-800 shadow-xl overflow-hidden relative">
-        <header class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-2">
-            <Clock :size="18" class="text-amber-500" />
-            <div>
-              <h2 class="text-sm font-bold text-white mb-0.5">Overdue Tickets</h2>
-              <p class="text-[10px] text-surface-500 uppercase font-semibold">Action required</p>
-            </div>
-          </div>
-        </header>
-
-        <div class="space-y-3">
-          <div v-if="filteredOverdueTickets.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">No overdue tickets detected.</div>
-          <div v-for="ticket in filteredOverdueTickets.slice(0, 5)" :key="ticket.issue_id" class="p-4 bg-surface-950/40 rounded-xl border border-surface-800 hover:border-amber-500/30 transition-all group flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-bold text-surface-200 line-clamp-1 mb-1">#{{ ticket.issue_id }} {{ ticket.subject }}</p>
-              <div class="flex items-center gap-2 text-[10px] text-surface-500 font-bold uppercase tracking-wider">
-                <span class="text-sage-400">{{ ticket.project_name }}</span>
-                <span class="opacity-30">•</span>
-                <span class="text-red-400">Due {{ ticket.due_date }}</span>
-              </div>
-            </div>
-            <a :href="ticket.url" target="_blank" class="w-8 h-8 rounded-lg bg-surface-900 border border-surface-800 flex items-center justify-center text-surface-400 hover:text-white hover:border-sage-400 transition-all shrink-0">
-              <ChevronRight :size="16" />
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <!-- At-Risk Strategy -->
-      <section class="p-6 rounded-2xl border border-surface-800 bg-surface-900 shadow-xl relative overflow-hidden">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl -mr-16 -mt-16" />
-        <header class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-2">
-            <AlertTriangle :size="18" class="text-red-500" />
-            <div>
-              <h2 class="text-sm font-bold text-white mb-0.5">Project Risks</h2>
-              <p class="text-[10px] text-surface-500 uppercase font-semibold">Recommended Mitigation</p>
-            </div>
-          </div>
-        </header>
-
-        <div class="space-y-3">
-          <div v-if="filteredAtRiskProjects.length === 0" class="py-12 text-center text-surface-600 text-sm font-medium italic">All projects within safe parameters.</div>
-          <div v-for="project in filteredAtRiskProjects.slice(0, 5)" :key="project.project_id" class="p-4 bg-red-500/5 rounded-xl border border-red-500/10 hover:border-red-500/30 transition-all flex items-start gap-4">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-bold text-surface-200 mb-1">{{ project.project_name }}</p>
-              <p class="text-[11px] text-red-300 font-medium mb-3 leading-relaxed">{{ project.reason }}</p>
-              <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10 w-fit text-[10px] font-black uppercase text-red-400 border border-red-500/20">
-                Action: {{ project.recommended_action }}
-              </div>
-            </div>
-            <a :href="project.url" target="_blank" class="w-8 h-8 rounded-lg bg-surface-900 border border-surface-800 flex items-center justify-center text-surface-400 hover:text-white hover:border-red-400 transition-all shrink-0 mt-1">
-              <ChevronRight :size="16" />
-            </a>
-          </div>
-        </div>
-      </section>
-    </div>
-    </section>
-
-    <!-- Admin Panel: PM Access -->
-    <section v-if="isAdmin" class="p-8 rounded-2xl border border-surface-800 bg-surface-900 shadow-2xl relative overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-br from-sage-500/[0.02] via-transparent to-transparent pointer-events-none" />
-      
-      <header class="flex items-end justify-between mb-10 relative">
+  <main class="min-h-full bg-surface-950 px-4 sm:px-6 lg:px-8 py-8 sm:py-10 text-surface-900">
+    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 lg:gap-8">
+      <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div class="space-y-2">
-          <div class="flex items-center gap-2">
-            <div class="w-2 h-2 rounded-full bg-sage-500 animate-pulse" />
-            <h2 class="text-lg font-extrabold text-white">Project Manager Operations</h2>
+          <div class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-sage-400">
+            <TrendingUp :size="14" /> {{ roleLabel }}
           </div>
-          <p class="text-xs text-surface-500 font-medium">Automatic reconciliation with Redmine user directory.</p>
-        </div>
-        
-        <div class="flex items-center gap-6">
-          <div class="flex flex-col items-end">
-            <span class="text-[9px] uppercase font-black text-surface-500 tracking-widest leading-none">Last Sync</span>
-            <span class="text-sm font-black text-sage-400 leading-tight">{{ lastPmRefreshAt || "—" }}</span>
-          </div>
-          <div class="flex -space-x-2">
-            <div v-for="i in 3" :key="i" class="w-8 h-8 rounded-full border-2 border-surface-900 bg-surface-800 flex items-center justify-center text-[10px] font-bold text-surface-400">
-              {{ i }}
+          <div class="space-y-1">
+            <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white">Project Health & Advancement</h1>
+            <p class="max-w-2xl text-sm text-surface-400">A concise portfolio view for planning, delivery, risk, and operational access.</p>
+            <div class="mt-3 inline-flex items-center gap-2 rounded-full border border-surface-200/70 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] shadow-sm">
+              <span :class="projectHealthStatus.color">{{ projectHealthStatus.label }}</span>
+              <span class="text-surface-300">•</span>
+              <span class="text-surface-500">Velocity {{ velocityTrend }}</span>
             </div>
+          </div>
+        </div>
+
+        <div class="w-full max-w-xs">
+          <label class="mb-2 block text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Project scope</label>
+          <div class="relative">
+            <select
+              v-model="selectedProjectId"
+              class="w-full appearance-none rounded-xl border border-surface-200/70 bg-white px-4 py-3 pr-10 text-sm font-medium text-surface-800 shadow-sm outline-none transition focus:border-sage-400 focus:ring-4 focus:ring-sage-500/10"
+            >
+              <option :value="null">All Projects</option>
+              <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+            </select>
+            <ChevronRight :size="16" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 -rotate-90 text-surface-400" />
           </div>
         </div>
       </header>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        <div v-for="stat in [
-          { label: 'Total Candidates', value: pmRows.length },
-          { label: 'Enabled Access', value: enabledPmCount },
-          { label: 'Platform Ready', value: pmRows.filter(r => r.credentials_ready).length }
-        ]" :key="stat.label" class="p-4 rounded-xl bg-surface-950/50 border border-surface-800">
-          <p class="text-[10px] font-bold text-surface-500 uppercase tracking-widest mb-1">{{ stat.label }}</p>
-          <span class="text-2xl font-black text-white italic tracking-tighter">{{ stat.value }}</span>
-        </div>
-      </div>
+      <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <article class="relative overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 p-5 shadow-sm before:absolute before:left-0 before:right-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-sage-500 before:to-sage-400/65">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Total Projects</p>
+          <div class="mt-3 text-4xl font-black tracking-tight text-white">{{ selectedProjectId ? 1 : projects.length }}</div>
+          <p class="mt-1 text-sm text-surface-400">Portfolio scope currently in view.</p>
+        </article>
 
-      <div v-if="pmError || pmSuccess" class="mb-6 animate-fade-in">
-        <div v-if="pmError" class="p-4 rounded-xl bg-red-400/5 border border-red-500/20 text-red-400 text-xs font-bold">{{ pmError }}</div>
-        <div v-if="pmSuccess" class="p-4 rounded-xl bg-sage-600/10 border border-sage-500/20 text-sage-400 text-xs font-bold flex items-center gap-2">
-          <CheckCircle :size="14" /> {{ pmSuccess }}
-        </div>
-      </div>
+        <article class="relative overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 p-5 shadow-sm before:absolute before:left-0 before:right-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-blue-500 before:to-blue-400/65">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Open Issues</p>
+          <div class="mt-3 text-4xl font-black tracking-tight text-white">{{ openIssuesCount }}</div>
+          <p class="mt-1 text-sm text-surface-400">Issues still needing delivery attention.</p>
+        </article>
 
-      <div class="overflow-hidden rounded-2xl border border-surface-800 bg-surface-950/30">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-surface-950/50 border-b border-surface-800">
-              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest">PM Identity</th>
-              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest">Credentials</th>
-              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest text-center">Status</th>
-              <th class="px-6 py-4 text-[10px] font-black text-surface-500 uppercase tracking-widest text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-surface-800">
-            <tr v-if="pmRows.length === 0">
-              <td colspan="4" class="px-6 py-20 text-center text-surface-600 text-sm font-medium italic">Fetching PM candidates from Redmine...</td>
-            </tr>
-            <tr v-for="pm in pmRows" :key="pm.redmine_user_id" class="hover:bg-surface-800/30 transition-colors group">
-              <td class="px-6 py-4">
-                <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-xl bg-surface-800 flex items-center justify-center text-xs font-black text-surface-400 group-hover:bg-sage-600/20 group-hover:text-sage-400 transition-all">
-                    {{ pm.full_name.charAt(0) }}
-                  </div>
-                  <div>
-                    <p class="text-[13px] font-bold text-surface-200">{{ pm.full_name }}</p>
-                    <p class="text-[10px] text-surface-500 font-medium">{{ pm.email }}</p>
-                  </div>
-                </div>
-              </td>
-              <td class="px-6 py-4">
-                <span 
-                  :class="[
-                    'px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border',
-                    pm.credentials_ready 
-                      ? 'bg-sage-600/10 text-sage-400 border-sage-500/10' 
-                      : 'bg-surface-900 text-surface-600 border-surface-800'
-                  ]"
-                >
-                  {{ pm.credentials_ready ? 'Available' : 'Pending' }}
+        <article class="relative overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 p-5 shadow-sm before:absolute before:left-0 before:right-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-amber-500 before:to-amber-400/65">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Overdue Issues</p>
+          <div class="mt-3 text-4xl font-black tracking-tight text-white">{{ overdueIssuesCount }}</div>
+          <p class="mt-1 text-sm text-surface-400">Tickets already slipping past due dates.</p>
+        </article>
+
+        <article class="relative overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 p-5 shadow-sm before:absolute before:left-0 before:right-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-red-500 before:to-red-400/65">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Critical Issues</p>
+          <div class="mt-3 text-4xl font-black tracking-tight text-white">{{ criticalIssuesCount }}</div>
+          <p class="mt-1 text-sm text-surface-400">High-priority blockers that need escalation.</p>
+        </article>
+      </section>
+
+      <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 rounded-full bg-amber-500/15 p-2 text-amber-400 ring-1 ring-amber-500/25">
+              <AlertTriangle :size="16" />
+            </div>
+            <div class="space-y-2">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">AI Insight: Team Capacity</p>
+              <h2 class="text-lg font-bold text-white">{{ teamWorkloadInsight }}</h2>
+              <p class="text-sm leading-relaxed text-surface-400">
+                Recommendation: {{ criticalIssuesCount > 5 ? 'Redistribute critical tasks across the team and reduce WIP immediately.' : 'Keep the current allocation, but continue monitoring workload concentration.' }}
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 rounded-full bg-red-500/15 p-2 text-red-400 ring-1 ring-red-500/25">
+              <Clock :size="16" />
+            </div>
+            <div class="space-y-2">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">AI Insight: Schedule Health</p>
+              <h2 class="text-lg font-bold text-white">
+                {{ milestoneSlippage > 30 ? 'Critical schedule drift detected.' : milestoneSlippage > 10 ? 'Schedule drift is emerging.' : 'Schedule adherence is strong.' }}
+              </h2>
+              <p class="text-sm leading-relaxed text-surface-400">
+                Recommendation: {{ milestoneSlippage > 30 ? 'Replan milestones, reassign owners, and protect critical path work now.' : 'Maintain current execution rhythm and review any slipping projects weekly.' }}
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm xl:col-span-1">
+          <header class="mb-5 space-y-1">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Risk Landscape</p>
+            <h2 class="text-xl font-bold text-white">Risk distribution</h2>
+          </header>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-red-400">Critical</p>
+              <div class="mt-2 text-3xl font-black text-red-300">{{ riskMatrixData.high }}</div>
+              <p class="mt-1 text-xs text-red-400">{{ riskMatrixData.high > 0 ? 'Escalate immediately.' : 'No critical concentration.' }}</p>
+            </div>
+            <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-400">Medium</p>
+              <div class="mt-2 text-3xl font-black text-amber-300">{{ riskMatrixData.medium }}</div>
+              <p class="mt-1 text-xs text-amber-400">Monitor closely.</p>
+            </div>
+            <div class="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-blue-400">Low</p>
+              <div class="mt-2 text-3xl font-black text-blue-300">{{ riskMatrixData.low }}</div>
+              <p class="mt-1 text-xs text-blue-400">Within threshold.</p>
+            </div>
+          </div>
+
+          <div class="mt-5 border-t border-surface-800 pt-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Recommendation</p>
+            <p class="mt-2 text-sm leading-relaxed text-surface-400">
+              {{ riskMatrixData.high > 0 ? `Focus immediately on ${riskMatrixData.high} high-risk project(s) and escalate the mitigation plan.` : 'Risk posture looks healthy. Keep the current controls and review weekly.' }}
+            </p>
+          </div>
+        </article>
+
+          <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm xl:col-span-2">
+            <header class="mb-6 space-y-1">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Throughput & Quality</p>
+              <h2 class="text-xl font-bold text-white">Delivery efficiency</h2>
+            </header>
+
+            <div class="space-y-6">
+              <div>
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-sm font-medium text-surface-300">Completion Rate</span>
+                  <span class="text-sm font-semibold text-sage-400">
+                  {{ projects.length > 0 ? Math.round((projectRows.filter((p) => p.progress >= 90).length / projects.length) * 100) : 0 }}%
                 </span>
-              </td>
-              <td class="px-6 py-4">
-                <div class="flex justify-center">
-                  <div 
-                    :class="[
-                      'w-2 h-2 rounded-full',
-                      pm.enabled ? 'bg-sage-400 shadow-[0_0_8px_rgba(125,154,121,0.6)]' : 'bg-surface-700'
-                    ]" 
-                  />
-                </div>
-              </td>
-              <td class="px-6 py-4 text-right">
-                <button
-                  @click="togglePmAccess(pm, !pm.enabled)"
-                  :disabled="rowLoading[pm.redmine_user_id]"
-                  :class="[
-                    'px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
-                    pm.enabled 
-                      ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 text-white hover:border-transparent' 
-                      : 'bg-sage-400 text-surface-950 hover:bg-sage-300 shadow-lg shadow-sage-900/20'
-                  ]"
-                >
-                  {{ rowLoading[pm.redmine_user_id] ? "Processing..." : (pm.enabled ? "Revoke Access" : "Grant Access") }}
+              </div>
+              <div class="h-2 rounded-full bg-surface-700">
+                <div
+                  class="h-2 rounded-full bg-sage-500 transition-all duration-700"
+                  :style="{ width: (projects.length > 0 ? Math.round((projectRows.filter((p) => p.progress >= 90).length / projects.length) * 100) : 0) + '%' }"
+                />
+              </div>
+              <p class="mt-2 text-xs text-surface-500">Projects already at 90%+ completion.</p>
+            </div>
+
+            <div>
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-sm font-medium text-surface-300">Quality Index</span>
+                <span class="text-sm font-semibold" :class="overdueIssuesCount === 0 ? 'text-sage-400' : overdueIssuesCount < 5 ? 'text-amber-400' : 'text-red-400'">
+                  {{ Math.max(0, 100 - (overdueIssuesCount * 5)) }}/100
+                </span>
+              </div>
+              <div class="h-2 rounded-full bg-surface-700">
+                <div
+                  class="h-2 rounded-full bg-blue-500 transition-all duration-700"
+                  :style="{ width: `${Math.max(0, 100 - (overdueIssuesCount * 5))}%` }"
+                />
+              </div>
+              <p class="mt-2 text-xs text-surface-500">Measured against overdue ticket pressure.</p>
+            </div>
+
+            <div>
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-sm font-medium text-surface-300">Milestone Health</span>
+                <span class="text-sm font-semibold text-amber-400">{{ 100 - milestoneSlippage }}%</span>
+              </div>
+              <div class="h-2 rounded-full bg-surface-700">
+                <div
+                  class="h-2 rounded-full bg-amber-500 transition-all duration-700"
+                  :style="{ width: `${100 - milestoneSlippage}%` }"
+                />
+              </div>
+              <p class="mt-2 text-xs text-surface-500">Share of projects still on schedule.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section>
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-white">Execution Tracking</h2>
+            <p class="text-sm text-surface-400">Monitoring trend and stream progress.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <article class="relative overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm xl:col-span-1">
+            <div class="absolute right-0 top-0 h-28 w-28 -translate-y-8 translate-x-8 rounded-full bg-sage-500/5 blur-3xl" />
+            <header class="mb-5 flex items-start justify-between gap-4">
+              <div class="space-y-1">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Monitoring Run Trend</p>
+                <h2 class="text-lg font-bold text-white">Recent monitoring runs</h2>
+              </div>
+              <div class="group relative">
+                <button type="button" class="rounded-full p-2 text-surface-500 transition hover:bg-surface-800 hover:text-surface-300" aria-label="Monitoring run info">
+                  <Info :size="16" />
                 </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+                <div class="pointer-events-none absolute right-0 top-12 z-10 w-72 rounded-2xl border border-surface-800 bg-surface-900 p-4 text-xs leading-relaxed text-surface-400 opacity-0 shadow-lg transition group-hover:opacity-100">
+                  <p class="mb-2 font-semibold text-white">What this card shows</p>
+                  <p>Bars reflect actual run events from the monitoring API. Taller bars mean more observed activity in that run.</p>
+                </div>
+              </div>
+            </header>
+
+            <div v-if="monitoringError" class="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400">{{ monitoringError }}</div>
+
+            <div v-if="runTrendBars.length" class="flex h-52 items-end justify-between gap-3">
+              <div v-for="bar in runTrendBars" :key="bar.label + bar.value" class="flex flex-1 flex-col items-center gap-2">
+                <div class="flex w-full flex-1 items-end justify-center">
+                  <div class="relative w-8 rounded-t-lg bg-sage-500 transition-all duration-700" :style="{ height: bar.height }">
+                    <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-surface-300">{{ bar.value }}</span>
+                  </div>
+                </div>
+                <span class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">{{ bar.label }}</span>
+              </div>
+            </div>
+
+            <div v-else class="flex h-52 items-center justify-center rounded-xl border border-dashed border-surface-800 bg-surface-800 text-sm text-surface-500">No monitoring runs yet.</div>
+          </article>
+
+          <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm xl:col-span-2">
+            <header class="mb-5 flex items-center justify-between gap-4">
+              <div class="space-y-1">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Project Streams</p>
+                <h2 class="text-lg font-bold text-white">Live progress tracking</h2>
+              </div>
+              <div v-if="projectsError" class="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400">{{ projectsError }}</div>
+            </header>
+
+            <div class="max-h-[340px] space-y-3 overflow-auto pr-1 custom-scrollbar">
+              <div v-for="project in projectRows" :key="project.id" class="rounded-2xl border border-surface-700 bg-surface-800 p-4 transition hover:border-surface-600 hover:bg-surface-700">
+                <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="space-y-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="text-sm font-semibold text-white">{{ project.name }}</h3>
+                      <span
+                        :class="[
+                          'rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider border',
+                          project.health === 'On track' ? 'bg-green-500/15 text-green-400 border-green-500/30' : project.health === 'Delayed' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-red-500/15 text-red-400 border-red-500/30'
+                        ]"
+                      >
+                        {{ project.statusLabel }}
+                      </span>
+                    </div>
+                    <p class="text-xs text-surface-500">{{ project.subtitle }}</p>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-2xl font-black tracking-tight text-white">{{ project.progress }}%</div>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Progress</p>
+                  </div>
+                </div>
+                <div class="mb-2 h-2 rounded-full bg-surface-700">
+                  <div class="h-2 rounded-full bg-sage-500 transition-all duration-700" :style="{ width: `${project.progress}%` }" />
+                </div>
+                <div class="flex items-center justify-between text-xs text-surface-500">
+                  <span>{{ project.subtitle }}</span>
+                  <span>{{ project.health }}</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="mb-4 text-xl font-bold text-white">Tactical Insights</h2>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
+            <header class="mb-5 flex items-center gap-3">
+              <Clock :size="18" class="text-red-400" />
+              <div>
+                <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Overdue Tickets</p>
+                <h2 class="text-lg font-bold text-white">Action required</h2>
+              </div>
+            </header>
+
+            <div class="space-y-3">
+              <div v-if="filteredOverdueTickets.length === 0" class="rounded-xl border border-dashed border-surface-800 bg-surface-800 px-4 py-10 text-center text-sm italic text-surface-500">No overdue tickets detected.</div>
+              <div v-for="ticket in filteredOverdueTickets.slice(0, 5)" :key="ticket.issue_id" class="flex items-start justify-between gap-4 rounded-xl border-l-4 border-red-500 bg-surface-800 px-4 py-4 shadow-sm transition hover:bg-surface-700">
+                <div class="min-w-0 flex-1">
+                  <div class="mb-1 flex items-center gap-2">
+                    <span class="font-mono text-sm font-semibold text-white">#{{ ticket.issue_id }}</span>
+                    <span class="text-sm font-medium text-surface-200">{{ ticket.subject }}</span>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">
+                    <span class="text-sage-400">{{ ticket.project_name }}</span>
+                    <span>•</span>
+                    <span class="text-red-400">Due {{ ticket.due_date }}</span>
+                  </div>
+                </div>
+                <a :href="ticket.url" target="_blank" class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-surface-700 bg-surface-800 text-surface-400 transition hover:border-surface-600 hover:text-surface-200">
+                  <ChevronRight :size="16" />
+                </a>
+              </div>
+            </div>
+          </article>
+
+          <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
+            <header class="mb-5 flex items-center gap-3">
+              <AlertTriangle :size="18" class="text-red-400" />
+              <div>
+                <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Project Risks</p>
+                <h2 class="text-lg font-bold text-white">Recommended mitigation</h2>
+              </div>
+            </header>
+
+            <div class="space-y-3">
+              <div v-if="filteredAtRiskProjects.length === 0" class="rounded-xl border border-dashed border-surface-800 bg-surface-800 px-4 py-10 text-center text-sm italic text-surface-500">All projects within safe parameters.</div>
+              <div v-for="project in filteredAtRiskProjects.slice(0, 5)" :key="project.project_id" class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 shadow-sm transition hover:bg-red-500/15">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0 flex-1">
+                    <h3 class="text-sm font-semibold text-white">{{ project.project_name }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-red-300">{{ project.reason }}</p>
+                    <span class="mt-3 inline-flex rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-red-400">Action: {{ project.recommended_action }}</span>
+                  </div>
+                  <a :href="project.url" target="_blank" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 transition hover:border-red-500/50 hover:bg-red-500/20">
+                    <ChevronRight :size="16" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="isAdmin" class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
+        <header class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div class="space-y-1">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Admin only</p>
+            <h2 class="text-xl font-bold text-white">Project Manager Operations</h2>
+            <p class="text-sm text-surface-400">Automatic reconciliation with the Redmine user directory.</p>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Last Sync</p>
+              <p class="text-sm font-semibold text-white">{{ lastPmRefreshAt || '—' }}</p>
+            </div>
+            <div class="flex -space-x-2">
+              <div v-for="i in 3" :key="i" class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-surface-900 bg-surface-700 text-[10px] font-semibold text-surface-300 shadow-sm">{{ i }}</div>
+            </div>
+          </div>
+        </header>
+
+        <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <article class="rounded-2xl border border-surface-800 bg-surface-800 p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Total</p>
+            <div class="mt-2 text-3xl font-black tracking-tight text-white">{{ pmRows.length }}</div>
+          </article>
+          <article class="rounded-2xl border border-surface-800 bg-surface-800 p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Enabled</p>
+            <div class="mt-2 text-3xl font-black tracking-tight text-white">{{ enabledPmCount }}</div>
+          </article>
+          <article class="rounded-2xl border border-surface-800 bg-surface-800 p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Ready</p>
+            <div class="mt-2 text-3xl font-black tracking-tight text-white">{{ pmRows.filter((r) => r.credentials_ready).length }}</div>
+          </article>
+        </div>
+
+        <div v-if="pmError || pmSuccess" class="mb-6 space-y-3">
+          <div v-if="pmError" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-400">{{ pmError }}</div>
+          <div v-if="pmSuccess" class="flex items-center gap-2 rounded-xl border border-sage-500/30 bg-sage-500/10 px-4 py-3 text-xs font-medium text-sage-400">
+            <CheckCircle :size="14" /> {{ pmSuccess }}
+          </div>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 shadow-sm">
+          <table class="min-w-full border-collapse text-left">
+            <thead class="sticky top-0 bg-surface-800">
+              <tr class="border-b border-surface-800">
+                <th class="px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">PM Identity</th>
+                <th class="px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Credentials</th>
+                <th class="px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500 text-center">Status</th>
+                <th class="px-6 py-4 text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-800">
+              <tr v-if="pmRows.length === 0">
+                <td colspan="4" class="px-6 py-16 text-center text-sm italic text-surface-500">Fetching PM candidates from Redmine...</td>
+              </tr>
+              <tr v-for="pm in pmRows" :key="pm.redmine_user_id" class="bg-surface-800 transition hover:bg-surface-700">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-700 text-sm font-semibold text-surface-300">{{ pm.full_name.charAt(0) }}</div>
+                    <div>
+                      <p class="text-sm font-semibold text-white">{{ pm.full_name }}</p>
+                      <p class="text-xs text-surface-500">{{ pm.email }}</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span :class="['inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider', pm.credentials_ready ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-surface-700 bg-surface-700 text-surface-500']">
+                    {{ pm.credentials_ready ? 'Available' : 'Pending' }}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span :class="['inline-flex h-2.5 w-2.5 rounded-full', pm.enabled ? 'bg-green-500 shadow-[0_0_0_4px_rgba(34,197,94,0.12)]' : 'bg-surface-600']" />
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <button
+                    @click="togglePmAccess(pm, !pm.enabled)"
+                    :disabled="rowLoading[pm.redmine_user_id]"
+                    :class="['inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60', pm.enabled ? 'border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/50' : 'border border-sage-500/30 bg-sage-500 text-white hover:bg-sage-600']"
+                  >
+                    {{ rowLoading[pm.redmine_user_id] ? 'Processing...' : (pm.enabled ? 'Revoke' : 'Grant') }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -762,11 +738,11 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #3c5439;
-  border-radius: 99px;
+  background: rgb(var(--surface-700));
+  border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #5f815b;
+  background: rgb(var(--surface-600));
 }
 </style>
 

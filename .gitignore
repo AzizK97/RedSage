@@ -28,6 +28,4 @@ frontend/redmineAgentUI/dist/
 .idea/
 .DS_Store
 
-CLAUDE.md
-
-.claude/
+.github/

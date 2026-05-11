@@ -244,6 +244,188 @@ body {
     background-size: 200% 100%;
     animation: shimmer 4s ease-in-out infinite;
   }
+
+  /* Dashboard stat card & dark table styles */
+  .stat-card {
+    position: relative;
+    border-radius: 1rem;
+    background: rgb(var(--surface-900));
+    border: 1px solid rgba(255,255,255,0.03);
+    color: var(--text-app);
+    overflow: hidden;
+  }
+
+  .stat-card .card-body {
+    padding: 1.25rem;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 6px;
+  }
+
+  .stat-card[data-accent='sage']::before { background: linear-gradient(90deg, rgba(var(--sage-500),1), rgba(var(--sage-400),0.65)); }
+  .stat-card[data-accent='copper']::before { background: linear-gradient(90deg, rgba(var(--copper-500),1), rgba(var(--copper-400),0.65)); }
+  .stat-card[data-accent='amber']::before { background: linear-gradient(90deg, rgba(245,158,11,1), rgba(250,204,21,0.6)); }
+  .stat-card[data-accent='red']::before { background: linear-gradient(90deg, rgba(239,68,68,1), rgba(252,165,165,0.5)); }
+  .stat-card[data-accent='blue']::before { background: linear-gradient(90deg, rgba(59,130,246,1), rgba(147,197,253,0.45)); }
+
+  .kpi-number { font-weight: 800; font-size: 1.875rem; color: var(--text-app); }
+  .kpi-sub { color: rgba(255,255,255,0.68); }
+
+  .dark-table thead { background: rgb(var(--surface-900)); }
+  .dark-table tbody tr { background: rgb(var(--surface-800)); border-bottom: 1px solid rgba(255,255,255,0.02); }
+  .dark-table tbody tr:hover { background: rgb(var(--surface-700)); }
+
+  .chip { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.675rem; font-weight: 600; }
+  .chip--muted { background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.03); }
+}
+
+/* Light Theme Overrides */
+:root[data-theme="light"] {
+  --overlay-bg: rgb(var(--surface-50));
+  --overlay-border: rgb(var(--surface-200));
+  --overlay-text: rgb(var(--surface-950));
+  --overlay-text-muted: rgb(var(--surface-600));
+}
+
+:root[data-theme="light"] .stat-card {
+  background: rgb(var(--surface-100));
+  border-color: rgb(var(--surface-300));
+}
+
+:root[data-theme="light"] .stat-card::before {
+  opacity: 0.85;
+}
+
+:root[data-theme="light"] .kpi-number {
+  color: rgb(var(--surface-950));
+}
+
+:root[data-theme="light"] .kpi-sub {
+  color: rgb(var(--surface-600));
+}
+
+/* Card backgrounds for light mode */
+:root[data-theme="light"] .rounded-2xl.bg-surface-900 {
+  background: rgb(var(--surface-50));
+  border-color: rgb(var(--surface-200));
+}
+
+:root[data-theme="light"] .rounded-2xl.bg-surface-800 {
+  background: rgb(var(--surface-100));
+  border-color: rgb(var(--surface-200));
+}
+
+/* Text color inversions for light mode */
+:root[data-theme="light"] .text-white {
+  color: rgb(var(--surface-950));
+}
+
+:root[data-theme="light"] .text-surface-300 {
+  color: rgb(var(--surface-700));
+}
+
+:root[data-theme="light"] .text-surface-400 {
+  color: rgb(var(--surface-600));
+}
+
+/* Icon badge backgrounds */
+:root[data-theme="light"] .bg-amber-500\/15 {
+  background: rgba(217, 119, 6, 0.1);
+  border-color: rgba(217, 119, 6, 0.2);
+}
+
+:root[data-theme="light"] .bg-red-500\/15 {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+:root[data-theme="light"] .text-amber-400 {
+  color: rgb(180, 83, 9);
+}
+
+:root[data-theme="light"] .text-red-400 {
+  color: rgb(220, 38, 38);
+}
+
+/* Risk indicator cards */
+:root[data-theme="light"] .bg-red-500\/10 {
+  background: rgba(254, 242, 242, 1);
+  border-color: rgba(254, 226, 226, 1);
+}
+
+:root[data-theme="light"] .bg-amber-500\/10 {
+  background: rgba(254, 252, 232, 1);
+  border-color: rgba(253, 244, 205, 1);
+}
+
+:root[data-theme="light"] .bg-blue-500\/10 {
+  background: rgba(239, 246, 255, 1);
+  border-color: rgba(219, 234, 254, 1);
+}
+
+:root[data-theme="light"] .border-red-500\/30 {
+  border-color: rgba(254, 226, 226, 1);
+}
+
+:root[data-theme="light"] .border-amber-500\/30 {
+  border-color: rgba(253, 244, 205, 1);
+}
+
+:root[data-theme="light"] .border-blue-500\/30 {
+  border-color: rgba(219, 234, 254, 1);
+}
+
+:root[data-theme="light"] .text-red-300 {
+  color: rgb(252, 165, 165);
+}
+
+:root[data-theme="light"] .text-red-400 {
+  color: rgb(240, 82, 82);
+}
+
+:root[data-theme="light"] .text-amber-300 {
+  color: rgb(253, 224, 71);
+}
+
+:root[data-theme="light"] .text-blue-300 {
+  color: rgb(147, 197, 253);
+}
+
+/* Table styling for light mode */
+:root[data-theme="light"] .dark-table thead {
+  background: rgb(var(--surface-100));
+}
+
+:root[data-theme="light"] .dark-table tbody tr {
+  background: white;
+  border-bottom-color: rgb(var(--surface-200));
+}
+
+:root[data-theme="light"] .dark-table tbody tr:hover {
+  background: rgb(var(--surface-50));
+}
+
+/* Status badges */
+:root[data-theme="light"] .bg-green-500\/15 {
+  background: rgba(220, 252, 231, 1);
+  border-color: rgba(187, 247, 208, 1);
+}
+
+:root[data-theme="light"] .text-green-400 {
+  color: rgb(34, 197, 94);
+}
+
+/* Chip styling */
+:root[data-theme="light"] .chip--muted {
+  background: rgb(var(--surface-100));
+  color: rgb(var(--surface-700));
+  border-color: rgb(var(--surface-300));
 }
 
 @keyframes dashMove {

@@ -117,18 +117,18 @@ function copyToClipboard(text: string) {
             <div class="w-10 h-10 rounded-lg bg-sage-500/10 border border-sage-500/15 flex items-center justify-center">
               <Terminal :size="20" class="text-sage-400" />
             </div>
-            <h4 :class="['font-bold', isDark.value ? 'text-white' : 'text-sage-900']">CLI Mode</h4>
+            <h4 :class="['font-bold', isDark ? 'text-white' : 'text-sage-900']">CLI Mode</h4>
           </div>
           <p :class="['text-sm leading-relaxed', descriptionTextClass]">
             Interactive terminal interface for direct usage. Type queries and get instant responses.
           </p>
         </div>
-        <div :class="['glass-card p-6 group transition-all', infoCardBg, isDark.value ? 'hover:border-copper-500/25' : 'hover:border-copper-400/40']">
+        <div :class="['glass-card p-6 group transition-all', infoCardBg, isDark ? 'hover:border-copper-500/25' : 'hover:border-copper-400/40']">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-10 h-10 rounded-lg bg-copper-500/10 border border-copper-500/15 flex items-center justify-center">
               <Zap :size="20" class="text-copper-400" />
             </div>
-            <h4 :class="['font-bold', isDark.value ? 'text-white' : 'text-sage-900']">REST API</h4>
+            <h4 :class="['font-bold', isDark ? 'text-white' : 'text-sage-900']">REST API</h4>
           </div>
           <p :class="['text-sm leading-relaxed', descriptionTextClass]">
             Full FastAPI backend with Swagger docs at <code class="text-copper-300">/docs</code>. Integrate with any tool.

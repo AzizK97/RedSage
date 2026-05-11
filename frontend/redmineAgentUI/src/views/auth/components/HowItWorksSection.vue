@@ -73,7 +73,7 @@ const agents = [
 
         <AnimatedSection v-for="(step, i) in steps" :key="step.title" :delay="i * 150">
           <div class="relative text-center group">
-            <div :class="['relative inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6 mx-auto transition-colors shadow-lg shadow-sage-900/10', stepBgClass, stepBorderClass, 'border', isDark.value ? 'group-hover:border-sage-500/40' : 'group-hover:border-sage-400/60']">
+            <div :class="['relative inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6 mx-auto transition-colors shadow-lg shadow-sage-900/10', stepBgClass, stepBorderClass, 'border', isDark ? 'group-hover:border-sage-500/40' : 'group-hover:border-sage-400/60']">
               <component :is="step.icon" :size="28" class="text-sage-400" />
               <div class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-copper-600 text-white text-xs font-bold flex items-center justify-center shadow-lg shadow-copper-700/30">
                 {{ i + 1 }}
@@ -87,19 +87,19 @@ const agents = [
 
       <AnimatedSection class="mt-20">
         <div class="glass-card p-8 max-w-4xl mx-auto">
-          <h3 :class="['text-center text-sm font-semibold uppercase tracking-wider mb-8', isDark.value ? 'text-surface-500' : 'text-surface-600']">Supervisor Routing Diagram</h3>
+          <h3 :class="['text-center text-sm font-semibold uppercase tracking-wider mb-8', isDark ? 'text-surface-500' : 'text-surface-600']">Supervisor Routing Diagram</h3>
           <div class="flex flex-col items-center gap-6">
-            <div :class="['flex items-center gap-3 px-5 py-3 rounded-xl border', isDark.value ? 'bg-surface-800/80 border-surface-700' : 'bg-sage-100/60 border-sage-300/40']">
+            <div :class="['flex items-center gap-3 px-5 py-3 rounded-xl border', isDark ? 'bg-surface-800/80 border-surface-700' : 'bg-sage-100/60 border-sage-300/40']">
               <MessageSquare :size="20" class="text-copper-400" />
-              <span :class="['text-sm font-medium', isDark.value ? 'text-surface-300' : 'text-sage-900']">User Query</span>
+              <span :class="['text-sm font-medium', isDark ? 'text-surface-300' : 'text-sage-900']">User Query</span>
             </div>
 
             <div class="w-px h-8 bg-gradient-to-b from-surface-600 to-sage-500/40" />
 
             <div class="relative flex items-center gap-3 px-6 py-3.5 rounded-xl bg-sage-500/10 border border-sage-500/25 animate-glow">
               <Cpu :size="20" class="text-sage-400" />
-                <span :class="['text-sm font-bold', isDark.value ? 'text-sage-300' : 'text-sage-700']">Supervisor Agent</span>
-              <span :class="['text-[10px] ml-2', isDark.value ? 'text-surface-500' : 'text-surface-600']">LangGraph</span>
+                <span :class="['text-sm font-bold', isDark ? 'text-sage-300' : 'text-sage-700']">Supervisor Agent</span>
+              <span :class="['text-[10px] ml-2', isDark ? 'text-surface-500' : 'text-surface-600']">LangGraph</span>
             </div>
 
             <div class="w-full grid grid-cols-4 gap-4 pt-4">
@@ -108,7 +108,7 @@ const agents = [
                 <div :class="['w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-lg', agent.gradient, agent.shadowColor]">
                   <component :is="agent.icon" :size="20" class="text-white" />
                 </div>
-                <span :class="['text-[11px] font-medium text-center', isDark.value ? 'text-surface-500' : 'text-surface-600']">{{ agent.name }}</span>
+                <span :class="['text-[11px] font-medium text-center', isDark ? 'text-surface-500' : 'text-surface-600']">{{ agent.name }}</span>
               </div>
             </div>
           </div>
