@@ -4,7 +4,7 @@ import { adminApi } from "../../api/admin";
 import { dashboardApi } from "../../api/dashboard";
 import { monitoringApi } from "../../api/monitoring";
 import type { AtRiskProjectInsight, DashboardProject, MonitoringOverview, OverdueTicketInsight, PmCandidate, ProjectStatus } from "../../types";
-import { Info, TrendingUp, AlertTriangle, CheckCircle, Clock, ChevronRight } from "lucide-vue-next";
+import { Info, TrendingUp, AlertTriangle, CheckCircle, Clock, ChevronRight, ChevronDown, Check } from "lucide-vue-next";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -19,6 +19,34 @@ const insightsError = ref("");
 const monitoringOverview = ref<MonitoringOverview | null>(null);
 const monitoringError = ref("");
 const selectedProjectId = ref<string | null>(null);
+const projectSelectorRef = ref<HTMLElement | null>(null);
+const isProjectSelectorOpen = ref(false);
+
+const selectedProjectLabel = computed(() => {
+  if (!selectedProjectId.value) return "All Projects";
+  return projects.value.find((project) => project.id === selectedProjectId.value)?.name ?? "All Projects";
+});
+
+function toggleProjectSelector() {
+  isProjectSelectorOpen.value = !isProjectSelectorOpen.value;
+}
+
+function closeProjectSelector() {
+  isProjectSelectorOpen.value = false;
+}
+
+function selectProjectScope(projectId: string | null) {
+  selectedProjectId.value = projectId;
+  closeProjectSelector();
+}
+
+function handleProjectSelectorClickOutside(event: MouseEvent) {
+  if (!projectSelectorRef.value) return;
+  const target = event.target as Node | null;
+  if (target && !projectSelectorRef.value.contains(target)) {
+    closeProjectSelector();
+  }
+}
 
 const selectedProjectIdentifier = computed(() => {
   if (!selectedProjectId.value) return null;
@@ -292,6 +320,7 @@ async function togglePmAccess(pm: PmCandidate, enabled: boolean) {
 }
 
 onMounted(async () => {
+  document.addEventListener("mousedown", handleProjectSelectorClickOutside);
   await loadProjects();
   await loadInsights();
   await loadMonitoringOverview();
@@ -303,6 +332,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener("mousedown", handleProjectSelectorClickOutside);
   if (pmPollTimer !== null) {
     window.clearInterval(pmPollTimer);
   }
@@ -328,17 +358,45 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="w-full max-w-xs">
+        <div ref="projectSelectorRef" class="w-full max-w-xs">
           <label class="mb-2 block text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Project scope</label>
           <div class="relative">
-            <select
-              v-model="selectedProjectId"
-              class="w-full appearance-none rounded-xl border border-surface-200/70 bg-white px-4 py-3 pr-10 text-sm font-medium text-surface-800 shadow-sm outline-none transition focus:border-sage-400 focus:ring-4 focus:ring-sage-500/10"
+            <button
+              type="button"
+              class="project-selector-trigger"
+              :aria-expanded="isProjectSelectorOpen"
+              aria-haspopup="listbox"
+              @click="toggleProjectSelector"
             >
-              <option :value="null">All Projects</option>
-              <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
-            </select>
-            <ChevronRight :size="16" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 -rotate-90 text-surface-400" />
+              <span class="truncate">{{ selectedProjectLabel }}</span>
+              <ChevronDown :size="16" :class="['transition-transform duration-200', isProjectSelectorOpen ? 'rotate-180' : 'rotate-0']" />
+            </button>
+
+            <transition name="fade-scale">
+              <div v-if="isProjectSelectorOpen" class="project-selector-menu" role="listbox" aria-label="Project scope selector">
+                <button
+                  type="button"
+                  class="project-selector-option"
+                  :class="{ 'project-selector-option--active': selectedProjectId === null }"
+                  @click="selectProjectScope(null)"
+                >
+                  <span>All Projects</span>
+                  <Check v-if="selectedProjectId === null" :size="16" class="project-selector-check" />
+                </button>
+
+                <button
+                  v-for="project in projects"
+                  :key="project.id"
+                  type="button"
+                  class="project-selector-option"
+                  :class="{ 'project-selector-option--active': selectedProjectId === project.id }"
+                  @click="selectProjectScope(project.id)"
+                >
+                  <span class="truncate">{{ project.name }}</span>
+                  <Check v-if="selectedProjectId === project.id" :size="16" class="project-selector-check" />
+                </button>
+              </div>
+            </transition>
           </div>
         </div>
       </header>
