@@ -34,6 +34,34 @@ def decode_and_verify_jwt(token: str) -> dict:
         )from exc
 
 
+WIDGET_ELIGIBILITY_SUB = "redmine_plugin"
+WIDGET_ELIGIBILITY_PURPOSE = "widget_eligibility"
+
+
+def verify_widget_eligibility_bearer_token(token: str, redmine_user_id: int) -> None:
+    """Validate server-to-server JWT from Redmine (same secret as user widget tokens)."""
+    payload = decode_and_verify_jwt(token)
+    if payload.get("sub") != WIDGET_ELIGIBILITY_SUB:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid eligibility token subject",
+        )
+    if payload.get("purpose") != WIDGET_ELIGIBILITY_PURPOSE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid eligibility token purpose",
+        )
+    try:
+        target = int(payload.get("target_redmine_user_id", 0))
+    except (TypeError, ValueError):
+        target = 0
+    if target != redmine_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Eligibility token does not match requested user",
+        )
+
+
 def create_access_token(claims: dict, expires_minutes: int = 720) -> str:
     if not settings.JWT_SECRET:
         raise HTTPException(

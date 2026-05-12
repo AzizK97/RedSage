@@ -1,10 +1,11 @@
-<% if User.current.logged? %>
+<% mount = User.current.logged? ? ai_chat_widget_mount_data(User.current) : nil %>
+<% if mount %>
   <div
     id="ai-chat-widget-root"
-    data-user-id="<%= User.current.id %>"
-    data-user-login="<%= User.current.login %>"
-    data-user-role="<%= get_user_role(User.current) %>"
-    data-widget-token="<%= generate_widget_token(User.current) %>"
-    data-backend-url="<%= Setting.plugin_redmine_ai_chat_widget['backend_url'] %>">
+    data-user-id="<%= mount[:user_id] %>"
+    data-user-login="<%= mount[:user_login] %>"
+    data-user-role="<%= mount[:user_role] %>"
+    data-widget-token="<%= mount[:widget_token] %>"
+    data-backend-url="<%= mount[:backend_url] %>">
   </div>
 <% end %>

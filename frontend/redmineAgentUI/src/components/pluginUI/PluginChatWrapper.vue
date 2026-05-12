@@ -2,11 +2,10 @@
 import { computed, ref } from 'vue';
 import { useChat } from '../../composables/useChat';
 import type { Message } from '../../types';
+import PluginStyles from './PluginStyles.vue';
 import WidgetChatPane from './WidgetChatPane.vue';
-import WidgetConversationList from './WidgetConversationList.vue';
 import WidgetHeader from './WidgetHeader.vue';
 import WidgetHistoryPage from './WidgetHistoryPage.vue';
-import WidgetTabs, { type WidgetView } from './WidgetTabs.vue';
 
 interface Props {
   token: string;
@@ -16,9 +15,9 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const currentView = ref<WidgetView>('chat');
+const currentView = ref<'chat' | 'history'>('history');
 const isExpanded = ref(false);
-const lastView = ref<WidgetView | null>(null);
+const lastView = ref<'chat' | 'history' | null>(null);
 
 const {
   messages,
@@ -110,58 +109,46 @@ async function handleEdit(message: string) {
 </script>
 
 <template>
-  <div class="rs-widget">
-    <WidgetHeader
-      title="Redmine Chat Assist"
-      subtitle="Project-aware support for your team"
-      :expanded="isExpanded"
-      :showBack="lastView === 'history'"
-      @close="handleClose"
-      @toggle-expand="toggleExpanded"
-      @back="() => { currentView.value = 'history'; lastView.value = null }"
-    />
+  <PluginStyles :expanded="isExpanded">
+    <div class="rs-widget">
+      <WidgetHeader
+        title="Redmine Chat Assist"
+        subtitle="Project-aware support for your team"
+        :expanded="isExpanded"
+        :showBack="lastView === 'history'"
+        @close="handleClose"
+        @toggle-expand="toggleExpanded"
+        @back="() => { currentView = 'history'; lastView = null }"
+      />
 
-    <WidgetTabs v-model="currentView" />
+      <div class="rs-widget__content">
+        <WidgetChatPane
+          v-if="currentView === 'chat'"
+          :messages="messages as Message[]"
+          :is-loading="isLoading"
+          :loading-status="loadingStatus"
+          :pending-interrupt="pendingInterrupt"
+          :visible-error="visibleError"
+          :thread-id="currentThreadId"
+          :thread-title="threadTitle"
+          :is-virgin-chat="isVirginChat"
+          :starter-suggestions="starterSuggestions"
+          @send="sendMessage"
+          @approve="handleApprove"
+          @reject="handleReject"
+          @edit="handleEdit"
+          @suggestion="handleSuggestion"
+        />
 
-    <div class="rs-widget__content">
-      <div v-if="currentView === 'chat'" class="rs-widget__split" :class="{ 'rs-widget__split--compact': !isExpanded }">
-        <WidgetConversationList
-          v-if="isExpanded"
+        <WidgetHistoryPage
+          v-else
           :conversations="widgetConversations"
           :active-thread-id="activeThreadId"
           @new="handleNewThread"
           @select="handleSelectThread"
           @delete="handleDeleteThread"
         />
-
-        <div class="rs-widget__main">
-          <WidgetChatPane
-            :messages="messages as Message[]"
-            :is-loading="isLoading"
-            :loading-status="loadingStatus"
-            :pending-interrupt="pendingInterrupt"
-            :visible-error="visibleError"
-            :thread-id="currentThreadId"
-            :thread-title="threadTitle"
-            :is-virgin-chat="isVirginChat"
-            :starter-suggestions="starterSuggestions"
-            @send="sendMessage"
-            @approve="handleApprove"
-            @reject="handleReject"
-            @edit="handleEdit"
-            @suggestion="handleSuggestion"
-          />
-        </div>
       </div>
-
-      <WidgetHistoryPage
-        v-else
-        :conversations="widgetConversations"
-        :active-thread-id="activeThreadId"
-        @new="handleNewThread"
-        @select="handleSelectThread"
-        @delete="handleDeleteThread"
-      />
     </div>
-  </div>
+  </PluginStyles>
 </template>

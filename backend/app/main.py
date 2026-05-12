@@ -1,5 +1,11 @@
-import os
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Load backend/.env before any app imports that read os.environ (e.g. app.core.config).
+_backend_root = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_root / ".env")
+load_dotenv(_backend_root / "app" / ".env", override=True)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,12 +18,11 @@ from app.api.endpoints.auth import router as auth_router
 from app.api.endpoints.dashboard import router as dashboard_router
 from app.api.endpoints.monitoring import router as monitoring_router, monitoring_service
 from app.api.endpoints.search import router as search_router
+from app.api.endpoints.redmine_widget_gate import router as redmine_widget_gate_router
 from app.core.settings import settings
 from app.services.user_sync_service import UserSyncService
 
 scheduler = AsyncIOScheduler()
-
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 
 def _run_pm_sync_job() -> None:
@@ -111,6 +116,7 @@ app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(monitoring_router)
 app.include_router(search_router)
+app.include_router(redmine_widget_gate_router)
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────

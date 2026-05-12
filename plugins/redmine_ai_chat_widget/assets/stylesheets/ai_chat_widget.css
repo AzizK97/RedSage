@@ -226,6 +226,149 @@
   cursor: not-allowed;
 }
 
+/* Vue chat widget styles */
+.rs-widget {
+  --rs-bg: #0e100c;
+  --rs-surface: #1e211b;
+  --rs-surface-2: #2a3027;
+  --rs-surface-3: #3a4338;
+  --rs-border: rgba(123, 138, 118, 0.28);
+  --rs-border-strong: rgba(180, 118, 54, 0.35);
+  --rs-text: #f4f5f3;
+  --rs-muted: #8c9487;
+  --rs-muted-2: #677063;
+  --rs-accent: #d86f29;
+  --rs-accent-soft: rgba(216, 111, 41, 0.18);
+  --rs-success: #7ea06f;
+  --rs-danger: #d46c67;
+  --rs-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, #11130f 0%, var(--rs-bg) 100%);
+  color: var(--rs-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji";
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rs-widget * {
+  box-sizing: border-box;
+}
+
+.rs-widget button,
+.rs-widget input,
+.rs-widget textarea {
+  font: inherit;
+}
+
+/* History list - scrollable */
+.rs-widget__history-page .rs-widget__history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px 90px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* List item sizing for better readability */
+.rs-widget__history-item-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 12px 14px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rs-widget__history-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(223, 145, 81, 0.18);
+  background: rgba(216, 111, 41, 0.12);
+  color: #efb07d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.rs-widget__history-item-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.rs-widget__history-item-preview {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--rs-muted);
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Floating action button - floats above list */
+.rs-widget__fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 9999;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(145deg, var(--rs-accent) 0%, #b8571c 100%);
+  box-shadow:
+    0 12px 28px rgba(216, 111, 41, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.rs-widget__fab:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 16px 34px rgba(216, 111, 41, 0.42),
+    0 4px 12px rgba(0, 0, 0, 0.38);
+}
+
+.rs-widget__fab:active {
+  transform: translateY(0);
+}
+
+.rs-widget__fab:focus-visible {
+  outline: 2px solid rgba(216, 111, 41, 0.65);
+  outline-offset: 3px;
+}
+
 @media (max-width: 640px) {
   #ai-chat-panel {
     width: calc(100% - 24px);

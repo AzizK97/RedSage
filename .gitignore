@@ -29,3 +29,4 @@ frontend/redmineAgentUI/dist/
 .DS_Store
 
 .github/
+node_modules/

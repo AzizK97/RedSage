@@ -11,10 +11,13 @@ Redmine::Plugin.register :redmine_ai_chat_widget do
   version '0.1.0'
   url 'https://github.com/AzizK97/Redmine-Agent'
   author_url 'https://github.com/AzizK97'
-  settings default: { 
+  settings default: {
+    # Server-side (Net::HTTP from Redmine). Docker: override with REDSAGE_BACKEND_URL=http://host.docker.internal:8000
     'backend_url' => 'http://localhost:8000',
+    # Browser (script src / fetch). Dev Docker: set REDSAGE_BACKEND_PUBLIC_URL=http://localhost:8000 or fill below.
+    'backend_url_public' => '',
     'jwt_secret' => '66uwKYHYwBmlxhdbzEv+ixJcwhZqi/osB/PwyBw5XNk=',
     'jwt_issuer' => 'redsage',
     'jwt_audience' => 'redsage-web'
-  }
+  }, partial: 'settings/redmine_ai_chat_widget_settings'
 end

@@ -1,0 +1,33 @@
+<fieldset class="box">
+  <legend>Redmine AI Chat Widget</legend>
+
+  <p>
+    <label for="settings_backend_url">Server-side API URL (eligibility check from Redmine)</label><br/>
+    <%= text_field_tag 'settings[backend_url]', @settings['backend_url'], size: 80, id: 'settings_backend_url' %>
+    <em class="info">Must be reachable from <strong>this Redmine server process</strong> (Ruby <code>Net::HTTP</code>). In Docker talking to an API on the host, use <code>http://host.docker.internal:8000</code> or set <code>REDSAGE_BACKEND_URL</code> (overrides this field).</em>
+  </p>
+
+  <p>
+    <label for="settings_backend_url_public">Browser API URL (widget scripts &amp; chat — optional)</label><br/>
+    <%= text_field_tag 'settings[backend_url_public]', @settings['backend_url_public'], size: 80, id: 'settings_backend_url_public' %>
+    <em class="info">Must be reachable from <strong>users’ browsers</strong> (often <code>http://localhost:8000</code> or <code>https://api.yourcompany.com</code>). Leave empty to reuse the server-side URL. Set <code>REDSAGE_BACKEND_PUBLIC_URL</code> to override without using the DB.</em>
+    <br/>
+    <em class="info warning"><strong>Why two URLs?</strong> In dev, Redmine in Docker uses <code>host.docker.internal</code> server-side, but browsers must use <code>localhost</code> or a real hostname — they do not resolve <code>host.docker.internal</code> the same way.</em>
+  </p>
+
+  <p>
+    <label for="settings_jwt_secret">JWT secret (HS256, same as <code>JWT_SECRET</code> on the API)</label><br/>
+    <%= text_field_tag 'settings[jwt_secret]', @settings['jwt_secret'], size: 80, id: 'settings_jwt_secret', autocomplete: 'off' %>
+    <em class="info">Must match <code>JWT_SECRET</code> in the API <strong>exactly</strong>. Alternatively set <code>REDSAGE_JWT_SECRET</code> on the Redmine host.</em>
+  </p>
+
+  <p>
+    <label for="settings_jwt_issuer">JWT issuer (optional)</label><br/>
+    <%= text_field_tag 'settings[jwt_issuer]', @settings['jwt_issuer'], size: 40, id: 'settings_jwt_issuer' %>
+  </p>
+
+  <p>
+    <label for="settings_jwt_audience">JWT audience (optional)</label><br/>
+    <%= text_field_tag 'settings[jwt_audience]', @settings['jwt_audience'], size: 40, id: 'settings_jwt_audience' %>
+  </p>
+</fieldset>

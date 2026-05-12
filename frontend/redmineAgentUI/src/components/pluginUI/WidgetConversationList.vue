@@ -1,62 +1,57 @@
 <template>
-  <section class="rs-widget__sidebar">
-    <div class="rs-widget__sidebar-header">
-      <div>
-        <h3 class="rs-widget__sidebar-title">Conversation history</h3>
-        <p class="rs-widget__sidebar-meta">Pick up where you left off</p>
-      </div>
-
-      <button type="button" class="rs-widget__primary-button" @click="$emit('new')">
-        <Plus :size="14" />
-        <span>New</span>
-      </button>
+  <div class="rs-widget__history-list">
+    <div v-if="groupedConversations.length === 0" class="rs-widget__empty-state rs-widget__history-empty">
+      <History :size="28" />
+      <p class="rs-widget__empty-state-title">No conversations yet</p>
+      <p class="rs-widget__empty-state-text">Use the + button below to start a new thread.</p>
     </div>
 
-    <div class="rs-widget__sidebar-list">
-      <div v-if="groupedConversations.length === 0" class="rs-widget__empty-state">
-        <History :size="30" />
-        <p class="rs-widget__empty-state-title">No conversations yet</p>
-        <p class="rs-widget__empty-state-text">Start a new thread to see it here.</p>
-      </div>
+    <template v-else>
+      <div v-for="group in groupedConversations" :key="group.label" class="rs-widget__history-group">
+        <div class="rs-widget__history-group-label">{{ group.label }}</div>
 
-      <template v-else>
-        <div v-for="group in groupedConversations" :key="group.label" class="rs-widget__group">
-          <div class="rs-widget__group-label">{{ group.label }}</div>
-
-          <button
+        <div class="rs-widget__history-items">
+          <article
             v-for="conversation in group.items"
             :key="conversation.thread_id"
-            type="button"
-            class="rs-widget__conversation-item"
-            :class="{ 'rs-widget__conversation-item--active': conversation.thread_id === activeThreadId }"
-            @click="$emit('select', conversation.thread_id)"
+            class="rs-widget__history-item"
+            :class="{ 'rs-widget__history-item--active': conversation.thread_id === activeThreadId }"
           >
-            <p class="rs-widget__conversation-title">{{ conversation.title || conversation.thread_id }}</p>
-            <p class="rs-widget__conversation-preview">{{ conversation.preview || 'No preview available' }}</p>
-
-            <div class="rs-widget__conversation-footer">
-              <span>{{ formatRelativeDate(conversation.updated_at) }}</span>
-              <span class="rs-widget__conversation-actions">
-                <button
-                  type="button"
-                  class="rs-widget__text-button"
-                  :aria-label="`Delete ${conversation.thread_id}`"
-                  @click.stop="$emit('delete', conversation.thread_id)"
-                >
-                  <Trash2 :size="14" />
-                </button>
+            <button
+              type="button"
+              class="rs-widget__history-item-main"
+              @click="$emit('select', conversation.thread_id)"
+            >
+              <span class="rs-widget__history-avatar" aria-hidden="true">
+                <MessagesSquare :size="18" />
               </span>
-            </div>
-          </button>
+
+              <span class="rs-widget__history-copy">
+                <span class="rs-widget__history-item-title">{{ conversation.title || conversation.thread_id }}</span>
+                <span class="rs-widget__history-item-preview">{{ conversation.preview || 'No preview available' }}</span>
+              </span>
+
+              <span class="rs-widget__history-time">{{ formatRelativeDate(conversation.updated_at) }}</span>
+            </button>
+
+            <button
+              type="button"
+              class="rs-widget__history-delete"
+              :aria-label="`Delete ${conversation.thread_id}`"
+              @click="$emit('delete', conversation.thread_id)"
+            >
+              <Trash2 :size="14" />
+            </button>
+          </article>
         </div>
-      </template>
-    </div>
-  </section>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { History, Plus, Trash2 } from 'lucide-vue-next';
+import { History, MessagesSquare, Trash2 } from 'lucide-vue-next';
 import type { ThreadSummary } from '../../types';
 
 const props = defineProps<{

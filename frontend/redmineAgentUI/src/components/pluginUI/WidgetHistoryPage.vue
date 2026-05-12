@@ -1,18 +1,7 @@
 <template>
   <section class="rs-widget__history-page">
-    <div class="rs-widget__page-header">
-      <div>
-        <h3 class="rs-widget__page-title">Thread history</h3>
-        <p class="rs-widget__page-meta">Return to earlier conversations anytime</p>
-      </div>
 
-      <button type="button" class="rs-widget__primary-button" @click="$emit('new')">
-        <Plus :size="14" />
-        <span>New thread</span>
-      </button>
-    </div>
-
-    <div class="rs-widget__page-body">
+    <div class="rs-widget__page-body rs-widget__page-body--history">
       <WidgetConversationList
         :conversations="conversations"
         :active-thread-id="activeThreadId"
@@ -21,6 +10,16 @@
         @delete="$emit('delete', $event)"
       />
     </div>
+
+    <button
+      type="button"
+      class="rs-widget__fab"
+      aria-label="New thread"
+      title="New thread"
+      @click="$emit('new')"
+    >
+      <Plus :size="22" />
+    </button>
   </section>
 </template>
 
