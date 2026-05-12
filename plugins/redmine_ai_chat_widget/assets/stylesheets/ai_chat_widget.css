@@ -5,7 +5,6 @@
   z-index: 9999;
   width: 60px;
   height: 60px;
-  border: 0;
   border-radius: 50%;
   /* design tokens (see :root below) */
   background: var(--copper-500);
@@ -32,6 +31,28 @@
 #ai-chat-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.ai-chat-modal {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 400px;
+  height: 600px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-chat-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 :root {
@@ -209,7 +230,7 @@
   #ai-chat-panel {
     width: calc(100% - 24px);
     height: calc(100vh - 80px);
-    right: 12px;
+    right: auto;
     bottom: 80px;
   }
 }

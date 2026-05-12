@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import psycopg
@@ -76,6 +77,21 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# ── Mount the built Vue widget ────────────────────────────────────────────────
+
+from pathlib import Path
+import os
+
+# Get absolute path to dist folder
+frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "redmineAgentUI" / "dist"
+
+if not frontend_dist.exists():
+    print(f"⚠️  Vue dist folder not found at {frontend_dist}")
+    print("⚠️  Run: cd frontend/redmineAgentUI && pnpm build")
+else:
+    app.mount("/api/static", StaticFiles(directory=str(frontend_dist)), name="static")
+    print(f"✓ Serving Vue widget from {frontend_dist}")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 

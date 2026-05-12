@@ -64,14 +64,14 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 
     return config
 
-# def create_llm() -> ChatOpenAI:
-#     return ChatOpenAI(
-#         model=os.getenv("MODEL_NAME","openrouter/auto"),
-#         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-#         open_ai_base=os.getenv("OPENROUTER_BASE_URL"),
-#         temperature=0,
-#         max_tokens=800
-#     )
+def create_llm() -> ChatOpenAI:
+    return ChatOpenAI(
+        model=os.getenv("MODEL_NAME","openrouter/auto"),
+        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+        open_ai_base=os.getenv("OPENROUTER_BASE_URL"),
+        temperature=0,
+        max_tokens=800
+    )
 
 # def create_llm() -> ChatOllama:
 #     return ChatOllama(
@@ -79,9 +79,9 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 #         temperature=0
 #     )
 
-def create_llm() -> ChatOllama:
-    provider = ModelProvider.instance()
-    return provider.build()
+# def create_llm() -> ChatOllama:
+#     provider = ModelProvider.instance()
+#     return provider.build()
 
 
 llm = create_llm()

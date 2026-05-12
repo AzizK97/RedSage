@@ -1,140 +1,110 @@
 <script setup lang="ts">
-import { Terminal, Zap } from 'lucide-vue-next';
+import { Check } from 'lucide-vue-next';
 import AnimatedSection from './AnimatedSection.vue';
-import { computed } from 'vue';
-import { useTheme } from '../../../composables/useTheme';
+import { useTheme } from '@/composables/useTheme';
 
-const { isDark } = useTheme();
-
-const descriptionTextClass = computed(() =>
-  isDark.value
-    ? 'text-surface-400'
-    : 'text-surface-600'
-);
-
-const terminalHeaderClass = computed(() =>
-  isDark.value
-    ? 'bg-surface-900/80 border-surface-800'
-    : 'bg-sage-50/80 border-sage-200/40'
-);
-
-const stepIndexClass = computed(() =>
-  isDark.value
-    ? 'text-surface-600'
-    : 'text-surface-500'
-);
-
-const codeTextClass = computed(() =>
-  isDark.value
-    ? 'text-sage-300 group-hover:text-sage-200'
-    : 'text-sage-700 group-hover:text-sage-800'
-);
-
-const labelTextClass = computed(() =>
-  isDark.value
-    ? 'text-surface-600'
-    : 'text-surface-700'
-);
-
-const infoCardBorder = computed(() =>
-  isDark.value
-    ? 'hover:border-sage-500/25'
-    : 'hover:border-sage-400/40'
-);
-
-const infoCardBg = computed(() =>
-  isDark.value
-    ? 'bg-surface-900/80 border-surface-800'
-    : 'bg-white/70 border-sage-200/40'
-);
-
-const steps = [
-  { code: 'git clone https://github.com/AzizK97/Redmine-Agent.git', label: 'Clone the repository' },
-  { code: 'cp .env.example .env', label: 'Configure environment' },
-  { code: 'docker compose up -d', label: 'Launch the stack' },
-  { code: 'python main.py', label: 'Start chatting' },
+const plans = [
+  {
+    name: 'Starter',
+    price: 'Free',
+    period: '',
+    desc: 'For individuals and small teams getting started.',
+    features: ['Up to 5 users', '1 Redmine project', '100 queries/month', 'Community support', 'Read-only agents'],
+    cta: 'Get Started Free',
+    ctaClass: 'bg-white dark:bg-surface-800 border border-sage-200 dark:border-surface-700 text-sage-700 dark:text-surface-300 hover:bg-sage-50 dark:hover:bg-surface-700 hover:border-sage-300 dark:hover:border-sage-500/40',
+    popular: false,
+  },
+  {
+    name: 'Pro',
+    price: '$29',
+    period: '/user/mo',
+    desc: 'For growing teams that need full AI capabilities.',
+    features: ['Unlimited users', 'Unlimited projects', 'Unlimited queries', 'Priority support', 'All 4 agents', 'API access', 'Audit trail', 'Custom workflows'],
+    cta: 'Start Free Trial',
+    ctaClass: 'bg-copper-600 text-white hover:bg-copper-500 shadow-lg shadow-copper-300/30 dark:shadow-copper-700/25',
+    popular: true,
+  },
+  {
+    name: 'Enterprise',
+    price: 'Custom',
+    period: '',
+    desc: 'For organizations with advanced security and compliance needs.',
+    features: ['Everything in Pro', 'Self-hosted deployment', 'SSO / SAML', 'SLA guarantee', 'Dedicated support', 'Custom agent training', 'On-premise option'],
+    cta: 'Contact Sales',
+    ctaClass: 'bg-white dark:bg-surface-800 border border-sage-200 dark:border-surface-700 text-sage-700 dark:text-surface-300 hover:bg-sage-50 dark:hover:bg-surface-700 hover:border-sage-300 dark:hover:border-sage-500/40',
+    popular: false,
+  },
 ];
 
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text);
-}
+const { isDark } = useTheme();
 </script>
 
 <template>
-  <section id="get-started" class="relative py-32">
+  <section id="pricing" class="relative py-32">
     <div class="absolute inset-0">
       <div class="absolute top-0 left-0 right-0 section-divider" />
-      <div class="absolute bottom-1/3 left-1/3 w-96 h-96 bg-sage-500/5 rounded-full blur-3xl" />
+      <div class="absolute bottom-1/3 left-1/3 w-96 h-96 bg-sage-100/40 dark:bg-sage-500/5 rounded-full blur-3xl" />
     </div>
 
     <div class="relative max-w-7xl mx-auto px-6">
       <AnimatedSection class="text-center mb-16">
-        <span class="inline-block text-xs font-semibold uppercase tracking-widest text-sage-400 mb-4">Quick Start</span>
-        <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6">
-          Up and Running <span class="gradient-text-copper">in Minutes</span>
+        <span class="inline-block text-xs font-semibold uppercase tracking-widest text-sage-600 dark:text-sage-400 mb-4">Pricing</span>
+        <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 text-sage-950 dark:text-white">
+          Start Free, <span class="gradient-text-copper">Scale When Ready</span>
         </h2>
-        <p :class="['text-lg max-w-2xl mx-auto', descriptionTextClass]">
-          Get the full stack — backend, Redmine, and database — running with a single Docker Compose command.
+        <p class="text-lg text-surface-600 dark:text-surface-400 max-w-2xl mx-auto">
+          No credit card required. Try RedSage on your Redmine instance in minutes.
         </p>
       </AnimatedSection>
 
-      <AnimatedSection class="max-w-2xl mx-auto">
-        <div class="glass-card overflow-hidden">
-          <div :class="['flex items-center gap-2 px-5 py-3 border-b', terminalHeaderClass]">
-            <div class="w-3 h-3 rounded-full bg-red-500/60" />
-            <div class="w-3 h-3 rounded-full bg-yellow-500/60" />
-            <div class="w-3 h-3 rounded-full bg-green-500/60" />
-            <span class="ml-2 text-xs text-surface-500 font-mono">terminal</span>
-          </div>
-
-          <div class="p-5 space-y-4">
-            <div v-for="(step, i) in steps" :key="step.code" class="group flex items-start gap-4">
-              <span :class="['text-xs font-mono mt-1.5 select-none', stepIndexClass]">{{ String(i + 1).padStart(2, '0') }}</span>
-              <div class="flex-1">
-                <div class="flex items-center gap-2">
-                  <code :class="['text-sm font-mono transition-colors', codeTextClass]">{{ step.code }}</code>
-                  <button
-                    @click="copyToClipboard(step.code)"
-                    class="opacity-0 group-hover:opacity-100 transition-opacity text-surface-500 hover:text-copper-400"
-                    title="Copy"
-                  >
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
-                  </button>
-                </div>
-                <span :class="['text-xs mt-1 block', labelTextClass]">{{ step.label }}</span>
-              </div>
+      <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto" >
+        <AnimatedSection v-for="(plan, i) in plans" :key="plan.name" :delay="100 * i">
+          <div :class="['glass-card p-7 h-full flex flex-col relative', 
+                        !isDark ? 'bg-white' : 'bg-surface-900',
+                        plan.popular ? 'border-copper-300 dark:border-copper-500/40 ring-1 ring-copper-200 dark:ring-copper-500/20' : '',
+                      ]">
+            <div v-if="plan.popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-copper-600 text-white text-xs font-semibold">
+              Most Popular
             </div>
-          </div>
-        </div>
-      </AnimatedSection>
 
-      <AnimatedSection :delay="200" class="mt-16 grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
-        <div :class="['glass-card p-6 group transition-all', infoCardBg, infoCardBorder]">
+            <div class="mb-6">
+              <h3 class="text-lg font-bold text-sage-900 dark:text-white mb-1">{{ plan.name }}</h3>
+              <p class="text-sm text-surface-500 dark:text-surface-400">{{ plan.desc }}</p>
+            </div>
+
+            <div class="mb-6">
+              <span class="text-4xl font-extrabold text-sage-950 dark:text-white">{{ plan.price }}</span>
+              <span class="text-sm text-surface-500 dark:text-surface-400">{{ plan.period }}</span>
+            </div>
+
+            <ul class="space-y-2.5 mb-8 flex-1">
+              <li v-for="feat in plan.features" :key="feat" class="flex items-start gap-2 text-sm text-surface-600 dark:text-surface-400">
+                <Check :size="16" class="text-sage-500 dark:text-sage-400 shrink-0 mt-0.5" />
+                {{ feat }}
+              </li>
+            </ul>
+
+            <a href="#" :class="['block text-center py-3 rounded-xl font-semibold text-sm transition-all', plan.ctaClass]">
+              {{ plan.cta }}
+            </a>
+          </div>
+        </AnimatedSection>
+      </div>
+
+      <!-- Integration callout
+      <AnimatedSection :delay="300" class="mt-16 grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        <div class="glass-card p-6 group transition-all">
           <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-lg bg-sage-500/10 border border-sage-500/15 flex items-center justify-center">
-              <Terminal :size="20" class="text-sage-400" />
+            <div class="w-10 h-10 rounded-lg bg-copper-50 dark:bg-copper-500/10 border border-copper-100 dark:border-copper-500/15 flex items-center justify-center">
+              <Zap :size="20" class="text-copper-600 dark:text-copper-400" />
             </div>
-            <h4 :class="['font-bold', isDark ? 'text-white' : 'text-sage-900']">CLI Mode</h4>
+            <h4 class="font-bold text-sage-900 dark:text-white">Quick Setup</h4>
           </div>
-          <p :class="['text-sm leading-relaxed', descriptionTextClass]">
-            Interactive terminal interface for direct usage. Type queries and get instant responses.
+          <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+            Connect your Redmine instance in under 5 minutes. Just API URL, key, and you're live.
           </p>
         </div>
-        <div :class="['glass-card p-6 group transition-all', infoCardBg, isDark ? 'hover:border-copper-500/25' : 'hover:border-copper-400/40']">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-lg bg-copper-500/10 border border-copper-500/15 flex items-center justify-center">
-              <Zap :size="20" class="text-copper-400" />
-            </div>
-            <h4 :class="['font-bold', isDark ? 'text-white' : 'text-sage-900']">REST API</h4>
-          </div>
-          <p :class="['text-sm leading-relaxed', descriptionTextClass]">
-            Full FastAPI backend with Swagger docs at <code class="text-copper-300">/docs</code>. Integrate with any tool.
-          </p>
-        </div>
-      </AnimatedSection>
+      </AnimatedSection> -->
     </div>
   </section>
 </template>

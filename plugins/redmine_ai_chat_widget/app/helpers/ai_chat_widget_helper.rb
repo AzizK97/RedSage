@@ -44,9 +44,28 @@ module AiChatWidgetHelper
     # Return complete token
     "#{signing_input}.#{signature_b64}"
   end
+
+  def get_user_role(user)
+    return 'admin' if user.admin?
+    if is_project_manager?(user)
+      return 'project_manager'
+    end
+
+    'project_manager'
+  end
   
   private
-  
+
+  def is_project_manager?(user)
+    return true if user.login.to_s.downcase.include?('manager')
+
+    user.groups.each do |group|
+      return true if group.name.to_s.downcase.include?('manager')
+    end
+
+    false
+  end
+
   def urlsafe_b64encode(str)
     Base64.urlsafe_encode64(str).delete('=')
   end

@@ -28,23 +28,23 @@ const secondaryButtonClass = computed(() =>
 
     <div class="relative max-w-4xl mx-auto px-6 text-center">
       <AnimatedSection>
-        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-copper-500/10 border border-copper-500/20 text-copper-300 text-xs font-medium mb-8">
-          <Flame :size="14" /> Ready to Ship
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-copper-50 dark:bg-copper-500/10 border border-copper-200 dark:border-copper-500/20 text-copper-700 dark:text-copper-300 text-xs font-medium mb-8">
+          <Flame :size="14" /> Ready to Transform Your Workflow
         </div>
-        <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6">
-          Transform Your<br /><span class="gradient-text-hero">Redmine Workflow</span>
+        <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 text-sage-950 dark:text-white">
+          Stop Clicking.<br /><span class="gradient-text-hero">Start Asking.</span>
         </h2>
         <p :class="['text-lg max-w-xl mx-auto mb-10', descriptionTextClass]">
-          Stop clicking through menus. Start asking questions. Let AI agents handle the heavy lifting while you stay in control.
+          Join teams using RedSage to manage Redmine through natural language. Free to start, powerful at scale.
         </p>
         <div class="flex flex-wrap justify-center gap-4">
-          <a href="https://github.com/AzizK97/Redmine-Agent" target="_blank" rel="noopener noreferrer"
-            class="group inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-copper-600 text-white font-bold text-lg hover:bg-copper-500 transition-all shadow-xl shadow-copper-700/25 hover:shadow-copper-600/30">
-            <Play :size="20" /> Get Started <ArrowRight :size="20" class="group-hover:translate-x-0.5 transition-transform" />
+          <a href="#pricing"
+            class="group inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-copper-600 text-white font-bold text-lg hover:bg-copper-500 transition-all shadow-xl shadow-copper-300/30 dark:shadow-copper-700/25 hover:shadow-copper-400/30">
+            Start Free Trial <ArrowRight :size="20" class="group-hover:translate-x-0.5 transition-transform" />
           </a>
-          <a href="https://github.com/AzizK97/Redmine-Agent" target="_blank" rel="noopener noreferrer"
-            :class="['inline-flex items-center gap-2.5 px-8 py-4 rounded-xl border font-bold text-lg transition-all', secondaryButtonClass]">
-            <Github :size="20" /> Star on GitHub
+          <a href="#features"
+            class="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl border font-bold text-lg transition-all" :class="secondaryButtonClass">
+            Explore Features
           </a>
         </div>
       </AnimatedSection>

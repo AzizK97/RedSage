@@ -1,69 +1,22 @@
 <script setup lang="ts">
-import { Cpu, Zap, Bot, Container, Database, GitBranch, Terminal, Activity } from 'lucide-vue-next';
+import { Globe, RefreshCw, Clock, BarChart3, Cpu, Zap, Container, Terminal } from 'lucide-vue-next';
 import AnimatedSection from './AnimatedSection.vue';
-import { computed } from 'vue';
-import { useTheme } from '../../../composables/useTheme';
+import { useTheme } from '@/composables/useTheme';
+
+const capabilities = [
+  { icon: Globe, name: 'Works With Your Redmine', desc: 'Connects to any Redmine instance via API. No migration, no setup changes, no risk to existing workflows.' },
+  { icon: Cpu, name: 'AI-Powered Routing', desc: 'Supervisor agent analyzes intent and dispatches to the right specialist agent automatically.' },
+  { icon: Zap, name: 'Instant Responses', desc: 'Read-only queries return in under 2 seconds. Get answers faster than navigating the Redmine UI.' },
+  { icon: Container, name: 'Cloud or Self-Hosted', desc: 'Deploy on your infrastructure or use our managed cloud. Your data never leaves your control.' },
+  { icon: RefreshCw, name: 'Real-Time Sync', desc: 'Changes reflect in Redmine instantly. No stale data, no sync delays, no cache issues.' },
+  { icon: Clock, name: 'Audit Trail', desc: 'Every action is logged with timestamps, user context, and full reasoning chain for compliance.' },
+  { icon: Terminal, name: 'Chat & API Access', desc: 'Use the conversational UI or integrate via REST API. Both interfaces share the same backend.' },
+  { icon: BarChart3, name: 'Usage Analytics', desc: 'Track team adoption, query patterns, and time saved. Measure the ROI of AI-assisted management.' },
+];
 
 const { isDark } = useTheme();
 
-const descriptionTextClass = computed(() =>
-  isDark.value
-    ? 'text-surface-400'
-    : 'text-surface-600'
-);
-
-const cardBg = computed(() =>
-  isDark.value
-    ? 'bg-sage-500/10'
-    : 'bg-sage-200/20'
-);
-
-const cardBgHover = computed(() =>
-  isDark.value
-    ? 'group-hover:bg-sage-500/15'
-    : 'group-hover:bg-sage-200/30'
-);
-
-const cardBorder = computed(() =>
-  isDark.value
-    ? 'border-sage-500/15'
-    : 'border-sage-300/30'
-);
-
-const cardBorderHover = computed(() =>
-  isDark.value
-    ? 'group-hover:border-sage-500/25'
-    : 'group-hover:border-sage-400/40'
-);
-
-const itemNameClass = computed(() =>
-  isDark.value
-    ? 'text-white'
-    : 'text-sage-900'
-);
-
-const itemDescClass = computed(() =>
-  isDark.value
-    ? 'text-surface-500'
-    : 'text-surface-700'
-);
-
-const glassCardBorder = computed(() =>
-  isDark.value
-    ? 'border-surface-800'
-    : 'border-sage-200/30'
-);
-
-const techItems = [
-  { icon: Cpu, name: 'LangChain + LangGraph', desc: 'Agent orchestration & routing' },
-  { icon: Zap, name: 'FastAPI', desc: 'High-performance REST API' },
-  { icon: Bot, name: 'OpenRouter', desc: 'LLM provider (OpenAI-compatible)' },
-  { icon: Container, name: 'Docker Compose', desc: 'One-command deployment' },
-  { icon: Database, name: 'MySQL', desc: 'Redmine database backend' },
-  { icon: GitBranch, name: 'K3s', desc: 'Kubernetes deployment ready' },
-  { icon: Terminal, name: 'CLI + API', desc: 'Dual interface modes' },
-  { icon: Activity, name: 'Benchmarking', desc: 'Built-in validation framework' },
-];
+const delays = [0, 80, 160, 240, 320, 400, 480, 560];
 </script>
 
 <template>
@@ -74,25 +27,25 @@ const techItems = [
 
     <div class="max-w-7xl mx-auto px-6">
       <AnimatedSection class="text-center mb-16">
-        <span class="inline-block text-xs font-semibold uppercase tracking-widest text-sage-400 mb-4">Under the Hood</span>
-        <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6">
-          Built with <span class="gradient-text">Modern Stack</span>
+        <span class="inline-block text-xs font-semibold uppercase tracking-widest text-sage-600 dark:text-sage-400 mb-4">Platform</span>
+        <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6 text-sage-950 dark:text-white">
+          Built for <span class="gradient-text">Enterprise Reliability</span>
         </h2>
-        <p :class="['text-lg max-w-2xl mx-auto', descriptionTextClass]">
-          Production-grade technologies chosen for reliability, performance, and developer experience.
+        <p class="text-lg text-surface-600 dark:text-surface-400 max-w-2xl mx-auto">
+          Production-grade infrastructure with the flexibility to match your team's needs.
         </p>
       </AnimatedSection>
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <AnimatedSection v-for="(item, i) in techItems" :key="item.name" :delay="i * 80">
-          <div :class="['group glass-card p-5 transition-all duration-300 hover:-translate-y-0.5 border', glassCardBorder, isDark ? 'hover:border-sage-500/25' : 'hover:border-sage-400/40']">
+        <AnimatedSection v-for="(item, i) in capabilities" :key="item.name" :delay="delays[i]">
+          <div class="group glass-card p-5 transition-all duration-300 hover:-translate-y-0.5" :class="{ 'bg-white': !isDark, 'dark:bg-surface-900': isDark }">
             <div class="flex items-center gap-3 mb-3">
-              <div :class="['w-9 h-9 rounded-lg border flex items-center justify-center transition-colors', cardBg, cardBorder, cardBgHover, cardBorderHover]">
-                <component :is="item.icon" :size="18" class="text-sage-400" />
+              <div class="w-9 h-9 rounded-lg bg-sage-50 dark:bg-sage-500/10 border border-sage-100 dark:border-sage-500/15 flex items-center justify-center group-hover:bg-sage-100 dark:group-hover:bg-sage-500/15 group-hover:border-sage-200 dark:group-hover:border-sage-500/25 transition-colors">
+                <component :is="item.icon" :size="18" class="text-sage-600 dark:text-sage-400" />
               </div>
-              <h4 :class="['text-sm font-bold', itemNameClass]">{{ item.name }}</h4>
+              <h4 class="text-sm font-bold text-sage-900 dark:text-white">{{ item.name }}</h4>
             </div>
-            <p :class="['text-xs leading-relaxed', itemDescClass]">{{ item.desc }}</p>
+            <p class="text-xs text-surface-500 dark:text-surface-500 leading-relaxed">{{ item.desc }}</p>
           </div>
         </AnimatedSection>
       </div>

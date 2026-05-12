@@ -3,6 +3,7 @@
     id="ai-chat-widget-root"
     data-user-id="<%= User.current.id %>"
     data-user-login="<%= User.current.login %>"
+    data-user-role="<%= get_user_role(User.current) %>"
     data-widget-token="<%= generate_widget_token(User.current) %>"
     data-backend-url="<%= Setting.plugin_redmine_ai_chat_widget['backend_url'] %>">
   </div>

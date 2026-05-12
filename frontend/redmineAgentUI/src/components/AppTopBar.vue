@@ -223,7 +223,7 @@ function openThread(id: string) {
           class="relative w-10 h-10 flex items-center justify-center rounded-xl border border-surface-800 text-surface-400 hover:text-white hover:bg-surface-800 transition-all"
         >
           <Bell :size="18" />
-          <span v-if="unreadCount > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center border-2 border-surface-950 px-1 shadow-lg shadow-red-900/40">
+          <span v-if="unreadCount > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-600 !text-white text-[10px] font-extrabold rounded-full flex items-center justify-center border-2 border-surface-950 px-1 shadow-lg shadow-red-900/40">
             {{ unreadCount > 9 ? "9+" : unreadCount }}
           </span>
         </button>

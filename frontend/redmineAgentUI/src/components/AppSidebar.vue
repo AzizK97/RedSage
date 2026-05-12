@@ -28,14 +28,15 @@ function roleLabel() {
   >
     <div class="flex items-center justify-between gap-3">
       <div v-show="!isCollapsed" class="flex items-center gap-2.5 overflow-hidden">
-        <div class="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-sage-400 to-copper-500 flex items-center justify-center shadow-lg shadow-sage-900/40">
-          <LampCeiling :size="18" />
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sage-400 to-copper-500 flex items-center justify-center shadow-md shadow-sage-300/30 dark:shadow-sage-700/30 group-hover:shadow-copper-400/30 dark:group-hover:shadow-copper-600/30 transition-shadow">
+          <LampCeiling :size="18" class="!text-white" />
         </div>
         <div class="flex flex-col leading-tight">
           <span class="font-bold text-white tracking-tight">RedSage</span>
           <span class="text-[10px] text-surface-500 uppercase tracking-widest font-semibold">{{ roleLabel() }}</span>
         </div>
       </div>
+      
       <button 
         class="w-8 h-8 rounded-lg flex items-center justify-center text-surface-400 hover:text-white hover:bg-surface-800 transition-colors"
         type="button" 

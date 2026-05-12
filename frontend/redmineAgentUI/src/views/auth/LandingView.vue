@@ -13,7 +13,7 @@ import CTASection from './components/CTASection.vue';
 import FooterSection from './components/FooterSection.vue';
 
 const emit = defineEmits<{ (e: 'start-login'): void }>();
-const { isDark } = useTheme();
+const { isDark, toggleTheme } = useTheme();
 
 const bgClass = computed(() => isDark.value ? 'bg-surface-950 text-surface-200' : 'bg-surface-50 text-sage-900');
 </script>
@@ -21,7 +21,7 @@ const bgClass = computed(() => isDark.value ? 'bg-surface-950 text-surface-200' 
 <template>
   <div :class="['min-h-screen overflow-x-hidden', bgClass]">
     <NavBar @start-login="emit('start-login')" />
-    <HeroSection />
+    <HeroSection @start-login="emit('start-login')" />
     <AgentsSection />
     <HowItWorksSection />
     <SafetySection />

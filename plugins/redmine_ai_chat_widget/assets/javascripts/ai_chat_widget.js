@@ -1,26 +1,22 @@
 (function () {
   const init = function () {
-    const root = document.getElementById("ai-chat-widget-root");
-    if (!root || document.getElementById("ai-chat-btn")) return;
+    const root = document.getElementById('ai-chat-widget-root')
+    if (!root || document.getElementById('ai-chat-btn')) return
 
-    const backendUrl = (root.dataset.backendUrl || "").replace(/\/$/, "");
-    const widgetToken = root.dataset.widgetToken || "";
-    const userId = root.dataset.userId || "";
-    const userLogin = root.dataset.userLogin || "";
+    const backendUrl = (root.dataset.backendUrl || '').replace(/\/$/, '')
+    const widgetToken = root.dataset.widgetToken || ''
+    const userId = root.dataset.userId || ''
+    const userRole = root.dataset.userRole || ''
 
-    if (!userId || !userLogin) {
-      return; 
-    }
+    if (!userId || !widgetToken || !backendUrl) return
 
-    if (!backendUrl || !widgetToken) {
-      return;
-    }
-
-    const btn = document.createElement("button");
-    btn.id = "ai-chat-btn";
-    btn.type = "button";
-    btn.title = "AI Chat Assistant";
-    btn.setAttribute("aria-label", "Open AI chat assistant");
+    // Create floating button using vanilla JS (lightweight)
+    const btn = document.createElement('button')
+    btn.id = 'ai-chat-btn'
+    btn.type = 'button'
+    btn.className = 'ai-chat-float-btn'
+    btn.title = 'AI Chat Assistant'
+    btn.setAttribute('aria-label', 'RedSage - Redmine chat assistant')
     btn.innerHTML = [
       '<svg class="ai-chat-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">',
       '  <path d="M12 8V4H8" />',
@@ -32,120 +28,97 @@
       '</svg>'
     ].join('');
 
-    const panel = document.createElement("div");
-    panel.id = "ai-chat-panel";
-    panel.setAttribute("aria-hidden", "true");
-    panel.innerHTML = [
-      '<div class="ai-chat-header">',
-      '  <h3>RedSage AI Assistant</h3>',
-      '  <button type="button" class="ai-chat-close" aria-label="Close chat">&times;</button>',
-      '</div>',
-      '<div class="ai-chat-messages" id="ai-chat-messages" aria-live="polite"></div>',
-      '<div class="ai-chat-input-area">',
-      '  <input type="text" class="ai-chat-input" id="ai-chat-input" placeholder="Type your question..." autocomplete="off" />',
-      '  <button type="button" class="ai-chat-send" id="ai-chat-send">Send</button>',
-      '</div>'
-    ].join('');
+    // Create container for Vue widget (hidden initially)
+    root.innerHTML = `
+      <div id="ai-chat-modal" class="ai-chat-modal" style="display: none;">
+        <div class="ai-chat-container" id="ai-chat-widget-mount"></div>
+      </div>
+    `
+    const modal = root.querySelector('#ai-chat-modal')
+    const container = root.querySelector('#ai-chat-widget-mount')
 
-    document.body.appendChild(btn);
-    document.body.appendChild(panel);
+    document.body.appendChild(btn)
 
-    const messagesDiv = panel.querySelector('#ai-chat-messages');
-    const input = panel.querySelector('#ai-chat-input');
-    const sendBtn = panel.querySelector('#ai-chat-send');
-    const closeBtn = panel.querySelector('.ai-chat-close');
+    let vueLoaded = false
+    let vueAppMounted = false
+    let isOpen = false
 
-    function escapeHtml(text) {
-      return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    const setOpen = function (nextOpen) {
+      isOpen = nextOpen
+      modal.style.display = nextOpen ? 'flex' : 'none'
     }
 
-    function addMessage(content, kind) {
-      const msgEl = document.createElement('div');
-      msgEl.className = `ai-chat-message ${kind}`;
-
-      const contentEl = document.createElement('div');
-      contentEl.className = 'ai-chat-message-content';
-      contentEl.innerHTML = escapeHtml(content);
-
-      msgEl.appendChild(contentEl);
-      messagesDiv.appendChild(msgEl);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    window.__redmineChatWidgetClose = function () {
+      setOpen(false)
     }
 
-    function setPanelOpen(isOpen) {
-      panel.classList.toggle('active', isOpen);
-      panel.setAttribute('aria-hidden', String(!isOpen));
-      if (isOpen) input.focus();
+    window.__redmineChatWidgetOpen = function () {
+      setOpen(true)
     }
 
-    function togglePanel() {
-      setPanelOpen(!panel.classList.contains('active'));
-    }
+    // Load Vue + widget on first button click (lazy loading)
+    btn.addEventListener('click', async function () {
+      if (!vueLoaded) {
+        try {
+          setOpen(true)
+          btn.disabled = true
+          btn.innerHTML = 'Loading...'
 
-    function setBusy(isBusy) {
-      sendBtn.disabled = isBusy;
-      input.disabled = isBusy;
-      btn.disabled = isBusy;
-    }
+          // Load chat-widget.js from backend OR plugin assets
+          const scriptPath = `${backendUrl}/api/static/chat-widget.js?v=${Date.now()}`
+          
+          const script = document.createElement('script')
+          script.src = scriptPath
+          script.type = 'module'
+          
+          script.onload = function () {
+            vueLoaded = true
+            btn.disabled = false
+            btn.innerHTML = [
+              '<svg class="ai-chat-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">',
+              '  <path d="M12 8V4H8" />',
+              '  <rect width="16" height="12" x="4" y="8" rx="2" />',
+              '  <path d="M2 14h2" />',
+              '  <path d="M20 14h2" />',
+              '  <path d="M15 13v2" />',
+              '  <path d="M9 13v2" />',
+              '</svg>'
+            ].join('');
 
-    async function sendMessage() {
-      const message = input.value.trim();
-      if (!message) return;
+            // Now that Vue is loaded, initialize the widget
+            if (window.initRedmineChatWidget && !vueAppMounted) {
+              window.initRedmineChatWidget({
+                token: widgetToken,
+                userId: userId,
+                role: userRole,
+                backendUrl: backendUrl,
+                containerId: 'ai-chat-widget-mount'
+              })
+              vueAppMounted = true
+            }
+          }
 
-      addMessage(message, 'user');
-      input.value = '';
-      setBusy(true);
+          script.onerror = function () {
+            btn.disabled = false
+            btn.innerHTML = '❌'
+            console.error('[RedmineChatWidget] Failed to load chat widget')
+          }
 
-      try {
-        const response = await fetch(`${backendUrl}/api/chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${widgetToken}`
-          },
-          body: JSON.stringify({
-            message: message,
-            thread_id: "default"
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status} ${response.statusText}`);
+          document.head.appendChild(script)
+        } catch (error) {
+          btn.disabled = false
+          console.error('[RedmineChatWidget] Error:', error)
         }
-
-        const data = await response.json();
-        addMessage(data.response || 'No response from server.', 'bot');
-      } catch (error) {
-        addMessage(`Error: ${error.message}. Check the backend at ${backendUrl}.`, 'bot');
-      } finally {
-        setBusy(false);
-        input.focus();
+      } else {
+        // Toggle modal only after Vue is loaded; do not pre-open first.
+        setOpen(!isOpen)
       }
-    }
-
-    btn.addEventListener('click', togglePanel);
-    closeBtn.addEventListener('click', function () {
-      setPanelOpen(false);
-    });
-    sendBtn.addEventListener('click', sendMessage);
-    input.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        sendMessage();
-      }
-    });
-
-    addMessage('Hello! How can I help you with your Redmine projects today?', 'bot');
-  };
+    })
+  }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
+    document.addEventListener('DOMContentLoaded', init, { once: true })
   } else {
-    init();
+    init()
   }
-})();
+})()
