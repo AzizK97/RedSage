@@ -88,14 +88,20 @@ app = FastAPI(
 from pathlib import Path
 import os
 
-# Get absolute path to dist folder
-frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "redmineAgentUI" / "dist"
+# Get absolute path to the widget build folder
+frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "redmineAgentUI" / "dist-widget"
 
 if not frontend_dist.exists():
     print(f"⚠️  Vue dist folder not found at {frontend_dist}")
-    print("⚠️  Run: cd frontend/redmineAgentUI && pnpm build")
-else:
-    app.mount("/api/static", StaticFiles(directory=str(frontend_dist)), name="static")
+    print("⚠️  Run: cd frontend/redmineAgentUI && pnpm build:widget")
+
+app.mount(
+    "/api/static",
+    StaticFiles(directory=str(frontend_dist), check_dir=False),
+    name="static",
+)
+
+if frontend_dist.exists():
     print(f"✓ Serving Vue widget from {frontend_dist}")
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
