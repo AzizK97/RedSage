@@ -110,7 +110,7 @@ async function handleEdit(message: string) {
 
 <template>
   <PluginStyles :expanded="isExpanded">
-    <div class="rs-widget">
+    <div class="redsage-widget rs-widget">
       <WidgetHeader
         title="Redmine Chat Assist"
         subtitle="Project-aware support for your team"

@@ -1,41 +1,3 @@
-.rs-widget {
-  --rs-bg: #0e100c;
-  --rs-surface: #1e211b;
-  --rs-surface-2: #2a3027;
-  --rs-surface-3: #3a4338;
-  --rs-border: rgba(123, 138, 118, 0.28);
-  --rs-border-strong: rgba(180, 118, 54, 0.35);
-  --rs-text: #f4f5f3;
-  --rs-muted: #8c9487;
-  --rs-muted-2: #677063;
-  --rs-accent: #d86f29;
-  --rs-accent-soft: rgba(216, 111, 41, 0.18);
-  --rs-success: #7ea06f;
-  --rs-danger: #d46c67;
-  --rs-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: linear-gradient(180deg, #11130f 0%, var(--rs-bg) 100%);
-  color: var(--rs-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji";
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.rs-widget * {
-  box-sizing: border-box;
-}
-
-.rs-widget button,
-.rs-widget input,
-.rs-widget textarea {
-  font: inherit;
-}
-
 .rs-widget__header {
   display: flex;
   align-items: center;
@@ -78,6 +40,7 @@
   font-size: 14px;
   line-height: 1.2;
   font-weight: 800;
+  color: var(--rs-text);
   letter-spacing: -0.02em;
 }
 
@@ -100,7 +63,7 @@
 
 .rs-widget__icon-button {
   width: 30px;
-  height: 30px;
+  height: 200px;
   border: 1px solid var(--rs-border);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
@@ -828,7 +791,8 @@
   align-items: flex-start;
   gap: 12px;
   min-width: 0;
-  padding: 14px 12px 14px 14px;
+  /* padding: 40px; */
+  height: fit-content;
   border: 0;
   background: transparent;
   color: inherit;

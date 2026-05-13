@@ -1,0 +1,56 @@
+/*
+  Dedicated widget stylesheet entry.
+  The Vue widget styles are authored in component-owned CSS and built
+  through this entry so the plugin consumes a single emitted asset.
+*/
+
+@import '../components/pluginUI/plugin-widget.css';
+
+.plugin-styles-provider {
+  --plugin-width: 400px;
+  --plugin-height: 600px;
+  /* --plugin-z-index: 40;
+  --plugin-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --plugin-radius: 20px; */
+
+  width: var(--plugin-width);
+  max-width: 95vw;
+  height: var(--plugin-height);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  /* border-radius: var(--plugin-radius);
+  box-shadow: var(--plugin-shadow);
+  z-index: var(--plugin-z-index); */
+  overflow-y: auto;
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.plugin-styles-provider--expanded {
+  width: 800px;
+  height: 85vh;
+}
+
+/* .redsage-widget {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+} */
+
+@media (max-width: 1024px) {
+  .plugin-styles-provider--expanded {
+    width: 90vw;
+  }
+}
+
+@media (max-width: 480px) {
+  .plugin-styles-provider,
+  .plugin-styles-provider--expanded {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 24px 24px 0 0;
+  }
+}

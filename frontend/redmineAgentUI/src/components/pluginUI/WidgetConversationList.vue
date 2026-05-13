@@ -22,9 +22,6 @@
               class="rs-widget__history-item-main"
               @click="$emit('select', conversation.thread_id)"
             >
-              <span class="rs-widget__history-avatar" aria-hidden="true">
-                <MessagesSquare :size="18" />
-              </span>
 
               <span class="rs-widget__history-copy">
                 <span class="rs-widget__history-item-title">{{ conversation.title || conversation.thread_id }}</span>

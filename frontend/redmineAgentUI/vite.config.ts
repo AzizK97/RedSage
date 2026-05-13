@@ -21,16 +21,33 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-        'chat-widget': path.resolve(__dirname, 'src/chat-widget-entry.ts'),
+    emptyOutDir: true,
+    cssCodeSplit: true,
+    outDir: mode === 'widget' ? 'dist-widget' : 'dist',
+    rollupOptions: mode === 'widget'
+      ? {
+        input: path.resolve(__dirname, 'src/chat-widget-entry.ts'),
+        output: {
+          entryFileNames: 'chat-widget.js',
+          chunkFileNames: 'chat-widget-[name].js',
+          assetFileNames: (assetInfo) => {
+            if (assetInfo.name?.endsWith('.css')) {
+              return 'chat-widget.css'
+            }
+
+            return 'assets/[name][extname]'
+          },
+        },
+      }
+      : {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+        },
+        output: {
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
+        },
       },
-      output: {
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name]-[hash].js',
-        assetFileNames: '[name]-[hash][extname]',
-      },
-    },
   },
 }))

@@ -1,27 +1,8 @@
 <script setup lang="ts">
 import AnimatedSection from './AnimatedSection.vue';
-import { computed } from 'vue';
 import { useTheme } from '../../../composables/useTheme';
 
 const { isDark } = useTheme();
-
-const metricLabelClass = computed(() =>
-  isDark.value
-    ? 'text-white'
-    : 'text-sage-900'
-);
-
-const metricDescClass = computed(() =>
-  isDark.value
-    ? 'text-surface-500'
-    : 'text-surface-700'
-);
-
-const cardBorderClass = computed(() =>
-  isDark.value
-    ? 'hover:border-sage-500/25'
-    : 'hover:border-sage-400/40'
-);
 
 const metrics = [
   { label: 'Routing Accuracy', value: '95%+', desc: 'Correct agent selection' },

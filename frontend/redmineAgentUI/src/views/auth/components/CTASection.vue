@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Play, ArrowRight, Github, Flame } from 'lucide-vue-next';
+import { ArrowRight, Flame } from 'lucide-vue-next';
 import AnimatedSection from './AnimatedSection.vue';
 import { computed } from 'vue';
 import { useTheme } from '../../../composables/useTheme';

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "build:widget":"vite build --mode widget",
+    "build:app": "vue-tsc -b && vite build",
+    "build:widget": "vite build --mode widget",
+    "build:widget:sync": "vite build --mode widget && node ../../scripts/sync-widget-assets.mjs",
     "preview": "vite preview",
     "preinstall": "npx only-allow pnpm"
   },
@@ -17,6 +19,7 @@
     "lucide-vue-next": "^1.0.0",
     "markdown-it": "^14.1.1",
     "motion": "^12.38.0",
+    "rollup": "^4.60.3",
     "vue": "^3.5.30",
     "vue-router": "4.5.1"
   },

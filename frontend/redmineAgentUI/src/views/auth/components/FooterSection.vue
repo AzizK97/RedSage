@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Leaf, Github, ExternalLink } from 'lucide-vue-next';
+import { Leaf } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useTheme } from '../../../composables/useTheme';
 
@@ -15,18 +15,6 @@ const brandTextClass = computed(() =>
   isDark.value
     ? 'text-white'
     : 'text-sage-900'
-);
-
-const linkTextClass = computed(() =>
-  isDark.value
-    ? 'text-surface-500'
-    : 'text-surface-600'
-);
-
-const copyrightClass = computed(() =>
-  isDark.value
-    ? 'text-surface-600'
-    : 'text-surface-500'
 );
 
 const productLinks = [

@@ -1,29 +1,21 @@
 /**
  * Standalone chat widget for Redmine plugin
  * Exports a single global function to initialize the chat
- * Creates a clean entry point that Vue can build seperatly.
+ * Creates a clean entry point that Vue can build separately.
  * When loaded, it exposes ONE function to window.
  */
 import { createApp } from 'vue';
 import PluginChatWrapper from './components/pluginUI/PluginChatWrapper.vue';
-import widgetStylesHref from './components/pluginUI/plugin-widget.css?url';
+import widgetStylesHref from './widget/chat-widget.css?url';
 
 function ensureWidgetStyles(backendUrl?: string) {
   if (document.getElementById('redmine-chat-widget-styles')) {
     return;
   }
 
-  // If a backendUrl is provided, prefer serving the emitted CSS from the
-  // backend static mount. This keeps the widget robust when built without
-  // the `widget` build mode or when filenames/hashes change.
   let href = widgetStylesHref;
   try {
-    const parts = String(widgetStylesHref).split('/');
-    const fileName = parts.pop() || parts[parts.length - 1] || widgetStylesHref;
-    if (backendUrl) {
-      const cleaned = backendUrl.replace(/\/$/, '');
-      href = `${cleaned}/api/static/${fileName}`;
-    }
+    href = backendUrl ? new URL(widgetStylesHref, backendUrl).toString() : widgetStylesHref;
   } catch (err) {
     // fallback to compiled url
     href = widgetStylesHref;

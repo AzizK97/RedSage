@@ -11,8 +11,8 @@
       <div class="rs-widget__pane-title-row">
         <span class="rs-widget__status-dot" />
         <div style="min-width: 0;">
-          <p class="rs-widget__pane-title">{{ heading }}</p>
-          <p class="rs-widget__pane-meta">{{ subheading }}</p>
+          <p class="rs-widget__pane-title">Wiouuuu</p>
+          <p class="rs-widget__pane-meta">Waaaaa333</p>
         </div>
       </div>
 

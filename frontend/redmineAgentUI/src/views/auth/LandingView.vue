@@ -13,7 +13,7 @@ import CTASection from './components/CTASection.vue';
 import FooterSection from './components/FooterSection.vue';
 
 const emit = defineEmits<{ (e: 'start-login'): void }>();
-const { isDark, toggleTheme } = useTheme();
+const { isDark } = useTheme();
 
 const bgClass = computed(() => isDark.value ? 'bg-surface-950 text-surface-200' : 'bg-surface-50 text-sage-900');
 </script>
