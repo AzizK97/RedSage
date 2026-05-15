@@ -5,8 +5,25 @@
     "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "packages/platform/src/*",
+        "packages/ui-core/src/*",
+        "packages/plugin-widget/src/*",
+        "packages/api-client/src/*"
+      ],
+      "@redsage/*": [
+        "packages/platform/src/*",
+        "packages/ui-core/src/*",
+        "packages/plugin-widget/src/*",
+        "packages/api-client/src/*"
+      ]
+      ,
+      "@redsage/ui-core/*": ["packages/ui-core/src/*"],
+      "@redsage/api-client/*": ["packages/api-client/src/*"],
+      "@redsage/platform/*": ["packages/platform/src/*"],
+      "@redsage/plugin-widget/*": ["packages/plugin-widget/src/*"]
     },
+    "allowImportingTsExtensions": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -14,5 +31,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+  "include": [
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "packages/**/*.vue",
+    "packages/**/*.d.ts"
+  ]
 }

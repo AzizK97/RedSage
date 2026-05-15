@@ -10,6 +10,10 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@redsage/ui-core': path.resolve(__dirname, './packages/ui-core/src'),
+      '@redsage/api-client': path.resolve(__dirname, './packages/api-client/src'),
+      '@redsage/platform': path.resolve(__dirname, './packages/platform/src'),
+      '@redsage/plugin-widget': path.resolve(__dirname, './packages/plugin-widget/src'),
     },
   },
   css: {
@@ -26,7 +30,7 @@ export default defineConfig(({ mode }) => ({
     outDir: mode === 'widget' ? 'dist-widget' : 'dist',
     rollupOptions: mode === 'widget'
       ? {
-        input: path.resolve(__dirname, 'src/chat-widget-entry.ts'),
+        input: path.resolve(__dirname, 'packages/chat-widget-entry.ts'),
         output: {
           entryFileNames: 'chat-widget.js',
           chunkFileNames: 'chat-widget-[name].js',

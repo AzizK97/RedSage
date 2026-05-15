@@ -84,7 +84,7 @@
               console.log('[RedmineChatWidget] Debug:', { hostname, port, isContainerHost, backendUrl })
 
               if (isContainerHost) {
-                const viteUrl = `${u.protocol}//localhost:5173/src/chat-widget-entry.ts`
+                const viteUrl = `${u.protocol}//localhost:5173/packages/chat-widget-entry.ts`
                 console.log('[RedmineChatWidget] Probing Vite dev server:', viteUrl)
                 const res = await fetch(viteUrl, { method: 'HEAD', mode: 'cors' })
                 console.log('[RedmineChatWidget] Vite probe result:', res.status, res.ok)

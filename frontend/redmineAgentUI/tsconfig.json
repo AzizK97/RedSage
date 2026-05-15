@@ -3,5 +3,35 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["vite/client"],
+    "lib": ["ES2020", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@/*": [
+        "./packages/platform/src/*",
+        "./packages/ui-core/src/*",
+        "./packages/plugin-widget/src/*",
+        "./packages/api-client/src/*"
+      ],
+      "@redsage/ui-core": ["./packages/ui-core/src/index.ts"],
+      "@redsage/ui-core/types": ["./packages/ui-core/src/types/index.ts"],
+      "@redsage/ui-core/composables": ["./packages/ui-core/src/composables/index.ts"],
+      "@redsage/ui-core/utils": ["./packages/ui-core/src/utils/index.ts"],
+      "@redsage/ui-core/*": ["./packages/ui-core/src/*"],
+      "@redsage/api-client": ["./packages/api-client/src/index.ts"],
+      "@redsage/api-client/auth": ["./packages/api-client/src/auth.ts"],
+      "@redsage/api-client/chat": ["./packages/api-client/src/chat.ts"],
+      "@redsage/api-client/admin": ["./packages/api-client/src/admin.ts"],
+      "@redsage/api-client/dashboard": ["./packages/api-client/src/dashboard.ts"],
+      "@redsage/api-client/monitoring": ["./packages/api-client/src/monitoring.ts"],
+      "@redsage/api-client/search": ["./packages/api-client/src/search.ts"],
+      "@redsage/api-client/*": ["./packages/api-client/src/*"],
+      "@redsage/platform/*": ["./packages/platform/src/*"],
+      "@redsage/plugin-widget/*": ["./packages/plugin-widget/src/*"]
+    }
+  }
 }
