@@ -64,12 +64,47 @@
           btn.disabled = true
           btn.innerHTML = 'Loading...'
 
-          // Load chat-widget.js from backend OR plugin assets
-          const scriptPath = `${backendUrl}/api/static/chat-widget.js?v=${Date.now()}`
-          
+          // Try Vite dev server module first (for local development with HMR).
+          // Falls back to the production built file under /api/static.
+          async function resolveScriptPath() {
+            const cleaned = backendUrl.replace(/\/$/, '')
+            const productionUrl = `${cleaned}/api/static/chat-widget.js?v=${Date.now()}`
+
+            try {
+              const u = new URL(cleaned)
+              const hostname = u.hostname || ''
+              const port = u.port || ''
+
+              const isContainerHost =
+                hostname === 'host.docker.internal' ||
+                hostname.endsWith('.docker.internal') ||
+                hostname === 'localhost' ||
+                (hostname !== 'localhost' && port === '8000')
+
+              console.log('[RedmineChatWidget] Debug:', { hostname, port, isContainerHost, backendUrl })
+
+              if (isContainerHost) {
+                const viteUrl = `${u.protocol}//localhost:5173/src/chat-widget-entry.ts`
+                console.log('[RedmineChatWidget] Probing Vite dev server:', viteUrl)
+                const res = await fetch(viteUrl, { method: 'HEAD', mode: 'cors' })
+                console.log('[RedmineChatWidget] Vite probe result:', res.status, res.ok)
+                if (res && res.ok) {
+                  console.log('[RedmineChatWidget] Using Vite dev server:', viteUrl)
+                  return viteUrl
+                }
+              }
+            } catch (e) {
+              console.log('[RedmineChatWidget] URL parsing failed:', e)
+            }
+
+            console.log('[RedmineChatWidget] Using production build:', productionUrl)
+            return productionUrl
+          }
+
           const script = document.createElement('script')
-          script.src = scriptPath
           script.type = 'module'
+          const scriptPath = await resolveScriptPath()
+          script.src = scriptPath
           
           script.onload = function () {
             vueLoaded = true

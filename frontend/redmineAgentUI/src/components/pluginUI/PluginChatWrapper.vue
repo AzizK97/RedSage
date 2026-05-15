@@ -3,9 +3,9 @@ import { computed, ref } from 'vue';
 import { useChat } from '../../composables/useChat';
 import type { Message } from '../../types';
 import PluginStyles from './PluginStyles.vue';
-import WidgetChatPane from './WidgetChatPane.vue';
 import WidgetHeader from './WidgetHeader.vue';
 import WidgetHistoryPage from './WidgetHistoryPage.vue';
+import WidgetChatPanel from './WidgetChatPanel.vue';
 
 interface Props {
   token: string;
@@ -41,6 +41,11 @@ const starterSuggestions = [
   'Show me what needs approval today.',
   'Which threads were updated this week?',
 ];
+
+const headerTitle = computed(() => {
+  const conversationTitle = currentConversation.value?.title?.trim();
+  return currentView.value === 'chat' && conversationTitle ? conversationTitle : 'RedSage AI Chat';
+});
 
 const threadTitle = computed(() => currentConversation.value?.title ?? '');
 const currentThreadId = threadId;
@@ -112,7 +117,7 @@ async function handleEdit(message: string) {
   <PluginStyles :expanded="isExpanded">
     <div class="redsage-widget rs-widget">
       <WidgetHeader
-        title="Redmine Chat Assist"
+        :title="headerTitle"
         subtitle="Project-aware support for your team"
         :expanded="isExpanded"
         :showBack="lastView === 'history'"
@@ -122,7 +127,7 @@ async function handleEdit(message: string) {
       />
 
       <div class="rs-widget__content">
-        <WidgetChatPane
+        <WidgetChatPanel
           v-if="currentView === 'chat'"
           :messages="messages as Message[]"
           :is-loading="isLoading"

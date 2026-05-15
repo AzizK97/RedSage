@@ -1,9 +1,26 @@
+<script setup lang="ts">
+import { Maximize2, Minimize2, X, ArrowLeft, LampCeiling } from 'lucide-vue-next';
+
+defineProps<{
+  title: string;
+  subtitle: string;
+  expanded: boolean;
+  showBack?: boolean;
+}>();
+
+defineEmits<{
+  (event: 'close'): void;
+  (event: 'toggle-expand'): void;
+  (event: 'back'): void;
+}>();
+</script>
+
 <template>
   <header class="rs-widget__header">
     <div class="rs-widget__brand">
       <div class="rs-widget__brand-row">
         <div class="rs-widget__brand-logo" aria-hidden="true">
-          <MessageCircleMore :size="18" />
+          <LampCeiling :size="18" />
         </div>
         <button
           v-if="showBack"
@@ -44,19 +61,3 @@
   </header>
 </template>
 
-<script setup lang="ts">
-import { MessageCircleMore, Maximize2, Minimize2, X, ArrowLeft } from 'lucide-vue-next';
-
-defineProps<{
-  title: string;
-  subtitle: string;
-  expanded: boolean;
-  showBack?: boolean;
-}>();
-
-defineEmits<{
-  (event: 'close'): void;
-  (event: 'toggle-expand'): void;
-  (event: 'back'): void;
-}>();
-</script>

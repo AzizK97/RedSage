@@ -27,18 +27,19 @@
                 <span class="rs-widget__history-item-title">{{ conversation.title || conversation.thread_id }}</span>
                 <span class="rs-widget__history-item-preview">{{ conversation.preview || 'No preview available' }}</span>
               </span>
+            </button>
 
+            <div class="rs-widget__history-meta">
               <span class="rs-widget__history-time">{{ formatRelativeDate(conversation.updated_at) }}</span>
-            </button>
-
-            <button
-              type="button"
-              class="rs-widget__history-delete"
-              :aria-label="`Delete ${conversation.thread_id}`"
-              @click="$emit('delete', conversation.thread_id)"
-            >
-              <Trash2 :size="14" />
-            </button>
+              <button
+                type="button"
+                class="rs-widget__history-delete"
+                :aria-label="`Delete ${conversation.thread_id}`"
+                @click="$emit('delete', conversation.thread_id)"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </div>
           </article>
         </div>
       </div>
@@ -48,7 +49,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { History, MessagesSquare, Trash2 } from 'lucide-vue-next';
+import { History, Trash2 } from 'lucide-vue-next';
 import type { ThreadSummary } from '../../types';
 
 const props = defineProps<{

@@ -43,7 +43,7 @@ function handleLogin(payload: { token: string; role: PlatformRole; fullName: str
 
 function handleLogout() {
   clearSession();
-  void router.replace({ name: "landing" });
+  void router.replace({ name: "login" });
 }
 
 function startLogin() {

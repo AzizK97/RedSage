@@ -18,13 +18,14 @@
       title="New thread"
       @click="$emit('new')"
     >
-      <Plus :size="22" />
+       Ask a question
+       <CircleQuestionMark :stroke-width="1.5" />
     </button>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Plus } from 'lucide-vue-next';
+import { CircleQuestionMark } from 'lucide-vue-next';
 import type { ThreadSummary } from '../../types';
 import WidgetConversationList from './WidgetConversationList.vue';
 

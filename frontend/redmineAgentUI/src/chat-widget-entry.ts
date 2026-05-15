@@ -12,10 +12,15 @@ function ensureWidgetStyles(backendUrl?: string) {
   if (document.getElementById('redmine-chat-widget-styles')) {
     return;
   }
+  // If backendUrl points to a local Vite dev server, skip adding the
+  // built stylesheet because Vite will inject styles via HMR.
+  if (backendUrl && backendUrl.includes(':5173')) {
+    return;
+  }
 
   let href = widgetStylesHref;
   try {
-    href = backendUrl ? new URL(widgetStylesHref, backendUrl).toString() : widgetStylesHref;
+    href = new URL(widgetStylesHref, import.meta.url).toString()
   } catch (err) {
     // fallback to compiled url
     href = widgetStylesHref;
