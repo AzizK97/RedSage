@@ -21,7 +21,10 @@ const links = [
   { label: 'Pricing', href: '#pricing' },
 ];
 
-const emit = defineEmits(['start-login']);
+const emit = defineEmits<{
+  (e: 'start-login'): void;
+  (e: 'start-onboarding'): void;
+}>();
 </script>
 
 <template>
@@ -47,10 +50,11 @@ const emit = defineEmits(['start-login']);
           class="text-sm font-medium px-4 py-2 rounded-lg text-sage-700 dark:text-surface-300 hover:bg-sage-50 dark:hover:bg-surface-800/50 transition-colors">
           Sign In
         </button>
-        <a href="#pricing"
+        <button
+          @click="emit('start-onboarding')"
           class="text-sm font-medium px-4 py-2 rounded-lg bg-copper-600 text-white hover:bg-copper-500 transition-colors shadow-md shadow-copper-300/30 dark:shadow-copper-700/25">
           Start Free Trial
-        </a>
+        </button>
       </div>
 
       <div class="flex md:hidden items-center gap-2">
@@ -68,8 +72,12 @@ const emit = defineEmits(['start-login']);
     <div v-if="mobileOpen" class="md:hidden bg-white/95 dark:bg-surface-950/95 backdrop-blur-xl border-t border-sage-100 dark:border-surface-800 px-6 py-4 space-y-3">
       <a v-for="l in links" :key="l.href" :href="l.href" @click="mobileOpen = false"
         class="block text-sm text-surface-600 dark:text-surface-400 hover:text-sage-700 dark:hover:text-sage-300 py-2">{{ l.label }}</a>
-      <a href="#pricing" @click="mobileOpen = false"
-        class="block text-sm font-medium text-copper-600 dark:text-copper-400 py-2">Start Free Trial</a>
+      <button
+        @click="mobileOpen = false; emit('start-onboarding')"
+        class="block text-sm font-medium text-copper-600 dark:text-copper-400 py-2"
+      >
+        Start Free Trial
+      </button>
     </div>
   </nav>
 </template>

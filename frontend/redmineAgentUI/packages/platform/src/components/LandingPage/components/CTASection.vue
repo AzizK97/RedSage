@@ -17,6 +17,8 @@ const secondaryButtonClass = computed(() =>
     ? 'bg-surface-900/50 border-surface-700 text-surface-300 hover:border-sage-500/40 hover:text-white'
     : 'bg-white/70 border-sage-300/40 text-sage-900 hover:border-sage-500/60 hover:text-sage-900'
 );
+
+const emit = defineEmits<{ (e: 'start-onboarding'): void }>();
 </script>
 
 <template>
@@ -38,10 +40,11 @@ const secondaryButtonClass = computed(() =>
           Join teams using RedSage to manage Redmine through natural language. Free to start, powerful at scale.
         </p>
         <div class="flex flex-wrap justify-center gap-4">
-          <a href="#pricing"
+          <button
+            @click="emit('start-onboarding')"
             class="group inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-copper-600 text-white font-bold text-lg hover:bg-copper-500 transition-all shadow-xl shadow-copper-300/30 dark:shadow-copper-700/25 hover:shadow-copper-400/30">
             Start Free Trial <ArrowRight :size="20" class="group-hover:translate-x-0.5 transition-transform" />
-          </a>
+          </button>
           <a href="#features"
             class="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl border font-bold text-lg transition-all" :class="secondaryButtonClass">
             Explore Features

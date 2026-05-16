@@ -96,6 +96,13 @@ async function submitLogin() {
         <button type="button" @click="emit('back')" class="w-full px-4 py-2.5 bg-surface-800/50 hover:bg-surface-800 text-surface-300 hover:text-surface-200 font-semibold rounded-lg transition-colors border border-surface-700">
           Back to landing
         </button>
+
+        <p class="text-center text-sm text-surface-400">
+          Need an account?
+          <RouterLink to="/signup" class="font-semibold text-copper-400 hover:text-copper-300 transition-colors">
+            Start free trial
+          </RouterLink>
+        </p>
       </form>
       <!-- <button class="secondary-btn" type="button" @click="signInWithRedmine">
         Sign in with Redmine

@@ -9,6 +9,7 @@ const dashboardDark = new URL('../../../../../ui-core/src/assets/dashboard-view.
 const dashboardLight = new URL('../../../../../ui-core/src/assets/dashboard-view-light.png', import.meta.url).href;
 
 const imageUrl = computed(() => isDark.value ? dashboardDark : dashboardLight);
+const emit = defineEmits<{ (e: 'start-onboarding'): void }>();
 
 </script>
 
@@ -39,10 +40,11 @@ const imageUrl = computed(() => isDark.value ? dashboardDark : dashboardLight);
         </p>
 
         <div class="animate-slide-up-delayed-2 flex flex-wrap justify-center gap-4 mt-10">
-          <a href="#pricing"
+          <button
+            @click="emit('start-onboarding')"
             class="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-copper-600 text-white font-semibold hover:bg-copper-500 transition-all shadow-lg shadow-copper-300/30 dark:shadow-copper-700/25 hover:shadow-copper-400/30">
             Start Free Trial <ArrowRight :size="16" class="group-hover:translate-x-0.5 transition-transform" />
-          </a>
+          </button>
           <a href="#features"
             class="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-sage-200 dark:border-surface-700 text-sage-700 dark:text-surface-300 font-semibold hover:border-sage-300 dark:hover:border-sage-500/40 hover:bg-sage-50 dark:hover:bg-surface-900/50 transition-all bg-white/60 dark:bg-surface-900/50">
             <Play :size="16" /> See How It Works

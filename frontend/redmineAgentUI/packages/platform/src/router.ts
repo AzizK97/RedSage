@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useSession } from '@redsage/ui-core/composables/useSession';
 import LandingView from './views/LandingView.vue';
 import LoginView from './views/auth/LoginView.vue';
+import SignupView from './views/auth/SignupView.vue';
 import RedmineCallback from './views/auth/RedmineCallback.vue';
 import DashboardView from './views/DashboardView.vue';
 import ChatInterface from './components/Dashboard/ChatInterface.vue';
@@ -12,6 +13,7 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'landing', component: LandingView },
     { path: '/login', name: 'login', component: LoginView },
+    { path: '/signup', name: 'signup', component: SignupView },
     { path: '/auth/redmine/callback', name: 'oauth-callback', component: RedmineCallback },
     { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
     { path: '/chat', name: 'chat', component: ChatInterface, meta: { requiresAuth: true } },
@@ -28,7 +30,7 @@ router.beforeEach((to) => {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
 
-  if ((to.name === 'landing' || to.name === 'login') && isAuthenticated.value) {
+  if ((to.name === 'landing' || to.name === 'login' || to.name === 'signup') && isAuthenticated.value) {
     return { name: 'dashboard' };
   }
 

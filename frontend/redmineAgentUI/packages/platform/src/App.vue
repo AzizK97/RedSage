@@ -28,9 +28,11 @@ const isOAuthCallback = computed(() => route.name === "oauth-callback");
 
 const isLanding = computed(() => route.name === "landing");
 const isLogin = computed(() => route.name === "login");
+const isSignup = computed(() => route.name === "signup");
+const isPublicRoute = computed(() => isLanding.value || isLogin.value || isSignup.value);
 
 watch(isAuthenticated, (authenticated) => {
-  if (authenticated && (route.name === "landing" || route.name === "login")) {
+  if (authenticated && (route.name === "landing" || route.name === "login" || route.name === "signup")) {
     void router.replace({ name: "dashboard" });
   }
 }, { immediate: true });
@@ -62,7 +64,7 @@ function handleNavigate(view: "dashboard" | "chat" | "profile" | "thread", threa
 <template>
   <RedmineCallback v-if="isOAuthCallback" />
   <main v-else-if="!isAuthenticated" class="app-shell">
-    <RouterView v-if="isLanding || isLogin" v-slot="{ Component }">
+    <RouterView v-if="isPublicRoute" v-slot="{ Component }">
       <component
         :is="Component"
         v-if="Component"
