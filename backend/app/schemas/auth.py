@@ -17,3 +17,13 @@ class MeResponse(BaseModel):
     redmine_user_id: int
     role: str
     enabled: bool
+
+
+class RedmineConnectRequest(BaseModel):
+    redmine_url: str | None = None
+    api_key: str
+
+
+class RedmineConnectRequest(BaseModel):
+    redmine_url: str | None = None
+    api_key: str

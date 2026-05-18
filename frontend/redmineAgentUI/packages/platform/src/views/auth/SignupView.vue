@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+import { authApi } from "@redsage/api-client/auth";
+import type { PlatformRole } from "@redsage/ui-core/composables/useSession";
 import {
   ArrowLeft,
   ArrowRight,
@@ -37,6 +39,12 @@ const apiKey = ref("");
 const showKey = ref(false);
 const connecting = ref(false);
 const copied = ref(false);
+const connectError = ref("");
+
+const emit = defineEmits<{
+  (event: "login", payload: { token: string; role: PlatformRole; fullName: string }): void;
+  (event: "back"): void;
+}>();
 
 const canContinueAccount = computed(() => {
   return name.value.trim().length > 0 && /\S+@\S+\.\S+/.test(email.value) && password.value.length >= 8;
@@ -54,11 +62,36 @@ function prev() {
   step.value = Math.max(0, step.value - 1) as Step;
 }
 
+function decodeRoleFromToken(token: string): PlatformRole {
+  const segments = token.split(".");
+  if (segments.length < 2) {
+    throw new Error("Invalid token format");
+  }
+
+  const payloadSegment = segments[1]
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  const paddedPayload = payloadSegment.padEnd(payloadSegment.length + ((4 - (payloadSegment.length % 4)) % 4), "=");
+  const decoded = JSON.parse(atob(paddedPayload)) as { role?: string };
+  if (decoded.role !== "admin" && decoded.role !== "project_manager") {
+    throw new Error("Unsupported role in token");
+  }
+  return decoded.role;
+}
+
 async function handleConnect() {
+  connectError.value = "";
   connecting.value = true;
-  await new Promise((resolve) => setTimeout(resolve, 1100));
-  connecting.value = false;
-  step.value = 3;
+  try {
+    const result = await authApi.redmineConnect(redmineUrl.value.trim() || undefined, apiKey.value.trim());
+    const role = decodeRoleFromToken(result.access_token);
+    emit("login", { token: result.access_token, role, fullName: result.full_name });
+  } catch (err) {
+    connectError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    connecting.value = false;
+  }
 }
 
 async function copyApiKey() {
@@ -109,7 +142,7 @@ function goToLanding() {
           </p>
         </div>
 
-        <ol v-if="step < 3" class="flex items-center justify-between gap-2">
+        <ol v-if="step < 2" class="flex justify-between pl-20 gap-20">
           <li v-for="(item, index) in steps" :key="item.id" class="flex flex-1 items-center gap-2">
             <div
               :class="[
@@ -253,7 +286,7 @@ function goToLanding() {
                 <p v-if="copied" class="text-xs text-emerald-400">API key copied to clipboard.</p>
               </label>
 
-              <a href="#" class="inline-flex items-center gap-1.5 text-sm text-copper-400 hover:text-copper-300 transition-colors" @click.prevent="step = 2">
+              <a href="#" class="inline-flex items-center gap-1.5 text-sm text-copper-400 hover:text-copper-300 transition-colors" @click.prevent="step = 1">
                 <ShieldCheck :size="14" /> Where do I find my API key?
               </a>
             </div>
@@ -272,6 +305,7 @@ function goToLanding() {
                 {{ connecting ? 'Connecting…' : 'Connect Redmine' }}
               </button>
             </div>
+            <p v-if="connectError" class="mt-3 p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-700/50 rounded-lg text-rose-700 dark:text-rose-300 text-sm">{{ connectError }}</p>
           </section>
 
           <section v-else class="space-y-6 text-center">

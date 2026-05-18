@@ -74,11 +74,31 @@ class UserRepository:
             redmine_user_id: int,
             email: str,
             full_name: str,
-            platform_role: str = "member",
-    ) -> dict: 
+            platform_role: str | None = None,
+    ) -> dict:
+        """Mirror a Redmine user into the platform.
+
+        Behavior (hybrid safe mode):
+        - If the user exists, update `email` and `full_name` always.
+        - Update `platform_role` only when `platform_role` is not None.
+          Additionally, never demote an existing `admin` to a non-admin role
+          (i.e. if existing role is 'admin' and incoming role is not 'admin', keep existing).
+        - If the user does not exist, insert a new row using the provided
+          `platform_role` or default to 'member'.
+        """
         existing = self.get_by_redmine_user_id(redmine_user_id)
 
         if existing:
+            # Determine whether to update platform_role
+            new_role = existing["platform_role"]
+            if platform_role is not None:
+                # Do not demote an admin via an ordinary login/update
+                if existing["platform_role"] == "admin" and platform_role != "admin":
+                    # preserve admin
+                    new_role = existing["platform_role"]
+                else:
+                    new_role = platform_role
+
             with self.db.cursor() as cur:
                 cur.execute(
                     """
@@ -86,18 +106,20 @@ class UserRepository:
                     SET email = %s, full_name = %s, platform_role = %s
                     WHERE redmine_user_id = %s
                     """,
-                    (email, full_name, platform_role, redmine_user_id),
+                    (email, full_name, new_role, redmine_user_id),
                 )
             self.db.commit()
             return self.get_by_redmine_user_id(redmine_user_id)
-        
+
+        # Insert new user
+        insert_role = platform_role if platform_role is not None else "member"
         with self.db.cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO redmine_users (id, redmine_user_id, email, full_name, platform_role)
                 VALUES (%s, %s, %s, %s, %s)
                 """,
-                (str(uuid.uuid4()), redmine_user_id, email, full_name, platform_role),
+                (str(uuid.uuid4()), redmine_user_id, email, full_name, insert_role),
             )
         self.db.commit()
         return self.get_by_redmine_user_id(redmine_user_id)

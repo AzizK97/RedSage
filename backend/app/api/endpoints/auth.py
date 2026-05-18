@@ -12,7 +12,7 @@ from app.dependencies.db import get_db
 from app.integrations.redmine_client import redmine_client
 from app.repositories.entitlement_repository import EntitlementRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import LoginRequest, LoginResponse, MeResponse
+from app.schemas.auth import LoginRequest, LoginResponse, MeResponse, RedmineConnectRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -44,6 +44,18 @@ def login(payload: LoginRequest, db: Connection = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User is not provisioned on the platform. Contact an admin.",
         )
+
+    # Detect Redmine admin and promote on login if needed (hybrid safe mode)
+    try:
+        is_admin = bool(redmine_user.get("admin"))
+    except Exception:
+        is_admin = False
+
+    if user:
+        # Update email/full_name and promote to admin if Redmine indicates admin.
+        user = users.mirror_user_from_redmine(redmine_user_id, redmine_user.get("mail", ""),
+                                             " ".join([redmine_user.get("firstname", ""), redmine_user.get("lastname", "")]).strip(),
+                                             "admin" if is_admin else None)
 
     enabled = ents.is_enabled(user["id"])
     if not enabled:
@@ -141,7 +153,8 @@ def redmine_callback(request: Request, code: str | None = None, db: Connection =
 
     users = UserRepository(db)
     ents = EntitlementRepository(db)
-    local_user = users.mirror_user_from_redmine(redmine_user_id, email, full_name)
+    is_admin = bool(user_obj.get("admin"))
+    local_user = users.mirror_user_from_redmine(redmine_user_id, email, full_name, "admin" if is_admin else None)
 
     enabled = ents.is_enabled(local_user["id"])
     if not enabled:
@@ -166,4 +179,55 @@ def redmine_callback(request: Request, code: str | None = None, db: Connection =
         return RedirectResponse(url)
 
     # Fallback: return JSON payload
+    return LoginResponse(access_token=token, full_name=local_user["full_name"])
+
+
+@router.post("/redmine/connect", response_model=LoginResponse)
+def redmine_connect(payload: RedmineConnectRequest, db: Connection = Depends(get_db)):
+    settings = get_settings()
+
+    base = (payload.redmine_url or settings.REDMINE_URL or "").rstrip("/")
+    if not base:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redmine base URL is required")
+
+    api_key = (payload.api_key or "").strip()
+    if not api_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="API key is required")
+
+    # Try X-Redmine-API-Key first (typical), fall back to Bearer
+    headers = {"X-Redmine-API-Key": api_key}
+    user_resp = requests.get(f"{base}/users/current.json", headers=headers, timeout=20)
+    if user_resp.status_code == 401:
+        # Try Bearer authorization
+        user_resp = requests.get(f"{base}/users/current.json", headers={"Authorization": f"Bearer {api_key}"}, timeout=20)
+
+    if user_resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch Redmine user: {user_resp.text}")
+
+    user_obj = user_resp.json().get("user")
+    if not user_obj:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve Redmine user information")
+
+    redmine_user_id = int(user_obj.get("id", 0))
+    email = user_obj.get("mail") or ""
+    full_name = " ".join([user_obj.get("firstname", ""), user_obj.get("lastname", "")]).strip()
+
+    users = UserRepository(db)
+    ents = EntitlementRepository(db)
+    is_admin = bool(user_obj.get("admin"))
+    local_user = users.mirror_user_from_redmine(redmine_user_id, email, full_name, "admin" if is_admin else None)
+
+    enabled = ents.is_enabled(local_user["id"])
+    if not enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access disabled by Admin")
+
+    token = create_access_token(
+        {
+            "sub": local_user["id"],
+            "redmine_user_id": local_user["redmine_user_id"],
+            "role": local_user["platform_role"],
+            "email": local_user["email"],
+        }
+    )
+
     return LoginResponse(access_token=token, full_name=local_user["full_name"])
