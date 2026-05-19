@@ -17,6 +17,7 @@ class Settings:
     ENV: str = os.getenv("ENV", "dev")
 
     PLATFORM_POSTGRES_URL: str = os.getenv("PLATFORM_POSTGRES_URL", "")
+    POSTGRES_URL: str = os.getenv("POSTGRES_URL", "")
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6380/0")
     REDMINE_URL: str = os.getenv("REDMINE_URL", "")
     REDMINE_API_KEY: str = os.getenv("REDMINE_API_KEY", "")

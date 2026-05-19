@@ -194,6 +194,56 @@ class RedmineClient:
 
         return unique_identifiers
 
+    def list_managed_project_identifiers_for_user_strict(self, redmine_user_id: int) -> list[str]:
+        """Return project identifiers where user has a managerial role (no fallback).
+        
+        Unlike list_managed_project_identifiers_for_user(), this does NOT fall back to 
+        member-only projects if no manager roles are found. Only returns projects where 
+        the user has an explicit managerial role (manager, lead, owner, chef, responsable).
+        
+        Use this for strict PM classification during user sync.
+        """
+        managed_identifiers: list[str] = []
+
+        for project in self.list_projects():
+            project_identifier = project.get("identifier")
+            if not project_identifier:
+                continue
+
+            url = f"{self.base_url}/projects/{project_identifier}/memberships.json"
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            if resp.status_code >= 400:
+                raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+            memberships = resp.json().get("memberships", [])
+            for membership in memberships:
+                member_user = membership.get("user") or {}
+                if member_user.get("id") != redmine_user_id:
+                    continue
+
+                roles = membership.get("roles") or []
+                has_manager_role = any(
+                    any(
+                        keyword in str(role.get("name", "")).lower()
+                        for keyword in ("manager", "lead", "owner", "chef", "responsable")
+                    )
+                    for role in roles
+                )
+                if has_manager_role:
+                    managed_identifiers.append(project_identifier)
+                break
+
+        seen: set[str] = set()
+        unique_identifiers: list[str] = []
+        for identifier in managed_identifiers:
+            normalized = (identifier or "").strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_identifiers.append(normalized)
+
+        return unique_identifiers
+
     def list_managed_projects_for_user(self, redmine_user_id: int) -> list[str]:
         """Return project names for a PM user."""
         identifiers = set(self.list_managed_project_identifiers_for_user(redmine_user_id))

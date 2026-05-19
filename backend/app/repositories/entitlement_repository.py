@@ -33,6 +33,20 @@ class EntitlementRepository:
 
         return bool(row[0]) if row else False
 
+    def has_access_record(self, user_id: str) -> bool:
+        with self.db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM entitlements
+                WHERE user_id = %s
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+
+        return row is not None
+
     def get_access_state(self, user_id: str) -> dict:
         with self.db.cursor() as cur:
             cur.execute(

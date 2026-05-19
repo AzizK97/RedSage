@@ -12,9 +12,50 @@ from app.dependencies.db import get_db
 from app.integrations.redmine_client import redmine_client
 from app.repositories.entitlement_repository import EntitlementRepository
 from app.repositories.user_repository import UserRepository
+from app.services.user_sync_service import UserSyncService
 from app.schemas.auth import LoginRequest, LoginResponse, MeResponse, RedmineConnectRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def _json_or_400(resp: requests.Response, context: str) -> dict:
+    try:
+        payload = resp.json()
+    except ValueError:
+        content_type = resp.headers.get("content-type", "unknown")
+        snippet = (resp.text or "").strip().replace("\n", " ")[:220]
+        if not snippet:
+            snippet = "<empty body>"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{context} returned non-JSON response "
+                f"(status={resp.status_code}, content-type={content_type}). "
+                f"Body starts with: {snippet}"
+            ),
+        )
+
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{context} returned unexpected JSON shape (expected object)",
+        )
+
+    return payload
+
+
+def _bootstrap_first_admin_access(ents: EntitlementRepository, user_id: str, is_admin: bool) -> None:
+    if not is_admin:
+        return
+    if ents.has_access_record(user_id):
+        return
+    ents.set_access(user_id, True, admin_user_id="system_auto_admin")
+
+
+def _sync_directory_if_admin(db: Connection, is_admin: bool) -> None:
+    if not is_admin:
+        return
+    UserSyncService(db).sync_all_active_users()
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -38,24 +79,34 @@ def login(payload: LoginRequest, db: Connection = Depends(get_db)):
 
     users = UserRepository(db)
     ents = EntitlementRepository(db)
-    user = users.get_by_redmine_user_id(redmine_user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User is not provisioned on the platform. Contact an admin.",
-        )
-
     # Detect Redmine admin and promote on login if needed (hybrid safe mode)
     try:
         is_admin = bool(redmine_user.get("admin"))
     except Exception:
         is_admin = False
 
+    user = users.get_by_redmine_user_id(redmine_user_id)
+    if not user:
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not provisioned on the platform. Contact an admin.",
+            )
+        user = users.mirror_user_from_redmine(
+            redmine_user_id,
+            redmine_user.get("mail", ""),
+            " ".join([redmine_user.get("firstname", ""), redmine_user.get("lastname", "")]).strip(),
+            "admin",
+        )
+
     if user:
         # Update email/full_name and promote to admin if Redmine indicates admin.
         user = users.mirror_user_from_redmine(redmine_user_id, redmine_user.get("mail", ""),
                                              " ".join([redmine_user.get("firstname", ""), redmine_user.get("lastname", "")]).strip(),
                                              "admin" if is_admin else None)
+
+    _bootstrap_first_admin_access(ents, user["id"], is_admin)
+    _sync_directory_if_admin(db, is_admin)
 
     enabled = ents.is_enabled(user["id"])
     if not enabled:
@@ -133,7 +184,7 @@ def redmine_callback(request: Request, code: str | None = None, db: Connection =
     if resp.status_code >= 400:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Token exchange failed: {resp.text}")
 
-    token_payload = resp.json()
+    token_payload = _json_or_400(resp, "Redmine token endpoint")
     access_token = token_payload.get("access_token")
     if not access_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No access token returned by Redmine")
@@ -143,7 +194,8 @@ def redmine_callback(request: Request, code: str | None = None, db: Connection =
     if user_resp.status_code >= 400:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch Redmine user: {user_resp.text}")
 
-    user_obj = user_resp.json().get("user")
+    user_payload = _json_or_400(user_resp, "Redmine current-user endpoint")
+    user_obj = user_payload.get("user")
     if not user_obj:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve Redmine user information")
 
@@ -155,6 +207,8 @@ def redmine_callback(request: Request, code: str | None = None, db: Connection =
     ents = EntitlementRepository(db)
     is_admin = bool(user_obj.get("admin"))
     local_user = users.mirror_user_from_redmine(redmine_user_id, email, full_name, "admin" if is_admin else None)
+    _bootstrap_first_admin_access(ents, local_user["id"], is_admin)
+    _sync_directory_if_admin(db, is_admin)
 
     enabled = ents.is_enabled(local_user["id"])
     if not enabled:
@@ -204,7 +258,8 @@ def redmine_connect(payload: RedmineConnectRequest, db: Connection = Depends(get
     if user_resp.status_code >= 400:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch Redmine user: {user_resp.text}")
 
-    user_obj = user_resp.json().get("user")
+    user_payload = _json_or_400(user_resp, "Redmine current-user endpoint")
+    user_obj = user_payload.get("user")
     if not user_obj:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to resolve Redmine user information")
 
@@ -216,6 +271,8 @@ def redmine_connect(payload: RedmineConnectRequest, db: Connection = Depends(get
     ents = EntitlementRepository(db)
     is_admin = bool(user_obj.get("admin"))
     local_user = users.mirror_user_from_redmine(redmine_user_id, email, full_name, "admin" if is_admin else None)
+    _bootstrap_first_admin_access(ents, local_user["id"], is_admin)
+    _sync_directory_if_admin(db, is_admin)
 
     enabled = ents.is_enabled(local_user["id"])
     if not enabled:

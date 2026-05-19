@@ -16,7 +16,7 @@ from app.agent.supervisor import (
 from app.agent.tools.read import set_session_user, clear_session_user
 from app.core.rbac import Permission, Role
 from app.dependencies.auth import CurrentUser, require_permission
-from app.dependencies.db import get_db
+from app.dependencies.db import get_db, get_agent_db
 from app.repositories.thread_message_repository import ThreadMessageRepository
 from app.repositories.thread_repository import ThreadRepository
 from app.services.chat_persistence import (
@@ -159,7 +159,7 @@ def _raise_http_from_exception(exc: Exception) -> None:
 async def chat_endpoint(
     request: ChatRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     ensure_thread_tables(db)
     ensure_thread_owner(db, request.thread_id, current.id)
@@ -199,7 +199,7 @@ async def chat_endpoint(
 async def chat_stream_endpoint(
     request: ChatRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     """
     Streaming chat endpoint using Server-Sent Events.
@@ -233,7 +233,7 @@ async def approve_endpoint(
     thread_id: str, 
     request: ApproveRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     app = get_app()
     config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
@@ -277,7 +277,7 @@ async def approve_endpoint(
 async def delete_thread_endpoint(
     thread_id: str,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     """Delete a thread's entire checkpoint history from PostgreSQL."""
     ensure_thread_tables(db)
@@ -300,7 +300,7 @@ async def delete_thread_endpoint(
 async def check_thread_endpoint(
     thread_id: str,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     """Diagnostic endpoint: Check if a thread has checkpoints in PostgreSQL."""
     ensure_thread_tables(db)
@@ -339,7 +339,7 @@ async def check_thread_endpoint(
 @router.post("/chat/thread", response_model=CreateThreadResponse)
 def create_thread_endpoint(
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     ensure_thread_tables(db)
     thread_id = ThreadRepository(db).create_thread(current.id)
@@ -349,7 +349,7 @@ def create_thread_endpoint(
 @router.get("/chat/threads", response_model=List[ThreadListItem])
 def list_threads_endpoint(
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     ensure_thread_tables(db)
     rows = ThreadRepository(db).list_for_owner(current.id)
@@ -368,7 +368,7 @@ def list_threads_endpoint(
 def get_thread_messages_endpoint(
     thread_id: str,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     ensure_thread_tables(db)
     ensure_thread_owner(db, thread_id, current.id)

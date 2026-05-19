@@ -4,7 +4,7 @@ from psycopg import Connection
 
 from app.dependencies.auth import CurrentUser, require_permission
 from app.core.rbac import Permission, Role
-from app.dependencies.db import get_db
+from app.dependencies.db import get_db, get_agent_db
 from app.repositories.thread_message_repository import ThreadMessageRepository
 from app.repositories.thread_repository import ThreadRepository
 from app.agent.cache import get_cached_sync
@@ -20,7 +20,7 @@ def search_endpoint(
     limit: int = 20,
     offset: int = 0,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
-    db: Connection = Depends(get_db),
+    db: Connection = Depends(get_agent_db),
 ):
     """Search messages or threads. Results are restricted by the caller's allowed projects (PMs).
 

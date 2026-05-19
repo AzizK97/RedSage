@@ -1,12 +1,14 @@
 import os
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
+# from langchain_ollama import ChatOllama
+# from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from typing import Any
 
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.postgres import PostgresSaver
 import psycopg
 
@@ -72,6 +74,12 @@ def create_llm() -> ChatOpenAI:
         temperature=0,
         max_tokens=800
     )
+
+# def create_llm() -> ChatGroq:
+#     return ChatGroq(
+#         model=os.getenv("GROQ_MODEL_NAME","gpt-4o"),
+#         temperature=0
+#     )
 
 # def create_llm() -> ChatOllama:
 #     return ChatOllama(
