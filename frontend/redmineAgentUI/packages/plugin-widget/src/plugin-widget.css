@@ -94,10 +94,16 @@
 
 .rs-widget__title {
   margin: 0;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: #ffffff;
   letter-spacing: 0.1px;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rs-widget__subtitle {
@@ -561,7 +567,8 @@
    9. COMPOSER / INPUT AREA
    ================================================ */
 .rs-widget__composer {
-  /* padding: 12px 14px 14px; */
+  /* Add spacing between messages panel and composer shell to avoid cramped input */
+  padding: 12px 14px 14px;
   border-top: 1px solid var(--rs-border);
   background: transparent;
   width: 100%;
@@ -575,7 +582,7 @@
   border-radius: 18px;
   border: 1px solid var(--rs-border);
   background: rgba(255, 255, 255, 0.03);
-  padding: 9px 10px 9px 12px;
+  padding: 12px 12px 12px 14px;
 }
 
 .rs-widget__composer-shell:focus-within {
@@ -591,6 +598,11 @@
   color: var(--rs-text);
   font-size: 13px;
   line-height: 1.4;
+}
+
+/* Small inner padding so text isn't flush to the left edge */
+.rs-widget__composer-input {
+  padding-left: 4px;
 }
 
 .rs-widget__composer-input:focus {

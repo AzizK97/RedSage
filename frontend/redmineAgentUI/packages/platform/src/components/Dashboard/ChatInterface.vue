@@ -53,11 +53,29 @@ watch(
 const isVirginChat = computed(() => messages.value.length === 0);
 const visibleError = computed(() => error.value || syncError.value);
 const virginDraft = ref("");
+const hideThinkingBar = ref(false);
 const starterSuggestions = [
   "Give me a list of all the projects",
-  "List high-priority issues assigned to me",
+  "List high-priority tasks that are due this week",
   "Summarize overdue tasks and next actions",
 ];
+
+const showThinkingBar = computed(
+  () => isLoading.value && showLoadingStatus.value && !hideThinkingBar.value,
+);
+
+watch(
+  () => isLoading.value,
+  (loadingNow) => {
+    if (loadingNow) {
+      hideThinkingBar.value = false;
+    }
+  },
+);
+
+function onSkipThinkingBar() {
+  hideThinkingBar.value = true;
+}
 
 function setSuggestionDraft(suggestion: string) {
   virginDraft.value = suggestion;
@@ -192,19 +210,18 @@ async function removeConversation(threadId: string) {
             </div>
 
             <div class="h-full overflow-hidden">
-               <MessageList :messages="messages" />
-            </div>
-            
-            <div v-if="isLoading && showLoadingStatus" class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-surface-900/80 backdrop-blur-md border border-surface-800 px-4 py-2.5 rounded-full flex items-center gap-3 shadow-xl z-10 animate-bounce">
-              <div class="flex gap-1">
-                <div v-for="i in 3" :key="i" class="w-1.5 h-1.5 rounded-full bg-sage-400 animate-bounce" :style="{ animationDelay: `${i * 0.1}s` }" />
-              </div>
-              <span class="text-[10px] font-black text-surface-300 uppercase tracking-widest">{{ loadingStatus }}</span>
+               <MessageList
+                :messages="messages"
+                :show-thinking-bar="showThinkingBar"
+                :loading-status="loadingStatus"
+                @skip-thinking="onSkipThinkingBar"
+              />
             </div>
           </div>
 
-          <div class="px-6 py-4">
+          <div class="px-6 py-4 bg-transparent">
              <ApprovalDialog
+                :token="token"
               :interrupt="pendingInterrupt"
               :disabled="isLoading"
               @approve="onApprove"

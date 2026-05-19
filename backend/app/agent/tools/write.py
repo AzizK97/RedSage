@@ -96,6 +96,7 @@ def _put(endpoint: str, payload: dict) -> dict:
 def create_issue(
     project_id:     str,
     subject:        str,
+    tracker_id:     int | str | None = None,
     description:    str  = None,
     assigned_to_id: int | str | None  = None,
     priority_id:    int | str  = 4,
@@ -110,6 +111,7 @@ def create_issue(
 
     Args:
         project_id:     Project identifier  e.g. 'ai-chatbot-platform'
+        tracker_id:     Tracker ID to use for the issue (string or integer)
         subject:        Title of the issue
         description:    Detailed description of the issue
         assigned_to_id: User ID to assign the issue to (string or integer)
@@ -121,10 +123,13 @@ def create_issue(
     """
     issue: dict = {
         "project_id": project_id,
+        "tracker_id": _as_str_id(tracker_id) if tracker_id is not None else None,
         "subject":    subject,
         "priority_id": _as_str_id(priority_id),
         "status_id":   _as_str_id(status_id),
     }
+    if issue["tracker_id"] is None:
+        issue.pop("tracker_id")
     if description:    issue["description"]    = description
     if assigned_to_id is not None: issue["assigned_to_id"] = _as_str_id(assigned_to_id)
     if version_id is not None:     issue["fixed_version_id"] = _as_str_id(version_id)

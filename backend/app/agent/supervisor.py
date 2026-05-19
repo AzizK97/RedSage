@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
 from langchain.agents import create_agent
-# from langchain_ollama import ChatOllama
+from langchain_ollama import ChatOllama
 # from langchain_openai import ChatOpenAI
-from langchain_groq import ChatGroq
+# from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from typing import Any
@@ -66,14 +66,14 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 
     return config
 
-def create_llm() -> ChatOpenAI:
-    return ChatOpenAI(
-        model=os.getenv("MODEL_NAME","openrouter/auto"),
-        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-        openai_api_base=os.getenv("OPENROUTER_BASE_URL"),
-        temperature=0,
-        max_tokens=800
-    )
+# def create_llm() -> ChatOpenAI:
+#     return ChatOpenAI(
+#         model=os.getenv("MODEL_NAME","openrouter/auto"),
+#         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+#         openai_api_base=os.getenv("OPENROUTER_BASE_URL"),
+#         temperature=0,
+#         max_tokens=800
+#     )
 
 # def create_llm() -> ChatGroq:
 #     return ChatGroq(
@@ -87,9 +87,9 @@ def create_llm() -> ChatOpenAI:
 #         temperature=0
 #     )
 
-# def create_llm() -> ChatOllama:
-#     provider = ModelProvider.instance()
-#     return provider.build()
+def create_llm() -> ChatOllama:
+    provider = ModelProvider.instance()
+    return provider.build()
 
 
 llm = create_llm()

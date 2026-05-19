@@ -62,6 +62,19 @@ class RedmineClient:
 
         return items
 
+    def _get_collection(self, endpoint: str, array_key: str) -> list[dict]:
+        if not self.base_url or not settings.REDMINE_API_KEY:
+            raise RuntimeError("REDMINE_URL / REDMINE_API_KEY not configured")
+
+        url = f"{self.base_url}/{endpoint}"
+        resp = requests.get(url, headers=self.headers, timeout=20)
+        if resp.status_code >= 400:
+            raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+        payload = resp.json()
+        items = payload.get(array_key, [])
+        return items if isinstance(items, list) else []
+
     def list_projects(self) -> list[dict]:
         return self._paginate("projects.json", "projects")
 
@@ -74,6 +87,15 @@ class RedmineClient:
                 "sort": "updated_on:desc",
             },
         )
+
+    def list_trackers(self) -> list[dict]:
+        return self._get_collection("trackers.json", "trackers")
+
+    def list_issue_statuses(self) -> list[dict]:
+        return self._get_collection("issue_statuses.json", "issue_statuses")
+
+    def list_issue_priorities(self) -> list[dict]:
+        return self._get_collection("enumerations/issue_priorities.json", "issue_priorities")
 
     @staticmethod
     def parse_redmine_datetime(value: str | None) -> datetime | None:

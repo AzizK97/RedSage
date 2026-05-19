@@ -22,7 +22,7 @@ defineEmits<{
   (event: 'send', message: string): void;
   (event: 'approve'): void;
   (event: 'reject', message: string): void;
-  (event: 'edit', message: string): void;
+  (event: 'edit', payload: { name: string; args: Record<string, any> }): void;
   (event: 'suggestion', suggestion: string): void;
 }>();
 

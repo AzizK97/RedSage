@@ -30,4 +30,10 @@
     <label for="settings_jwt_audience">JWT audience (optional)</label><br/>
     <%= text_field_tag 'settings[jwt_audience]', @settings['jwt_audience'], size: 40, id: 'settings_jwt_audience' %>
   </p>
+  
+  <p>
+    <label for="settings_dev_mode">Enable development mode (allow admins to mount widget when backend unreachable)</label><br/>
+    <%= check_box_tag 'settings[dev_mode]', 'true', (@settings['dev_mode'].to_s == 'true' || @settings['dev_mode'].to_s == '1'), id: 'settings_dev_mode' %>
+    <em class="info">When enabled the plugin will render the widget for admin users even if the external eligibility API cannot be reached or returns ineligible. Intended for initial install and testing.</em>
+  </p>
 </fieldset>

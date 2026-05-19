@@ -18,12 +18,12 @@ tools = [
 interrupt_on = {
     "create_version":
         {"allowed_decisions": 
-            ["approve","reject"]
+            ["approve","reject","edit"]
         },
     
     "update_version_dates":
         {"allowed_decisions":
-            ["approve","reject"]
+            ["approve","reject","edit"]
         }
     }
 

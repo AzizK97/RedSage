@@ -19,6 +19,7 @@ from app.api.endpoints.dashboard import router as dashboard_router
 from app.api.endpoints.monitoring import router as monitoring_router, monitoring_service
 from app.api.endpoints.search import router as search_router
 from app.api.endpoints.redmine_widget_gate import router as redmine_widget_gate_router
+from app.api.endpoints.redmine_metadata import router as redmine_metadata_router
 from app.core.settings import settings
 from app.services.user_sync_service import UserSyncService
 
@@ -123,6 +124,7 @@ app.include_router(dashboard_router)
 app.include_router(monitoring_router)
 app.include_router(search_router)
 app.include_router(redmine_widget_gate_router)
+app.include_router(redmine_metadata_router)
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────

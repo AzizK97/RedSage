@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useChat } from '../../../ui-core/src/composables/useChat.ts';
+import { useChat } from '../../../ui-core/src/composables/useChat';
 import type { Message } from '../../../ui-core/src/types/index.ts';
 import PluginStyles from './PluginStyles.vue';
 import WidgetHeader from './WidgetHeader.vue';
@@ -102,13 +102,9 @@ async function handleReject(message: string) {
   await submitDecision({ decision_type: 'reject', reason: message } as any);
 }
 
-async function handleEdit(message: string) {
+async function handleEdit(editPayload: { name: string; args: Record<string, any> }) {
   let payload: any = { decision_type: 'edit' };
-  try {
-    payload.edited_action = JSON.parse(message);
-  } catch {
-    payload.edited_action = { name: String(message || 'edit'), args: {} };
-  }
+  payload.edited_action = editPayload;
   await submitDecision(payload as any);
 }
 </script>

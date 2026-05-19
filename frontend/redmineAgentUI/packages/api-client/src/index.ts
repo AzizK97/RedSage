@@ -6,4 +6,5 @@ export * from './admin';
 export * from './dashboard';
 export * from './monitoring';
 export * from './search';
+export * from './redmine';
 export * from './types.ts';

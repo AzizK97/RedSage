@@ -17,8 +17,16 @@ module AiChatWidgetHelper
 
     check = fetch_platform_widget_eligibility(user)
     unless truthy?(check['eligible'])
-      log_mount_suppressed(user, check, 'eligible_false_or_missing')
-      return nil
+      # If dev_mode is enabled allow admins to mount the widget even when the
+      # external eligibility check is missing/fails. This makes the plugin
+      # usable immediately after installation for testing and initial setup.
+      dev_mode = plugin_settings_hash['dev_mode']
+      if truthy?(dev_mode) && user.admin?
+        Rails.logger.warn('[redmine_ai_chat_widget] dev_mode enabled: mounting widget despite ineligible platform response')
+      else
+        log_mount_suppressed(user, check, 'eligible_false_or_missing')
+        return nil
+      end
     end
 
     role = check['platform_role'].to_s

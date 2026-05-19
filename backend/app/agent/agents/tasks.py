@@ -29,32 +29,32 @@ tools = [
 interrupt_on = {
     "create_issue":
         {"allowed_decisions": 
-            ["approve","reject"]
+            ["approve","reject","edit"]
         },
     
     "update_issue_status":
         {"allowed_decisions":
-            ["approve","reject"]
+            ["approve","reject","edit"]
         },
     
     "reassign_issue":
         {"allowed_decisions":
-            ["approve","reject"]
+            ["approve","reject","edit"]
         },
     
     "add_comment_to_issue":
         {"allowed_decisions":
-            ["approve","reject"]
+            ["approve","reject","edit"]
         },
     
     "update_issue_dates":
         {"allowed_decisions":
-            ["approve","reject"]
+            ["approve","reject","edit"]
         },
     
     "log_time":
         {"allowed_decisions":
-            ["approve","reject"]
+            ["approve","reject","edit"]
         }
     }
 

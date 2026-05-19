@@ -18,6 +18,10 @@ Redmine::Plugin.register :redmine_ai_chat_widget do
     'backend_url_public' => '',
     'jwt_secret' => '66uwKYHYwBmlxhdbzEv+ixJcwhZqi/osB/PwyBw5XNk=',
     'jwt_issuer' => 'redsage',
-    'jwt_audience' => 'redsage-web'
+    'jwt_audience' => 'redsage-web',
+    # When true, allows admins to mount the widget even if the external
+    # backend eligibility check fails or is unreachable. Useful for first-time
+    # installs and development. Disable in production if you want strict gating.
+    'dev_mode' => true
   }, partial: 'settings/redmine_ai_chat_widget_settings'
 end
