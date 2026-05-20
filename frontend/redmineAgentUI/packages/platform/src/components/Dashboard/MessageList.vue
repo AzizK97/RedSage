@@ -3,7 +3,7 @@ import { nextTick, onMounted, ref, watch } from "vue";
 import type { Message } from "../../../../ui-core/src/types/index.ts";
 import MarkDownIt from "markdown-it";
 import DOMPurify from "dompurify";
-import { Lightbulb, ChevronRight } from "lucide-vue-next";
+import { Lightbulb } from "lucide-vue-next";
 
 const props = defineProps<{
   messages: Message[];
@@ -98,9 +98,9 @@ onMounted(() => {
               >
                 <Lightbulb :size="16" class="text-surface-600" />
                 <div class="mt-3 flex items-center gap-2 text-surface-600" aria-label="assistant thinking animation">
-                  <span class="w-1.5 h-1.5 rounded-full bg-indigo-500/80 animate-thinking-dot" />
-                  <span class="w-1.5 h-1.5 rounded-full bg-indigo-500/80 animate-thinking-dot" style="animation-delay: .12s" />
-                  <span class="w-1.5 h-1.5 rounded-full bg-indigo-500/80 animate-thinking-dot" style="animation-delay: .24s" />
+                  <span class="w-1.5 h-1.5 rounded-full bg-copper-500/80 animate-thinking-dot" />
+                  <span class="w-1.5 h-1.5 rounded-full bg-copper-500/80 animate-thinking-dot" style="animation-delay: .12s" />
+                  <span class="w-1.5 h-1.5 rounded-full bg-copper-500/80 animate-thinking-dot" style="animation-delay: .24s" />
                 </div>
                 <!-- <ChevronRight :size="14" class="text-surface-600" /> -->
               </button>

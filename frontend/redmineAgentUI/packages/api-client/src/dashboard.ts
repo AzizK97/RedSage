@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { AtRiskProjectInsight, DashboardProject, OverdueTicketInsight } from './types.ts';
+import type { AtRiskProjectInsight, DashboardProject, OverdueTicketInsight, TaskDistributionItem } from './types.ts';
 
 export const dashboardApi = {
   async listProjects(token: string): Promise<{ items: DashboardProject[] }> {
@@ -8,7 +8,9 @@ export const dashboardApi = {
 
   async getInsights(
     token: string,
-  ): Promise<{ top_overdue_tickets: OverdueTicketInsight[]; at_risk_projects: AtRiskProjectInsight[] }> {
-    return apiClient.get("/dashboard/insights", token);
+    projectIdentifier?: string | null,
+  ): Promise<{ top_overdue_tickets: OverdueTicketInsight[]; at_risk_projects: AtRiskProjectInsight[]; task_distribution: TaskDistributionItem[] }> {
+    const query = projectIdentifier?.trim() ? `?project_identifier=${encodeURIComponent(projectIdentifier.trim())}` : "";
+    return apiClient.get(`/dashboard/insights${query}`, token);
   },
 };

@@ -13,6 +13,8 @@ export function useChat(token: string, userId: string) {
         activeThreadId,
         currentConversation,
         getMessages,
+        getPendingInterrupt,
+        setPendingInterrupt,
         saveMessages,
         conversations,
         createThread,
@@ -32,7 +34,7 @@ export function useChat(token: string, userId: string) {
     const showLoadingStatus: Ref<boolean> = ref(false);
     let loadingTimer: ReturnType<typeof setInterval> | null = null;
 
-    function buildLoadingSteps(text: string): string[] {
+    function buildLoadingSteps(): string[] {
         // const q = text.toLowerCase();
 
         // if (/(member|team|role)/.test(q)) {
@@ -51,8 +53,8 @@ export function useChat(token: string, userId: string) {
         return ["Thinking...", "Gathering Redmine data...", "Analyzing results..."];
     }
 
-    function startLoadingStatus(userText: string) {
-        const steps = buildLoadingSteps(userText);
+    function startLoadingStatus() {
+        const steps = buildLoadingSteps();
         let index = 0;
 
         showLoadingStatus.value = true;
@@ -82,7 +84,7 @@ export function useChat(token: string, userId: string) {
         (nextThreadId) => {
             const localMessages = getMessages(nextThreadId);
             messages.value = localMessages;
-            pendingInterrupt.value = null;
+            pendingInterrupt.value = getPendingInterrupt(nextThreadId);
             error.value = null;
         },
         { immediate: true },
@@ -113,7 +115,7 @@ export function useChat(token: string, userId: string) {
         try{
             pushMessage(messages, "user", userText);
             saveMessages(currentThreadId, messages.value);
-            startLoadingStatus(userText);
+            startLoadingStatus();
 
             const response = await chatApi.sendMessage(userText, currentThreadId, token);
             responseReceived = true;
@@ -124,10 +126,12 @@ export function useChat(token: string, userId: string) {
             pendingInterrupt.value = (response.requires_human || hasInterruptPayload)
                 ? response.interrupts
                 : null;
+            setPendingInterrupt(currentThreadId, pendingInterrupt.value);
 
             try {
                 await reloadThreadMessages(currentThreadId);
                 messages.value = getMessages(currentThreadId);
+                pendingInterrupt.value = getPendingInterrupt(currentThreadId);
             } catch {
                 // Keep optimistic messages if history sync fails.
             }
@@ -174,10 +178,12 @@ export function useChat(token: string, userId: string) {
             const response = await chatApi.approve(currentThreadId, payload, token);
             pushMessage(messages, "assistant", response.response);
             pendingInterrupt.value = null;
+            setPendingInterrupt(currentThreadId, null);
 
             try {
                 await reloadThreadMessages(currentThreadId);
                 messages.value = getMessages(currentThreadId);
+                pendingInterrupt.value = getPendingInterrupt(currentThreadId);
             } catch {
                 // Keep optimistic assistant message if history sync fails.
             }

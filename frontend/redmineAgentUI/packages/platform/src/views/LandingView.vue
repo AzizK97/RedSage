@@ -20,7 +20,7 @@ const router = useRouter();
 const bgClass = computed(() => isDark.value ? 'bg-surface-950 text-surface-200' : 'bg-surface-50 text-sage-900');
 
 const showOnboarding = ref(false);
-const onboardingSectionRef = ref<HTMLElement | null>(null);
+// const onboardingSectionRef = ref<HTMLElement | null>(null);
 const redmineUrl = ref('');
 const apiKey = ref('');
 const submitError = ref('');

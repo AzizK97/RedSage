@@ -3,15 +3,18 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, List, Literal, Optional
 import json
+import os
+import psycopg
 
 from psycopg import Connection
+from langgraph.types import Command
 
 from app.agent.supervisor import (
-    chat_stream, 
-    get_app, 
-    chat_with_interrupts, 
+    chat_stream,
+    get_app,
+    chat_with_interrupts,
     build_invoke_config,
-    delete_thread_memory
+    delete_thread_memory,
 )
 from app.agent.tools.read import set_session_user, clear_session_user
 from app.core.rbac import Permission, Role
@@ -25,7 +28,6 @@ from app.services.chat_persistence import (
     persist_user_and_assistant,
 )
 from app.services.thread_access import ensure_thread_owner
-from langgraph.types import Command
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -43,23 +45,18 @@ class ChatResponse(BaseModel):
 
 class ApproveRequest(BaseModel):
     decision_type: Literal["approve", "reject", "edit"] = "approve"
-    message: str = ""                
+    message: str = ""
     edited_action: Optional[Dict[str, Any]] = None
-
 
     @model_validator(mode="after")
     def validate_edit_payload(self):
         if self.decision_type == "edit":
-            
             if not self.edited_action:
                 raise ValueError("edited_action is required when decision_type is 'edit'")
-            
             if "name" not in self.edited_action or "args" not in self.edited_action:
                 raise ValueError("edited_action must contain 'name' and 'args'")
-            
             if not isinstance(self.edited_action["args"], dict):
                 raise ValueError("edited_action 'args' must be a dictionary")
-            
         return self
 
 
@@ -78,12 +75,13 @@ def _interrupt_to_payload(interrupt_obj: Any) -> Dict[str, Any]:
     if hasattr(interrupt_obj, "value"):
         value = interrupt_obj.value
         return value if isinstance(value, dict) else {"value": value}
-    
+
     if isinstance(interrupt_obj, dict):
         value = interrupt_obj.get("value", interrupt_obj)
         return value if isinstance(value, dict) else {"value": value}
-    
+
     return {"value": interrupt_obj}
+
 
 def _message_content_to_text(message: Any) -> str:
     content = getattr(message, "content", message)
@@ -116,7 +114,6 @@ def _extract_full_message_content(result: Any) -> str:
     if not messages:
         return "No response message produced."
 
-    # Walk backward and pick the latest AI/assistant message only.
     for message in reversed(messages):
         mtype = type(message).__name__.lower()
         role = str(getattr(message, "type", "")).lower()
@@ -132,7 +129,6 @@ def _extract_full_message_content(result: Any) -> str:
             if text:
                 return text
 
-    # Fallback: last non-tool message
     for message in reversed(messages):
         mtype = type(message).__name__.lower()
         if "toolmessage" in mtype:
@@ -153,7 +149,29 @@ def _raise_http_from_exception(exc: Exception) -> None:
     if message.startswith("REDMINE_API_ERROR:"):
         raise HTTPException(status_code=502, detail=message)
 
+    if "human decisions" in message.lower() or "does not match num" in message.lower():
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "The approval state is out of sync with the backend checkpoint. "
+                "Refresh the page and submit the currently visible approval again."
+            ),
+        )
+
     raise HTTPException(status_code=500, detail=message)
+
+
+def _get_thread_pending_interrupt(db: Connection, thread_id: str) -> dict | None:
+    return ThreadRepository(db).get_pending_interrupt(thread_id)
+
+
+def _set_thread_pending_interrupt(db: Connection, thread_id: str, pending: dict | None) -> None:
+    threads = ThreadRepository(db)
+    if pending:
+        threads.set_pending_interrupt(thread_id, pending)
+    else:
+        threads.clear_pending_interrupt(thread_id)
+
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(
@@ -163,6 +181,7 @@ async def chat_endpoint(
 ):
     ensure_thread_tables(db)
     ensure_thread_owner(db, request.thread_id, current.id)
+
     try:
         result = chat_with_interrupts(
             request.message,
@@ -180,15 +199,15 @@ async def chat_endpoint(
                 request.message,
                 "Action waiting for human confirmation.",
             )
+            _set_thread_pending_interrupt(db, request.thread_id, pending)
             return ChatResponse(
                 response="Action waiting for human confirmation.",
                 requires_human=True,
-                interrupts=pending
+                interrupts=pending,
             )
 
-        persist_user_and_assistant(
-            db, request.thread_id, request.message, result["response"]
-        )
+        _set_thread_pending_interrupt(db, request.thread_id, None)
+        persist_user_and_assistant(db, request.thread_id, request.message, result["response"])
         return ChatResponse(response=result["response"])
 
     except Exception as e:
@@ -224,13 +243,14 @@ async def chat_stream_endpoint(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
-        }
+            "X-Accel-Buffering": "no",
+        },
     )
+
 
 @router.post("/chat/approve/{thread_id}")
 async def approve_endpoint(
-    thread_id: str, 
+    thread_id: str,
     request: ApproveRequest,
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
     db: Connection = Depends(get_agent_db),
@@ -240,38 +260,48 @@ async def approve_endpoint(
     ensure_thread_tables(db)
     ensure_thread_owner(db, thread_id, current.id)
 
+    pending_interrupt = _get_thread_pending_interrupt(db, thread_id)
+    if not pending_interrupt:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "No pending approval exists for this thread. Refresh the page and wait for a new approval request."
+            ),
+        )
+
     try:
         set_session_user(current.redmine_user_id, is_admin=(current.role == Role.ADMIN))
+
         if request.decision_type == "edit":
             decision = {
                 "type": "edit",
-                "edited_action": request.edited_action
+                "edited_action": request.edited_action,
             }
-
         elif request.decision_type == "reject":
-            decision = {"type": "reject"}    
+            decision = {"type": "reject"}
             if request.message:
                 decision["message"] = request.message
-
         else:
             decision = {"type": "approve"}
 
         result = app.invoke(
             Command(resume={"decisions": [decision]}),
-            config=config
+            config=config,
         )
 
         response_text = _extract_full_message_content(result)
         persist_assistant_only(db, thread_id, response_text)
+        _set_thread_pending_interrupt(db, thread_id, None)
         return {
             "status": request.decision_type,
-            "response": response_text
+            "response": response_text,
         }
 
     except Exception as e:
         _raise_http_from_exception(e)
     finally:
         clear_session_user()
+
 
 @router.delete("/chat/thread/{thread_id}")
 async def delete_thread_endpoint(
@@ -290,11 +320,12 @@ async def delete_thread_endpoint(
         return {
             "status": "deleted",
             "thread_id": thread_id,
-            "message": f"Thread {thread_id} checkpoint purged from database"
+            "message": f"Thread {thread_id} checkpoint purged from database",
         }
     except Exception as e:
         print(f"❌ Delete failed for thread {thread_id}: {e}")
         _raise_http_from_exception(e)
+
 
 @router.get("/chat/thread/{thread_id}/exists")
 async def check_thread_endpoint(
@@ -305,32 +336,28 @@ async def check_thread_endpoint(
     """Diagnostic endpoint: Check if a thread has checkpoints in PostgreSQL."""
     ensure_thread_tables(db)
     ensure_thread_owner(db, thread_id, current.id)
-    import os
-    import psycopg
-    
+
     postgres_url = os.getenv("POSTGRES_URL")
     if not postgres_url:
         raise HTTPException(status_code=500, detail="POSTGRES_URL not configured")
-    
+
     try:
         with psycopg.connect(postgres_url) as conn:
             with conn.cursor() as cur:
-                # Query the checkpoints table to see if thread exists
                 cur.execute(
                     """
-                    SELECT COUNT(*) FROM checkpoints 
+                    SELECT COUNT(*) FROM checkpoints
                     WHERE thread_id = %s
                     """,
-                    (thread_id,)
+                    (thread_id,),
                 )
                 count = cur.fetchone()[0]
-                
+
                 return {
                     "thread_id": thread_id,
                     "exists": count > 0,
                     "checkpoint_count": count,
-                    "message": f"Thread has {count} checkpoint(s)" if count > 0 
-                            else "Thread has no checkpoints"
+                    "message": f"Thread has {count} checkpoint(s)" if count > 0 else "Thread has no checkpoints",
                 }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -373,4 +400,7 @@ def get_thread_messages_endpoint(
     ensure_thread_tables(db)
     ensure_thread_owner(db, thread_id, current.id)
     raw = ThreadMessageRepository(db).list_for_thread(thread_id)
-    return {"messages": raw}
+    return {
+        "messages": raw,
+        "pending_interrupt": ThreadRepository(db).get_pending_interrupt(thread_id),
+    }

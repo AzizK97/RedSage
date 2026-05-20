@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { adminApi } from "@redsage/api-client/admin";
 import { dashboardApi } from "@redsage/api-client/dashboard";
 import { monitoringApi } from "@redsage/api-client/monitoring";
-import type { AtRiskProjectInsight, DashboardProject, MonitoringOverview, OverdueTicketInsight, PmCandidate, ProjectStatus } from "@redsage/ui-core/types";
+import type { AtRiskProjectInsight, DashboardProject, MonitoringOverview, OverdueTicketInsight, PmCandidate, ProjectStatus, TaskDistributionItem } from "@redsage/ui-core/types";
 import { Info, TrendingUp, AlertTriangle, CheckCircle, Clock, ChevronRight, ChevronDown, Check } from "lucide-vue-next";
 
 const props = defineProps<{
@@ -15,9 +15,11 @@ const projects = ref<ProjectStatus[]>([]);
 const projectsError = ref("");
 const topOverdueTickets = ref<OverdueTicketInsight[]>([]);
 const atRiskProjects = ref<AtRiskProjectInsight[]>([]);
+const taskDistribution = ref<TaskDistributionItem[]>([]);
 const insightsError = ref("");
 const monitoringOverview = ref<MonitoringOverview | null>(null);
 const monitoringError = ref("");
+const lastDashboardRefreshAt = ref("");
 const selectedProjectId = ref<string | null>(null);
 const projectSelectorRef = ref<HTMLElement | null>(null);
 const isProjectSelectorOpen = ref(false);
@@ -70,19 +72,93 @@ const projectRows = computed(() => {
   });
 });
 
-const runTrendBars = computed((): { label: string; height: string; value: number }[] => {
+const runTrendBars = computed((): { id: string; label: string; fullDate: string; height: string; value: number; toneClass: string }[] => {
   const trend = (monitoringOverview.value?.run_trend ?? []) as Array<{ started_at: string; events_count?: number | string }>;
   if (!trend.length) return [];
 
   const values = trend.map((item) => Number(item.events_count || 0));
   const maxValue = Math.max(1, ...values);
 
-  return trend.map((item) => {
+  return trend.map((item, index) => {
     const events = Number(item.events_count || 0);
-    const label = new Date(item.started_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const startedAt = new Date(item.started_at);
+    const label = startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const fullDate = startedAt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+    const ratio = events / maxValue;
     const height = Math.max(24, Math.round((events / maxValue) * 160));
-    return { label, value: events, height: `${height}px` };
+    const toneClass = ratio >= 0.75
+      ? "bg-sage-400"
+      : ratio >= 0.4
+        ? "bg-sage-500"
+        : "bg-sage-600";
+    return { id: `${item.started_at}-${index}`, label, fullDate, value: events, height: `${height}px`, toneClass };
   });
+});
+
+const monitoringTrendSummary = computed(() => {
+  if (!runTrendBars.value.length) {
+    return {
+      runCount: 0,
+      totalEvents: 0,
+      averageEvents: 0,
+      latestEvents: 0,
+      trendLabel: "No trend",
+      trendPercent: 0,
+      trendToneClass: "text-surface-400",
+      peakLabel: "—",
+      peakValue: 0,
+    };
+  }
+
+  const totalEvents = runTrendBars.value.reduce((sum, bar) => sum + bar.value, 0);
+  const runCount = runTrendBars.value.length;
+  const averageEvents = Math.round(totalEvents / runCount);
+  const peak = runTrendBars.value.reduce((best, current) => (current.value > best.value ? current : best), runTrendBars.value[0]);
+
+  const latestEvents = runTrendBars.value[runCount - 1]?.value ?? 0;
+  const previousEvents = runTrendBars.value[runCount - 2]?.value ?? latestEvents;
+  const delta = latestEvents - previousEvents;
+
+  let trendLabel = "Stable";
+  let trendPercent = 0;
+  let trendToneClass = "text-surface-300";
+
+  if (delta > 0) {
+    trendLabel = "Increasing";
+    trendPercent = previousEvents > 0 ? Math.round((delta / previousEvents) * 100) : 100;
+    trendToneClass = "text-sage-400";
+  } else if (delta < 0) {
+    trendLabel = "Decreasing";
+    trendPercent = previousEvents > 0 ? Math.round((Math.abs(delta) / previousEvents) * 100) : 0;
+    trendToneClass = "text-amber-400";
+  }
+
+  return {
+    runCount,
+    totalEvents,
+    averageEvents,
+    latestEvents,
+    trendLabel,
+    trendPercent,
+    trendToneClass,
+    peakLabel: peak.label,
+    peakValue: peak.value,
+  };
+});
+
+const runTrendLinePoints = computed(() => {
+  if (!runTrendBars.value.length) return "";
+  const width = 100;
+  const height = 36;
+  const maxValue = Math.max(1, ...runTrendBars.value.map((bar) => bar.value));
+
+  return runTrendBars.value
+    .map((bar, index) => {
+      const x = runTrendBars.value.length === 1 ? width / 2 : (index / (runTrendBars.value.length - 1)) * width;
+      const y = height - (bar.value / maxValue) * (height - 4);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
 });
 
 const openIssuesCount = computed(() => {
@@ -161,6 +237,61 @@ const milestoneSlippage = computed(() => {
   return Math.round((slippedProjects / totalProjects) * 100);
 });
 
+const schedulePressureChart = computed(() => {
+  const items = filteredAtRiskProjects.value.slice(0, 5) as Array<{
+    project_id?: string | number;
+    project_identifier?: string;
+    project_name?: string;
+    name: string;
+    overdue_count?: number;
+    high_priority_open_count?: number;
+    reason?: string;
+    recommended_action?: string;
+  }>;
+  const maxPressure = Math.max(
+    1,
+    ...items.map((item) => (item.overdue_count || 0) + (item.high_priority_open_count || 0)),
+  );
+
+  return items.map((item) => {
+    const pressure = (item.overdue_count || 0) + (item.high_priority_open_count || 0);
+    return {
+      id: String(item.project_id ?? item.project_identifier ?? item.name),
+      label: item.project_name || item.name,
+      detail: item.reason || item.recommended_action || "Review schedule risk",
+      pressure,
+      width: `${Math.max(12, Math.round((pressure / maxPressure) * 100))}%`,
+    };
+  });
+});
+
+const scheduleHealthSummary = computed(() => {
+  const criticalProjects = filteredAtRiskProjects.value as Array<{
+    project_id?: string | number;
+    project_identifier?: string;
+    project_name?: string;
+    name: string;
+    overdue_count?: number;
+    high_priority_open_count?: number;
+    reason?: string;
+    recommended_action?: string;
+    url?: string;
+  }>;
+  const overdueTickets = filteredOverdueTickets.value;
+  const totalPressure = criticalProjects.reduce(
+    (sum, item) => sum + (item.overdue_count || 0) + (item.high_priority_open_count || 0),
+    0,
+  );
+
+  return {
+    criticalProjects: criticalProjects.length,
+    overdueTickets: overdueTickets.length,
+    totalPressure,
+    topProject: criticalProjects[0] || null,
+    topTicket: overdueTickets[0] || null,
+  };
+});
+
 // Resource capacity insights
 const teamWorkloadInsight = computed(() => {
   const criticalCount = criticalIssuesCount.value;
@@ -168,6 +299,35 @@ const teamWorkloadInsight = computed(() => {
   if (criticalCount > 5 || overdueCount > 10) return "⚠️ High workload detected. Consider task redistribution.";
   if (criticalCount > 0) return "🟡 Monitor critical tasks closely.";
   return "✅ Team capacity is balanced.";
+});
+
+const taskDistributionSummary = computed(() => {
+  const rows = taskDistribution.value;
+  const totalOpen = rows.reduce((sum, row) => sum + (row.open_tasks || 0), 0);
+  const overloaded = rows.filter((row) => (row.load_score || 0) >= 6).length;
+  return {
+    people: rows.length,
+    totalOpen,
+    overloaded,
+    topLoad: rows[0] || null,
+  };
+});
+
+const taskDistributionChart = computed(() => {
+  const rows = taskDistribution.value.slice(0, 6);
+  const maxLoad = Math.max(1, ...rows.map((row) => Number(row.load_score || row.open_tasks || 0)));
+  const palette = ["bg-sage-500", "bg-copper-500", "bg-amber-500", "bg-sky-500", "bg-violet-500", "bg-rose-500"];
+
+  return rows.map((row, index) => {
+    const load = Number(row.load_score || row.open_tasks || 0);
+    const percent = Math.max(8, Math.round((load / maxLoad) * 100));
+    return {
+      ...row,
+      load,
+      percent,
+      colorClass: palette[index % palette.length],
+    };
+  });
 });
 
 // Velocity trend (simplified - uses project progress as proxy)
@@ -194,7 +354,9 @@ const pmRows = ref<PmCandidate[]>([]);
 const pmError = ref("");
 const pmSuccess = ref("");
 const PM_TABLE_REFRESH_MS = 60_000;
+const DASHBOARD_REFRESH_MS = 30_000;
 let pmPollTimer: number | null = null;
+let dashboardPollTimer: number | null = null;
 
 const enabledPmCount = computed(() => pmRows.value.filter((item) => item.enabled).length);
 
@@ -236,20 +398,25 @@ function mapDashboardProject(project: DashboardProject): ProjectStatus {
   };
 }
 
-async function loadInsights() {
+async function loadInsights(projectIdentifier?: string | null) {
   if (!props.token.trim()) {
     insightsError.value = "Missing authentication token.";
     return;
   }
   try {
     insightsError.value = "";
-    const response = await dashboardApi.getInsights(props.token.trim());
+    const response = await dashboardApi.getInsights(props.token.trim(), projectIdentifier);
     topOverdueTickets.value = response.top_overdue_tickets;
     atRiskProjects.value = response.at_risk_projects;
+    taskDistribution.value = response.task_distribution ?? [];
   } catch (error) {
     insightsError.value = error instanceof Error ? error.message : "Failed to load dashboard insights.";
   }
 }
+
+watch(selectedProjectIdentifier, (projectIdentifier) => {
+  void loadInsights(projectIdentifier);
+});
 
 async function loadMonitoringOverview() {
   if (!props.token.trim()) {
@@ -260,9 +427,24 @@ async function loadMonitoringOverview() {
   try {
     monitoringError.value = "";
     monitoringOverview.value = await monitoringApi.getOverview(props.token.trim());
+    lastDashboardRefreshAt.value = new Date().toLocaleTimeString();
   } catch (error) {
     monitoringError.value = error instanceof Error ? error.message : "Failed to load monitoring overview.";
     monitoringOverview.value = null;
+  }
+}
+
+async function refreshDashboardData() {
+  await Promise.allSettled([
+    loadProjects(),
+    loadInsights(selectedProjectIdentifier.value),
+    loadMonitoringOverview(),
+  ]);
+}
+
+function handleVisibilityRefresh() {
+  if (document.visibilityState === "visible") {
+    void refreshDashboardData();
   }
 }
 
@@ -321,9 +503,14 @@ async function togglePmAccess(pm: PmCandidate, enabled: boolean) {
 
 onMounted(async () => {
   document.addEventListener("mousedown", handleProjectSelectorClickOutside);
-  await loadProjects();
-  await loadInsights();
-  await loadMonitoringOverview();
+  document.addEventListener("visibilitychange", handleVisibilityRefresh);
+  window.addEventListener("focus", handleVisibilityRefresh);
+  await refreshDashboardData();
+
+  dashboardPollTimer = window.setInterval(() => {
+    void refreshDashboardData();
+  }, DASHBOARD_REFRESH_MS);
+
   if (!isAdmin.value) return;
   await loadPmRows();
   pmPollTimer = window.setInterval(() => {
@@ -333,6 +520,11 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("mousedown", handleProjectSelectorClickOutside);
+  document.removeEventListener("visibilitychange", handleVisibilityRefresh);
+  window.removeEventListener("focus", handleVisibilityRefresh);
+  if (dashboardPollTimer !== null) {
+    window.clearInterval(dashboardPollTimer);
+  }
   if (pmPollTimer !== null) {
     window.clearInterval(pmPollTimer);
   }
@@ -428,23 +620,78 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
-          <div class="flex items-start gap-3">
-            <div class="mt-0.5 rounded-full bg-amber-500/15 p-2 text-amber-400 ring-1 ring-amber-500/25">
-              <AlertTriangle :size="16" />
+        <article class="overflow-hidden rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
+          <header class="mb-5 flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Team Capacity</p>
+              <h2 class="text-xl font-bold text-white">Task distribution by developer</h2>
+              <p class="text-sm text-surface-400">Open tasks, overdue items, and weighted load per assignee.</p>
             </div>
-            <div class="space-y-2">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">AI Insight: Team Capacity</p>
-              <h2 class="text-lg font-bold text-white">{{ teamWorkloadInsight }}</h2>
-              <p class="text-sm leading-relaxed text-surface-400">
-                Recommendation: {{ criticalIssuesCount > 5 ? 'Redistribute critical tasks across the team and reduce WIP immediately.' : 'Keep the current allocation, but continue monitoring workload concentration.' }}
+            <div class="rounded-xl border border-surface-700 bg-surface-800 px-3 py-2 text-right">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">Overloaded</p>
+              <p class="text-lg font-black text-amber-400">{{ taskDistributionSummary.overloaded }}</p>
+            </div>
+          </header>
+
+          <div class="mb-5 grid grid-cols-3 gap-3">
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-3">
+              <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Developers</p>
+              <p class="mt-1 text-2xl font-black text-white">{{ taskDistributionSummary.people }}</p>
+            </div>
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-3">
+              <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Open tasks</p>
+              <p class="mt-1 text-2xl font-black text-white">{{ taskDistributionSummary.totalOpen }}</p>
+            </div>
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-3">
+              <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Top load</p>
+              <p class="mt-1 text-2xl font-black text-white">{{ taskDistributionSummary.topLoad ? taskDistributionSummary.topLoad.assignee_name : '—' }}</p>
+            </div>
+          </div>
+
+          <div v-if="taskDistributionChart.length" class="mb-5 overflow-hidden rounded-2xl border border-surface-800 bg-surface-800 p-4">
+            <div class="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-surface-500">
+              <span>Load intensity chart</span>
+              <span>Highest load at {{ taskDistributionChart[0].assignee_name }}</span>
+            </div>
+            <div class="space-y-3">
+              <div v-for="item in taskDistributionChart" :key="String(item.assignee_id ?? item.assignee_name)" class="space-y-1.5">
+                <div class="flex items-center justify-between gap-3 text-xs">
+                  <div class="min-w-0">
+                    <p class="truncate font-semibold text-white">{{ item.assignee_name }}</p>
+                    <p class="text-surface-500">{{ item.open_tasks }} open • {{ item.overdue_tasks }} overdue</p>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <p class="font-semibold text-white">{{ item.load }}</p>
+                    <p class="text-surface-500">load</p>
+                  </div>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-surface-700">
+                  <div class="h-2 rounded-full transition-all duration-700" :class="item.colorClass" :style="{ width: `${item.percent}%` }" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="mb-5 rounded-2xl border border-dashed border-surface-800 bg-surface-800 px-4 py-8 text-center text-sm text-surface-500">
+            No task distribution data yet.
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">Insight</p>
+              <h3 class="mt-2 text-base font-bold text-white">{{ teamWorkloadInsight }}</h3>
+            </div>
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">Recommendation</p>
+              <p class="mt-2 text-sm leading-relaxed text-surface-400">
+                {{ criticalIssuesCount > 5 ? 'Redistribute critical tasks across the team and reduce WIP immediately.' : 'Balance remains acceptable, but keep an eye on developers with higher load scores.' }}
               </p>
             </div>
           </div>
         </article>
 
         <article class="rounded-2xl border border-surface-800 bg-surface-900 p-6 shadow-sm">
-          <div class="flex items-start gap-3">
+          <header class="flex items-start gap-3">
             <div class="mt-0.5 rounded-full bg-red-500/15 p-2 text-red-400 ring-1 ring-red-500/25">
               <Clock :size="16" />
             </div>
@@ -456,6 +703,87 @@ onBeforeUnmount(() => {
               <p class="text-sm leading-relaxed text-surface-400">
                 Recommendation: {{ milestoneSlippage > 30 ? 'Replan milestones, reassign owners, and protect critical path work now.' : 'Maintain current execution rhythm and review any slipping projects weekly.' }}
               </p>
+            </div>
+          </header>
+
+          <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="rounded-xl border border-red-500/20 bg-red-500/10 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-red-300">Critical projects</p>
+              <div class="mt-2 text-3xl font-black text-red-200">{{ scheduleHealthSummary.criticalProjects }}</div>
+              <p class="mt-1 text-xs text-red-300">Projects with overdue or high-priority work.</p>
+            </div>
+            <div class="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-amber-300">Overdue items</p>
+              <div class="mt-2 text-3xl font-black text-amber-200">{{ scheduleHealthSummary.overdueTickets }}</div>
+              <p class="mt-1 text-xs text-amber-300">Open issues past due date.</p>
+            </div>
+            <div class="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-blue-300">Pressure score</p>
+              <div class="mt-2 text-3xl font-black text-blue-200">{{ scheduleHealthSummary.totalPressure }}</div>
+              <p class="mt-1 text-xs text-blue-300">Combined schedule load across risky projects.</p>
+            </div>
+          </div>
+
+          <div class="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">Critical path</p>
+                  <h3 class="mt-1 text-sm font-semibold text-white">Most pressured projects</h3>
+                </div>
+                <span class="rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-[11px] font-semibold text-red-300">
+                  {{ schedulePressureChart.length }} shown
+                </span>
+              </div>
+
+              <div v-if="schedulePressureChart.length" class="mt-4 space-y-4">
+                <div v-for="item in schedulePressureChart" :key="item.id" class="space-y-2">
+                  <div class="flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <div class="font-medium text-surface-200">{{ item.label }}</div>
+                      <div class="text-surface-500">{{ item.detail }}</div>
+                    </div>
+                    <div class="font-semibold text-red-300">{{ item.pressure }}</div>
+                  </div>
+                  <div class="h-2 rounded-full bg-surface-700">
+                    <div class="h-2 rounded-full bg-gradient-to-r from-red-500 to-amber-400" :style="{ width: item.width }" />
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="mt-4 rounded-xl border border-dashed border-surface-700 bg-surface-900/50 px-4 py-5 text-sm text-surface-500">
+                No risky projects are currently driving schedule pressure.
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-surface-800 bg-surface-800 p-4">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">What is critical</p>
+              <div class="mt-3 space-y-3">
+                <div v-if="scheduleHealthSummary.topProject" class="rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-red-300">Top project</p>
+                  <div class="mt-1 text-sm font-semibold text-white">{{ scheduleHealthSummary.topProject.project_name || scheduleHealthSummary.topProject.project_identifier }}</div>
+                  <p class="mt-1 text-xs leading-relaxed text-red-200/90">{{ scheduleHealthSummary.topProject.recommended_action }}</p>
+                </div>
+
+                <div v-if="scheduleHealthSummary.topTicket" class="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">Top overdue issue</p>
+                  <div class="mt-1 text-sm font-semibold text-white">{{ scheduleHealthSummary.topTicket.subject }}</div>
+                  <p class="mt-1 text-xs text-amber-200/90">
+                    Due {{ scheduleHealthSummary.topTicket.due_date }} • {{ scheduleHealthSummary.topTicket.project_name || scheduleHealthSummary.topTicket.project_identifier }}
+                  </p>
+                </div>
+
+                <div v-if="!scheduleHealthSummary.topProject && !scheduleHealthSummary.topTicket" class="rounded-xl border border-surface-700 bg-surface-900/50 p-3 text-sm text-surface-500">
+                  No critical schedule items found.
+                </div>
+
+                <div class="rounded-xl border border-surface-700 bg-surface-900/50 p-3">
+                  <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-surface-500">Recommendation</p>
+                  <p class="mt-2 text-sm leading-relaxed text-surface-300">
+                    {{ milestoneSlippage > 30 ? 'Re-plan milestone dates, surface the blocked items first, and move capacity to the critical path.' : 'Keep reviewing the slipping projects and clear overdue items before they stack up.' }}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </article>
@@ -565,6 +893,7 @@ onBeforeUnmount(() => {
               <div class="space-y-1">
                 <p class="text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Monitoring Run Trend</p>
                 <h2 class="text-lg font-bold text-white">Recent monitoring runs</h2>
+                <p class="text-[10px] font-medium uppercase tracking-[0.18em] text-surface-500">Live refresh: {{ lastDashboardRefreshAt || 'Waiting for first sync' }}</p>
               </div>
               <div class="group relative">
                 <button type="button" class="rounded-full p-2 text-surface-500 transition hover:bg-surface-800 hover:text-surface-300" aria-label="Monitoring run info">
@@ -579,10 +908,51 @@ onBeforeUnmount(() => {
 
             <div v-if="monitoringError" class="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400">{{ monitoringError }}</div>
 
-            <div v-if="runTrendBars.length" class="flex h-52 items-end justify-between gap-3">
-              <div v-for="bar in runTrendBars" :key="bar.label + bar.value" class="flex flex-1 flex-col items-center gap-2">
+            <div v-if="runTrendBars.length" class="mb-4 grid grid-cols-2 gap-2">
+              <div class="rounded-xl border border-surface-800 bg-surface-800 px-3 py-2">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Total events</p>
+                <p class="mt-1 text-base font-bold text-white">{{ monitoringTrendSummary.totalEvents }}</p>
+              </div>
+              <div class="rounded-xl border border-surface-800 bg-surface-800 px-3 py-2">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Avg / run</p>
+                <p class="mt-1 text-base font-bold text-white">{{ monitoringTrendSummary.averageEvents }}</p>
+              </div>
+              <div class="rounded-xl border border-surface-800 bg-surface-800 px-3 py-2">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Latest run</p>
+                <p class="mt-1 text-base font-bold text-white">{{ monitoringTrendSummary.latestEvents }}</p>
+              </div>
+              <div class="rounded-xl border border-surface-800 bg-surface-800 px-3 py-2">
+                <p class="text-[10px] uppercase tracking-[0.2em] text-surface-500">Trend</p>
+                <p class="mt-1 text-base font-bold" :class="monitoringTrendSummary.trendToneClass">
+                  {{ monitoringTrendSummary.trendLabel }}
+                  <span v-if="monitoringTrendSummary.trendLabel !== 'Stable' && monitoringTrendSummary.trendLabel !== 'No trend'" class="text-xs font-semibold">
+                    ({{ monitoringTrendSummary.trendPercent }}%)
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div v-if="runTrendBars.length" class="mb-4 rounded-xl border border-surface-800 bg-surface-800/70 p-3">
+              <div class="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-surface-500">
+                <span>Event intensity curve</span>
+                <span>Peak {{ monitoringTrendSummary.peakLabel }} • {{ monitoringTrendSummary.peakValue }}</span>
+              </div>
+              <svg viewBox="0 0 100 36" preserveAspectRatio="none" class="h-14 w-full">
+                <polyline
+                  :points="runTrendLinePoints"
+                  fill="none"
+                  stroke="rgb(94 234 212)"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+
+            <div v-if="runTrendBars.length" class="flex h-44 items-end justify-between gap-2">
+              <div v-for="bar in runTrendBars" :key="bar.id" class="group flex flex-1 flex-col items-center gap-2" :title="`${bar.fullDate}: ${bar.value} events`">
                 <div class="flex w-full flex-1 items-end justify-center">
-                  <div class="relative w-8 rounded-t-lg bg-sage-500 transition-all duration-700" :style="{ height: bar.height }">
+                  <div class="relative w-8 rounded-t-lg transition-all duration-700 group-hover:opacity-90" :class="bar.toneClass" :style="{ height: bar.height }">
                     <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-surface-300">{{ bar.value }}</span>
                   </div>
                 </div>

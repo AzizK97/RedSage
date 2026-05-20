@@ -2,6 +2,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from psycopg import Connection
+from psycopg.types.json import Jsonb
 
 
 class ThreadRepository:
@@ -30,6 +31,7 @@ class ThreadRepository:
             )
             # Ensure project_identifier exists for threads (nullable)
             cur.execute("ALTER TABLE thread_owners ADD COLUMN IF NOT EXISTS project_identifier TEXT NULL")
+            cur.execute("ALTER TABLE thread_owners ADD COLUMN IF NOT EXISTS pending_interrupt JSONB NULL")
             # Create trigram index on title if missing (for fuzzy search)
             cur.execute("CREATE INDEX IF NOT EXISTS idx_thread_owners_title_trgm ON thread_owners USING GIN (title gin_trgm_ops)")
         self.db.commit()
@@ -165,6 +167,36 @@ class ThreadRepository:
                 (preview, now, thread_id),
             )
         self.db.commit()
+
+    def set_pending_interrupt(self, thread_id: str, pending_interrupt: dict | None) -> None:
+        now = datetime.now(timezone.utc)
+        serialized_interrupt = Jsonb(pending_interrupt) if pending_interrupt is not None else None
+        with self.db.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE thread_owners
+                SET pending_interrupt = %s, updated_at = %s
+                WHERE thread_id = %s
+                """,
+                (serialized_interrupt, now, thread_id),
+            )
+        self.db.commit()
+
+    def clear_pending_interrupt(self, thread_id: str) -> None:
+        self.set_pending_interrupt(thread_id, None)
+
+    def get_pending_interrupt(self, thread_id: str) -> dict | None:
+        with self.db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT pending_interrupt
+                FROM thread_owners
+                WHERE thread_id = %s
+                """,
+                (thread_id,),
+            )
+            row = cur.fetchone()
+        return row[0] if row and row[0] is not None else None
 
     def delete_thread(self, thread_id: str) -> None:
         with self.db.cursor() as cur:

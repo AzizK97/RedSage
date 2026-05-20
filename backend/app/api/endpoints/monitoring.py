@@ -2,17 +2,19 @@ from fastapi import APIRouter, Depends
 
 from app.core.rbac import Permission
 from app.dependencies.auth import CurrentUser, require_permission
-from app.services.monitoring_service import MonitoringService
+from app.monitoring.service import MonitoringService as MonitoringDataService
+from app.services.monitoring_service import MonitoringService as MonitoringStatusService
 
 router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
-monitoring_service = MonitoringService()
+monitoring_service = MonitoringStatusService()
+monitoring_data_service = MonitoringDataService()
 
 
 @router.post("/run-now")
-def run_monitoring_now(
+async def run_monitoring_now(
     _: CurrentUser = Depends(require_permission(Permission.PM_ACCESS_MANAGE)),
 ):
-    return monitoring_service.run_once()
+    return await monitoring_data_service.run_once()
 
 
 @router.get("/status")
@@ -23,10 +25,10 @@ def monitoring_status(
 
 
 @router.get("/overview")
-def monitoring_overview(
+async def monitoring_overview(
     _: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
 ):
-    return monitoring_service.get_overview()
+    return await monitoring_data_service.get_overview()
 
 
 @router.get("/notifications")

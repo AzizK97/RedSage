@@ -32,7 +32,7 @@ export const chatApi = {
   async getThreadMessages(
     thread_id: string,
     token: string,
-  ): Promise<{ messages: { role: string; content: string; timestamp: number }[] }> {
+  ): Promise<{ messages: { role: string; content: string; timestamp: number }[]; pending_interrupt?: Record<string, any> | null }> {
     return apiClient.get(`/chat/thread/${thread_id}/messages`, token);
   },
 };

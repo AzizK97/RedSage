@@ -15,6 +15,7 @@ let lastToken = "";
 
 const conversations = ref<ConversationSummary[]>([]);
 const messagesByThread = ref<Record<string, Message[]>>({});
+const pendingInterruptsByThread = ref<Record<string, Record<string, any> | null>>({});
 const activeThreadId = ref("");
 
 let hydrated = false;
@@ -85,6 +86,7 @@ function persistState(userId: string) {
   const keys = buildKeys(userId);
   localStorage.setItem(keys.conversations, JSON.stringify(conversations.value));
   localStorage.setItem(keys.messages, JSON.stringify(messagesByThread.value));
+  localStorage.setItem(`${keys.active}:pending-interrupts`, JSON.stringify(pendingInterruptsByThread.value));
   localStorage.setItem(keys.active, activeThreadId.value);
 }
 
@@ -113,6 +115,7 @@ function ensureThreadExists(threadId: string) {
 function resetModuleState() {
   conversations.value = [];
   messagesByThread.value = {};
+  pendingInterruptsByThread.value = {};
   activeThreadId.value = "";
   hydrated = false;
   syncStarted = false;
@@ -130,6 +133,10 @@ function hydrateState(userId: string) {
     localStorage.getItem(keys.messages),
     {},
   );
+  const storedPendingInterrupts = safeParse<Record<string, Record<string, any> | null>>(
+    localStorage.getItem(`${keys.active}:pending-interrupts`),
+    {},
+  );
   const storedActive = localStorage.getItem(keys.active)?.trim() || "";
 
   messagesByThread.value = Object.fromEntries(
@@ -138,6 +145,7 @@ function hydrateState(userId: string) {
       normalizeMessages(threadMessages),
     ]),
   );
+  pendingInterruptsByThread.value = { ...storedPendingInterrupts };
 
   conversations.value = sortConversations(
     storedConversations
@@ -201,9 +209,13 @@ export function useThreads(token: string, userId: string) {
 
   async function loadThreadMessages(threadId: string) {
     if (!userId) return;
-    const { messages: raw } = await chatApi.getThreadMessages(threadId, token);
+    const { messages: raw, pending_interrupt } = await chatApi.getThreadMessages(threadId, token);
     const list = normalizeMessages(raw);
     messagesByThread.value = { ...messagesByThread.value, [threadId]: list };
+    pendingInterruptsByThread.value = {
+      ...pendingInterruptsByThread.value,
+      [threadId]: pending_interrupt ?? null,
+    };
     persistState(userId);
   }
 
@@ -234,6 +246,7 @@ export function useThreads(token: string, userId: string) {
       ]);
       activeThreadId.value = newId;
       messagesByThread.value[newId] = [];
+      pendingInterruptsByThread.value = { ...pendingInterruptsByThread.value, [newId]: null };
       persistState(userId);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to sync conversations from server.";
@@ -288,6 +301,7 @@ export function useThreads(token: string, userId: string) {
     ensureThreadExists(threadId);
     activeThreadId.value = threadId;
     messagesByThread.value = { ...messagesByThread.value, [threadId]: [] };
+    pendingInterruptsByThread.value = { ...pendingInterruptsByThread.value, [threadId]: null };
     const remaining = conversations.value.filter((conversation) => conversation.id !== threadId);
     conversations.value = sortConversations([
       {
@@ -336,6 +350,16 @@ export function useThreads(token: string, userId: string) {
     persistState(userId);
   }
 
+  function setPendingInterrupt(threadId: string, interrupt: Record<string, any> | null) {
+    if (!userId) return;
+    pendingInterruptsByThread.value = { ...pendingInterruptsByThread.value, [threadId]: interrupt };
+    persistState(userId);
+  }
+
+  function getPendingInterrupt(threadId: string): Record<string, any> | null {
+    return pendingInterruptsByThread.value[threadId] ?? null;
+  }
+
   async function deleteThread(threadId: string) {
     if (!userId) return;
     syncError.value = null;
@@ -360,6 +384,8 @@ export function useThreads(token: string, userId: string) {
     setActiveThread,
     createThread,
     getMessages,
+    getPendingInterrupt,
+    setPendingInterrupt,
     saveMessages,
     renameThread,
     deleteThread,

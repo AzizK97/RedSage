@@ -16,7 +16,7 @@ from app.api.endpoints.chat import router as chat_router
 from app.api.endpoints.admin_users import router as admin_users_router
 from app.api.endpoints.auth import router as auth_router
 from app.api.endpoints.dashboard import router as dashboard_router
-from app.api.endpoints.monitoring import router as monitoring_router, monitoring_service
+from app.api.endpoints.monitoring import router as monitoring_router, monitoring_data_service
 from app.api.endpoints.search import router as search_router
 from app.api.endpoints.redmine_widget_gate import router as redmine_widget_gate_router
 from app.api.endpoints.redmine_metadata import router as redmine_metadata_router
@@ -37,9 +37,9 @@ def _run_pm_sync_job() -> None:
         print(f"[PM_SYNC_JOB] failed: {exc}")
 
 
-def _run_monitoring_job() -> None:
+async def _run_monitoring_job() -> None:
     try:
-        monitoring_service.run_once()
+        await monitoring_data_service.run_once()
     except Exception as exc:
         print(f"[MONITORING_JOB] failed: {exc}")
 
@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
         )
         if not scheduler.running:
             scheduler.start()
-        _run_monitoring_job()
+        await _run_monitoring_job()
     yield
     if scheduler.running:
         scheduler.shutdown()

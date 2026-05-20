@@ -124,6 +124,7 @@ export interface AtRiskProjectInsight {
   id: string | number;
   name: string;
   project_identifier?: string;
+  overdue_count?: number;
   high_priority_open_count?: number;
   project_name?: string;
   reason?: string;
@@ -142,4 +143,16 @@ export interface ProjectStatus {
   completionEta?: string;
   open_issues?: number;
   closed_issues?: number;
+}
+
+export interface TaskDistributionItem {
+  assignee_id?: string | number | null;
+  assignee_name: string;
+  project_identifier?: string;
+  project_name?: string;
+  open_tasks?: number;
+  overdue_tasks?: number;
+  critical_tasks?: number;
+  estimated_hours?: number;
+  load_score?: number;
 }

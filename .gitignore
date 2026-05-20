@@ -30,3 +30,5 @@ frontend/redmineAgentUI/dist/
 
 .github/
 node_modules/
+backend/alembic.ini
+backend/pytest.ini

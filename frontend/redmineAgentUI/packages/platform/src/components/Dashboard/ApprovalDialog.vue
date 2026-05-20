@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { AlertTriangle, Check, X, Edit3, Terminal } from "lucide-vue-next";
-import { redmineApi, type RedmineOption } from "@redsage/api-client";
+import { AlertTriangle, Check, X, Edit3 } from "lucide-vue-next";
+import { redmineApi, type RedmineOption } from "@redsage/api-client/redmine";
 
 const props = defineProps<{
   token: string;

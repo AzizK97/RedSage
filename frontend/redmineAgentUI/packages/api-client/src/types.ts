@@ -91,6 +91,18 @@ export interface DashboardProject {
   name: string;
 }
 
+export interface TaskDistributionItem {
+  assignee_id?: number | string | null;
+  assignee_name: string;
+  project_identifier?: string;
+  project_name?: string;
+  open_tasks?: number;
+  overdue_tasks?: number;
+  critical_tasks?: number;
+  estimated_hours?: number;
+  load_score?: number;
+}
+
 export interface OverdueTicketInsight {
   id: string;
   title: string;
@@ -99,6 +111,7 @@ export interface OverdueTicketInsight {
 export interface AtRiskProjectInsight {
   id: string;
   name: string;
+  overdue_count?: number;
 }
 
 export interface ProjectStatus {

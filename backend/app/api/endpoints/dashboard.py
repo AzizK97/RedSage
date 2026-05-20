@@ -202,6 +202,7 @@ def list_dashboard_projects(
 @router.get("/insights")
 def list_dashboard_insights(
     current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+    project_identifier: str | None = None,
 ):
     projects = redmine_client.list_projects()
     if current.role != Role.ADMIN:
@@ -212,8 +213,17 @@ def list_dashboard_insights(
             project for project in projects if (project.get("identifier") or "") in allowed_identifiers
         ]
 
+    requested_identifier = (project_identifier or "").strip()
+    if requested_identifier:
+        projects = [
+            project
+            for project in projects
+            if (project.get("identifier") or "").strip() == requested_identifier
+        ]
+
     overdue_items: list[dict] = []
     at_risk_projects: list[dict] = []
+    task_loads: dict[tuple[int | None, str], dict] = {}
     today_iso = datetime.now(timezone.utc).date().isoformat()
 
     for project in projects:
@@ -228,18 +238,51 @@ def list_dashboard_insights(
         project_overdue = 0
         project_high_priority = 0
         for issue in issues:
+            assignee = issue.get("assigned_to") or {}
+            assignee_id = assignee.get("id")
+            assignee_name = (assignee.get("name") or "Unassigned").strip() or "Unassigned"
+            load_key = (assignee_id if assignee_id is None else int(assignee_id), assignee_name)
+            bucket = task_loads.setdefault(
+                load_key,
+                {
+                    "assignee_id": assignee_id,
+                    "assignee_name": assignee_name,
+                    "project_identifier": identifier,
+                    "project_name": project.get("name"),
+                    "open_tasks": 0,
+                    "overdue_tasks": 0,
+                    "critical_tasks": 0,
+                    "estimated_hours": 0.0,
+                    "load_score": 0.0,
+                },
+            )
+
             status_name = str((issue.get("status") or {}).get("name", "")).lower()
             if "closed" in status_name:
                 continue
-            due_date = issue.get("due_date")
+
+            estimated_hours = 0.0
+            try:
+                estimated_hours = float(issue.get("estimated_hours") or 0)
+            except (TypeError, ValueError):
+                estimated_hours = 0.0
+
             priority_name = str((issue.get("priority") or {}).get("name", "")).lower()
             is_high_priority = any(
                 tag in priority_name for tag in ("high", "urgent", "immediate", "critical")
             )
+
+            bucket["open_tasks"] += 1
+            bucket["estimated_hours"] += estimated_hours if estimated_hours > 0 else 1.0
+            bucket["load_score"] += 1.0 + (0.75 if is_high_priority else 0.0)
+
+            due_date = issue.get("due_date")
             if is_high_priority:
                 project_high_priority += 1
+                bucket["critical_tasks"] += 1
             if due_date and due_date < today_iso:
                 project_overdue += 1
+                bucket["overdue_tasks"] += 1
                 overdue_items.append(
                     {
                         "issue_id": issue.get("id"),
@@ -280,7 +323,14 @@ def list_dashboard_insights(
     at_risk_projects.sort(
         key=lambda item: (-(item.get("overdue_count") or 0), -(item.get("high_priority_open_count") or 0))
     )
+
+    task_distribution = sorted(
+        task_loads.values(),
+        key=lambda item: (-(item.get("load_score") or 0), -(item.get("open_tasks") or 0), str(item.get("assignee_name") or "")),
+    )
+
     return {
         "top_overdue_tickets": overdue_items[:8],
         "at_risk_projects": at_risk_projects[:6],
+        "task_distribution": task_distribution[:10],
     }

@@ -14,7 +14,6 @@ import {
   Loader2,
   Settings,
   ShieldCheck,
-  UserPlus,
 } from "lucide-vue-next";
 
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -31,8 +30,8 @@ const router = useRouter();
 const step = ref<Step>(0);
 
 const name = ref("");
-const email = ref("");
-const password = ref("");
+// const email = ref("");
+// const password = ref("");
 
 const redmineUrl = ref("");
 const apiKey = ref("");
@@ -46,9 +45,9 @@ const emit = defineEmits<{
   (event: "back"): void;
 }>();
 
-const canContinueAccount = computed(() => {
-  return name.value.trim().length > 0 && /\S+@\S+\.\S+/.test(email.value) && password.value.length >= 8;
-});
+// const canContinueAccount = computed(() => {
+//   return name.value.trim().length > 0 && /\S+@\S+\.\S+/.test(email.value) && password.value.length >= 8;
+// });
 
 const canConnect = computed(() => {
   return /^https?:\/\//i.test(redmineUrl.value.trim()) && apiKey.value.trim().length >= 8;
