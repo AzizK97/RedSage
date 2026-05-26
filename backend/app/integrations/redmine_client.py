@@ -97,6 +97,78 @@ class RedmineClient:
     def list_issue_priorities(self) -> list[dict]:
         return self._get_collection("enumerations/issue_priorities.json", "issue_priorities")
 
+    def get_project(self, project_id: int | str) -> dict | None:
+        if not self.base_url or not settings.REDMINE_API_KEY:
+            raise RuntimeError("REDMINE_URL / REDMINE_API_KEY not configured")
+
+        if project_id is None:
+            return None
+
+        url = f"{self.base_url}/projects/{project_id}.json"
+        resp = requests.get(url, headers=self.headers, timeout=20)
+        if resp.status_code == 404:
+            return None
+        if resp.status_code >= 400:
+            raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+        payload = resp.json()
+        return payload.get("project")
+
+    def get_issue(self, issue_id: int | str) -> dict | None:
+        if not self.base_url or not settings.REDMINE_API_KEY:
+            raise RuntimeError("REDMINE_URL / REDMINE_API_KEY not configured")
+
+        if issue_id is None:
+            return None
+
+        url = f"{self.base_url}/issues/{issue_id}.json"
+        resp = requests.get(url, headers=self.headers, timeout=20)
+        if resp.status_code == 404:
+            return None
+        if resp.status_code >= 400:
+            raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+        payload = resp.json()
+        return payload.get("issue")
+
+    def list_project_versions(self, project_identifier: str) -> list[dict]:
+        if not project_identifier:
+            return []
+        return self._get_collection(f"projects/{project_identifier}/versions.json", "versions")
+
+    def list_project_members(self, project_identifier: str) -> list[dict]:
+        if not self.base_url or not settings.REDMINE_API_KEY:
+            raise RuntimeError("REDMINE_URL / REDMINE_API_KEY not configured")
+
+        if not project_identifier:
+            return []
+
+        url = f"{self.base_url}/projects/{project_identifier}/memberships.json"
+        resp = requests.get(url, headers=self.headers, timeout=20)
+        if resp.status_code >= 400:
+            raise RuntimeError(f"REDMINE_API_ERROR: {resp.status_code} - {resp.text}")
+
+        memberships = resp.json().get("memberships", [])
+        members: list[dict] = []
+
+        for membership in memberships:
+            user = membership.get("user") or {}
+            user_id = user.get("id")
+            name = (user.get("name") or "").strip()
+            if user_id is None or not name:
+                continue
+
+            roles = [str(role.get("name", "")).strip() for role in membership.get("roles", [])]
+            members.append(
+                {
+                    "id": user_id,
+                    "name": name,
+                    "roles": [role for role in roles if role],
+                }
+            )
+
+        return members
+
     @staticmethod
     def parse_redmine_datetime(value: str | None) -> datetime | None:
         if not value:

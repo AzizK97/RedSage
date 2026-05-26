@@ -15,15 +15,37 @@ tools = [
             update_version_dates
         ]
 
+CREATE_VERSION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "project_id": {"type": "string", "title": "Project"},
+        "name": {"type": "string", "title": "Name"},
+        "due_date": {"type": "string", "title": "Due date"},
+        "description": {"type": "string", "title": "Description"},
+        "status": {"type": "string", "title": "Status"},
+    },
+    "required": ["project_id", "name"],
+}
+
+UPDATE_VERSION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "version_id": {"type": "string", "title": "Version"},
+        "due_date": {"type": "string", "title": "Due date"},
+        "name": {"type": "string", "title": "Name"},
+        "status": {"type": "string", "title": "Status"},
+        "description": {"type": "string", "title": "Description"},
+    },
+    "required": ["version_id"],
+}
+
 interrupt_on = {
     "create_version":
-        {"allowed_decisions": 
-            ["approve","reject","edit"]
+        {"allowed_decisions": ["approve", "reject", "edit"], "description": "Review the version details before creating the sprint or milestone.", "args_schema": CREATE_VERSION_SCHEMA
         },
     
     "update_version_dates":
-        {"allowed_decisions":
-            ["approve","reject","edit"]
+        {"allowed_decisions": ["approve", "reject", "edit"], "description": "Review the version update before saving changes.", "args_schema": UPDATE_VERSION_SCHEMA
         }
     }
 

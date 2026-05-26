@@ -4,18 +4,26 @@ import type { Message } from "../../../../ui-core/src/types/index.ts";
 import MarkDownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { Lightbulb } from "lucide-vue-next";
+import ApprovalDialog from "./ApprovalDialog.vue";
 
 const props = defineProps<{
   messages: Message[];
   showThinkingBar?: boolean;
   loadingStatus?: string;
+  token: string;
+  interrupt: Record<string, any> | null;
+  disabled: boolean;
 }>();
 
 defineEmits<{
   (e: "skip-thinking"): void;
+  (e: "approve"): void;
+  (e: "reject", message: string): void;
+  (e: "edit", payload: { name: string; args: Record<string, any> }): void;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
+const approvalDialogRef = ref<HTMLElement | null>(null);
 
 const md = new MarkDownIt({
   html: false,
@@ -34,12 +42,28 @@ async function scrollToBottom() {
   listRef.value.scrollTop = listRef.value.scrollHeight;
 }
 
+async function scrollApprovalDialogIntoView() {
+  await nextTick();
+  if (approvalDialogRef.value) {
+    approvalDialogRef.value.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
 watch(
   () => props.messages,
   () => {
     scrollToBottom();
   },
   { deep: true },
+);
+
+watch(
+  () => props.interrupt,
+  () => {
+    if (props.interrupt) {
+      scrollApprovalDialogIntoView();
+    }
+  },
 );
 
 onMounted(() => {
@@ -81,6 +105,25 @@ onMounted(() => {
               v-html="renderMarkdown(msg.content)"
             ></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Approval Dialog as inline message -->
+      <div
+        v-if="interrupt"
+        ref="approvalDialogRef"
+        class="flex gap-4 sm:gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
+      >
+        <div class="flex flex-col max-w-[85%] sm:max-w-[100%] items-start w-full">
+          <ApprovalDialog
+            :token="token"
+            :interrupt="interrupt"
+            :disabled="disabled"
+            inline
+            @approve="$emit('approve')"
+            @reject="(msg) => $emit('reject', msg)"
+            @edit="(payload) => $emit('edit', payload)"
+          />
         </div>
       </div>
 

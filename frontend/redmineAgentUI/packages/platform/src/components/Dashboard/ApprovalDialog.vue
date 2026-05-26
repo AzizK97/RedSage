@@ -7,6 +7,7 @@ const props = defineProps<{
   token: string;
   interrupt: Record<string, any> | null;
   disabled: boolean;
+  inline?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -17,16 +18,30 @@ const emit = defineEmits<{
 
 const rejectMessage = ref("Rejected by user");
 const actionName = ref("");
+const actionDescription = ref("");
 const editableArgs = ref<Record<string, string>>({});
 const originalArgs = ref<Record<string, any>>({});
+const schemaProperties = ref<Record<string, any>>({});
 const redmineBaseUrl = ref("");
 const trackers = ref<RedmineOption[]>([]);
 const issueStatuses = ref<RedmineOption[]>([]);
 const issuePriorities = ref<RedmineOption[]>([]);
+const projectVersions = ref<RedmineOption[]>([]);
+const projectMembers = ref<RedmineOption[]>([]);
+const versionStatuses = ref<RedmineOption[]>([]);
+const issueSummary = ref<{
+  id: string;
+  subject: string;
+  assigned_to_name: string;
+  assigned_to_id?: string | number | null;
+  project_name?: string;
+  project_identifier?: string;
+} | null>(null);
 const metadataLoading = ref(false);
 const defaultFieldValues: Record<string, string> = {
   status_id: "1",
   priority_id: "4",
+  status: "open",
 };
 
 const actionFieldOrders: Record<string, string[]> = {
@@ -51,7 +66,12 @@ const actionFieldOrders: Record<string, string[]> = {
   log_time: ["issue_id", "hours", "activity_id", "comments", "spent_on"],
 };
 
-const selectFieldKeys = new Set(["tracker_id", "status_id", "priority_id"]);
+const selectFieldKeys = new Set(["tracker_id", "status_id", "priority_id", "assigned_to_id", "version_id", "status"]);
+
+function normalizeSchemaProperties(schema: Record<string, any> | null | undefined): Record<string, any> {
+  const properties = schema?.properties;
+  return properties && typeof properties === "object" && !Array.isArray(properties) ? properties : {};
+}
 
 function normalizeArgs(args: Record<string, any>) {
   const normalized = { ...args };
@@ -68,6 +88,16 @@ function hasInterruptPayload(interrupt: Record<string, any> | null) {
   return Object.keys(interrupt).length > 0;
 }
 
+function extractProjectIdentifier(args: Record<string, any>) {
+  const candidate = args.project_id ?? args.project_identifier ?? args.project ?? "";
+  return typeof candidate === "string" ? candidate.trim() : "";
+}
+
+function extractIssueId(args: Record<string, any>) {
+  const candidate = args.issue_id ?? args.id ?? args.issue ?? "";
+  return candidate === null || candidate === undefined ? "" : String(candidate).trim();
+}
+
 function extractEditableAction(interrupt: Record<string, any> | null) {
   if (!interrupt) return null;
 
@@ -75,7 +105,12 @@ function extractEditableAction(interrupt: Record<string, any> | null) {
     ? interrupt.action_requests
     : [];
 
+  const reviewConfigs = Array.isArray(interrupt.review_configs)
+    ? interrupt.review_configs
+    : [];
+
   const firstAction = actionRequests[0] ?? interrupt.action_request ?? interrupt;
+  const firstReview = reviewConfigs[0] ?? interrupt.review_config ?? null;
 
   const name =
     firstAction?.name ??
@@ -89,12 +124,20 @@ function extractEditableAction(interrupt: Record<string, any> | null) {
     firstAction?.tool?.args ??
     firstAction?.action_input ??
     {};
+  const description =
+    firstAction?.description ??
+    firstReview?.description ??
+    "";
+
+  const schema = normalizeSchemaProperties(firstReview?.args_schema ?? firstAction?.args_schema ?? null);
 
   if (!name || typeof name !== "string") return null;
 
   return {
     name: name.trim(),
+    description: typeof description === "string" ? description.trim() : "",
     args: args && typeof args === "object" && !Array.isArray(args) ? normalizeArgs(args) : {},
+    schema,
   };
 }
 
@@ -165,6 +208,10 @@ function parseEditedValue(raw: string, original: unknown): unknown {
 }
 
 function getPreferredFieldOrder(actionName: string): string[] {
+  if (Object.keys(schemaProperties.value).length > 0) {
+    return Object.keys(schemaProperties.value);
+  }
+
   return actionFieldOrders[actionName] || Object.keys(originalArgs.value);
 }
 
@@ -178,13 +225,20 @@ function buildArgOrder(args: Record<string, any>, preferredOrder: string[]): str
 
 function getFieldOptions(key: string): RedmineOption[] {
   if (key === "tracker_id") return trackers.value;
-  if (key === "status_id") return issueStatuses.value;
+  if (key === "status_id") {
+    return actionName.value.startsWith("create_version") || actionName.value.startsWith("update_version")
+      ? versionStatuses.value
+      : issueStatuses.value;
+  }
   if (key === "priority_id") return issuePriorities.value;
+  if (key === "version_id") return projectVersions.value;
+  if (key === "assigned_to_id") return projectMembers.value;
+  if (key === "status") return versionStatuses.value;
   return [];
 }
 
 function isSelectField(key: string): boolean {
-  return selectFieldKeys.has(key);
+  return selectFieldKeys.has(key) && getFieldOptions(key).length > 0;
 }
 
 function normalizeSelectedValue(key: string, value: unknown): string {
@@ -201,15 +255,25 @@ async function loadMetadata() {
   if (!props.token) return;
   metadataLoading.value = true;
   try {
-    const metadata = await redmineApi.getMetadata(props.token);
+    const projectIdentifier = extractProjectIdentifier(originalArgs.value);
+    const issueId = extractIssueId(originalArgs.value);
+    const metadata = await redmineApi.getMetadata(props.token, projectIdentifier || undefined, issueId || undefined);
     redmineBaseUrl.value = metadata.base_url;
     trackers.value = metadata.trackers || [];
     issueStatuses.value = metadata.issue_statuses || [];
     issuePriorities.value = metadata.issue_priorities || [];
+    versionStatuses.value = metadata.version_statuses || [];
+    projectVersions.value = metadata.project_versions || [];
+    projectMembers.value = metadata.project_members || [];
+    issueSummary.value = metadata.issue_summary || null;
   } catch {
     trackers.value = [];
     issueStatuses.value = [];
     issuePriorities.value = [];
+    versionStatuses.value = [];
+    projectVersions.value = [];
+    projectMembers.value = [];
+    issueSummary.value = null;
   } finally {
     metadataLoading.value = false;
   }
@@ -225,13 +289,19 @@ watch(
     const extracted = extractEditableAction(nextInterrupt);
     if (!extracted) {
       actionName.value = "";
+      actionDescription.value = "";
       originalArgs.value = {};
+      schemaProperties.value = {};
+      issueSummary.value = null;
       editableArgs.value = {};
       return;
     }
 
     actionName.value = extracted.name;
+    actionDescription.value = extracted.description;
     originalArgs.value = { ...extracted.args };
+    schemaProperties.value = extracted.schema;
+    issueSummary.value = null;
     const mapped: Record<string, string> = {};
     preferredFieldOrder.value.forEach((key) => {
       const raw = extracted.args[key];
@@ -251,6 +321,13 @@ watch(
 );
 
 watch(
+  () => [originalArgs.value.project_id, originalArgs.value.issue_id],
+  () => {
+    void loadMetadata();
+  },
+);
+
+watch(
   () => props.token,
   () => {
     void loadMetadata();
@@ -263,6 +340,26 @@ function approve() {
 
 function reject() {
   emit("reject", rejectMessage.value || "Rejected by user");
+}
+
+function getIssueDisplayText() {
+  if (issueSummary.value?.subject) {
+    return issueSummary.value.subject;
+  }
+  if (originalArgs.value.issue_id !== undefined && originalArgs.value.issue_id !== null) {
+    return `Issue #${originalArgs.value.issue_id}`;
+  }
+  return "Issue";
+}
+
+function getAssigneeDisplayText() {
+  if (issueSummary.value?.assigned_to_name) {
+    return issueSummary.value.assigned_to_name;
+  }
+  if (originalArgs.value.assigned_to_id !== undefined && originalArgs.value.assigned_to_id !== null && String(originalArgs.value.assigned_to_id).trim() !== "") {
+    return `User #${originalArgs.value.assigned_to_id}`;
+  }
+  return "Unassigned";
 }
 
 function edit() {
@@ -293,7 +390,15 @@ function edit() {
 </script>
 
 <template>
-  <section v-if="visible" class="m-6 p-6 rounded-3xl bg-surface-900 border border-copper-500/20 shadow-2xl animate-in zoom-in-95 duration-300 overflow-auto custom-scrollbar">
+  <section 
+    v-if="visible" 
+    :class="[
+      'rounded-3xl border shadow-2xl animate-in zoom-in-95 duration-300 overflow-auto custom-scrollbar',
+      props.inline
+        ? 'w-full p-6 bg-surface-900 border-copper-500/20'
+        : 'm-6 p-6 bg-surface-900 border-copper-500/20'
+    ]"
+  >
     <div class="flex items-center gap-3 mb-6">
       <div class="w-10 h-10 rounded-xl bg-copper-500/20 flex items-center justify-center text-copper-500">
         <AlertTriangle :size="20" />
@@ -301,6 +406,9 @@ function edit() {
       <div>
         <h3 class="text-sm font-black text-white uppercase tracking-widest">Approval Required</h3>
         <p class="text-xs text-surface-500 font-bold">The agent is requesting permission to execute an action.</p>
+        <p v-if="actionDescription" class="mt-2 text-xs text-surface-400 leading-relaxed">
+          {{ actionDescription }}
+        </p>
       </div>
     </div>
 
@@ -345,6 +453,28 @@ function edit() {
             class="grid gap-2"
           >
             <label class="text-[10px] font-black uppercase tracking-widest text-surface-500">{{ labelize(key) }}</label>
+            <div
+              v-if="key === 'issue_id'"
+              class="w-full rounded-xl border border-surface-700 bg-surface-800 px-4 py-3"
+            >
+              <div class="text-xs font-bold text-surface-100 truncate">
+                {{ getIssueDisplayText() }}
+              </div>
+              <div class="mt-1 text-[10px] uppercase tracking-widest text-surface-500">
+                ID {{ originalArgs[key] ?? "—" }}
+              </div>
+            </div>
+            <div
+              v-else-if="key === 'assigned_to_id' && !isSelectField(key)"
+              class="w-full rounded-xl border border-surface-700 bg-surface-800 px-4 py-3"
+            >
+              <div class="text-xs font-bold text-surface-100 truncate">
+                {{ getAssigneeDisplayText() }}
+              </div>
+              <div class="mt-1 text-[10px] uppercase tracking-widest text-surface-500">
+                ID {{ originalArgs[key] ?? "—" }}
+              </div>
+            </div>
             <select
               v-if="isSelectField(key)"
               v-model="editableArgs[key]"

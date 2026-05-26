@@ -2,7 +2,6 @@
 import ConversationSidebar from "./ConversationSidebar.vue";
 import MessageList from "./MessageList.vue";
 import MessageInput from "./MessageInput.vue";
-import ApprovalDialog from "./ApprovalDialog.vue";
 import { useChat } from "@redsage/ui-core/composables/useChat";
 import type { ApproveRequest } from "@redsage/ui-core/types";
 import { computed, ref, watch } from "vue";
@@ -214,21 +213,19 @@ async function removeConversation(threadId: string) {
                 :messages="messages"
                 :show-thinking-bar="showThinkingBar"
                 :loading-status="loadingStatus"
+                :token="token"
+                :interrupt="pendingInterrupt"
+                :disabled="isLoading"
+                @approve="onApprove"
+                @reject="onReject"
+                @edit="onEdit"
                 @skip-thinking="onSkipThinkingBar"
               />
             </div>
           </div>
 
           <div class="px-6 py-4 bg-transparent">
-             <ApprovalDialog
-                :token="token"
-              :interrupt="pendingInterrupt"
-              :disabled="isLoading"
-              @approve="onApprove"
-              @reject="onReject"
-              @edit="onEdit"
-            />
-            <div class="mt-2">
+             <div class="mt-2">
               <MessageInput :disabled="isLoading || !!pendingInterrupt" @send="onSend" />
             </div>
           </div>

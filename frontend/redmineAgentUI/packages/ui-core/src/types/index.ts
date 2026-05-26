@@ -9,6 +9,29 @@ export interface ChatResponse {
   interrupts: Record<string, any>;
 }
 
+export interface RedmineOption {
+  id: string;
+  name: string;
+}
+
+export interface RedmineMetadata {
+  base_url: string;
+  trackers: RedmineOption[];
+  issue_statuses: RedmineOption[];
+  issue_priorities: RedmineOption[];
+  version_statuses?: RedmineOption[];
+  project_versions?: RedmineOption[];
+  project_members?: RedmineOption[];
+  issue_summary?: {
+    id: string;
+    subject: string;
+    assigned_to_name: string;
+    assigned_to_id?: string | number | null;
+    project_name?: string;
+    project_identifier?: string;
+  } | null;
+}
+
 export interface ApproveRequest {
   decision_type: 'approve' | 'reject' | 'edit';
   message?: string;
@@ -62,7 +85,7 @@ export interface SetPmAccessResponse {
   email: string;
   full_name: string;
   enabled: boolean;
-  projects_name: [string];
+  projects_name: string[];
   enabled_by_admin_id: string | null;
 }
 
@@ -72,7 +95,7 @@ export interface PmCandidate {
   email: string;
   full_name: string;
   in_platform: boolean;
-  projects_name: [string];
+  projects_name: string[];
   enabled: boolean;
 }
 
