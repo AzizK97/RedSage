@@ -78,7 +78,7 @@ class UserRepository:
     ) -> dict:
         """Mirror a Redmine user into the platform.
 
-        Behavior (hybrid safe mode):
+        Behavior :
         - If the user exists, update `email` and `full_name` always.
         - Update `platform_role` only when `platform_role` is not None.
           Additionally, never demote an existing `admin` to a non-admin role

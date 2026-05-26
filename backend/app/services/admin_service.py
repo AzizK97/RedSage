@@ -8,12 +8,12 @@ class AdminService:
     def __init__(self, db: Connection) -> None:
         self.users = UserRepository(db)
         self.entitlements = EntitlementRepository(db)
+        self.redmine_client = redmine_client
 
     def set_pm_access(self, admin_user_id: str, redmine_user_id: int, enabled: bool) -> dict:
         user = self.users.get_by_redmine_user_id(redmine_user_id)
-        generated_account = False
         if not user and enabled:
-            redmine_user = redmine_client.get_user(redmine_user_id)
+            redmine_user = self.redmine_client.get_user(redmine_user_id)
             if not redmine_user:
                 raise ValueError("Redmine user was not found.")
 
@@ -28,7 +28,6 @@ class AdminService:
                 full_name=full_name,
                 platform_role="project_manager",
             )
-            generated_account = True
 
         if not user:
             raise ValueError("PM candidate not found in platform. Sync first or enable access to auto-provision.")
@@ -41,7 +40,7 @@ class AdminService:
             "email": user["email"],
             "full_name": user["full_name"],
             "enabled": enabled,
-            "generated_account": generated_account,
+            "projects_name": self.redmine_client.list_managed_projects_for_user(user["redmine_user_id"]),
             "enabled_by_admin_id": access_state["enabled_by_admin_id"],
         }
 
@@ -57,7 +56,7 @@ class AdminService:
                     "full_name": user["full_name"],
                     "in_platform": True,
                     "enabled": access_state["enabled"],
-                    "credentials_ready": True,
+                    "projects_name": self.redmine_client.list_managed_projects_for_user(user["redmine_user_id"]),
                 }
             )
 

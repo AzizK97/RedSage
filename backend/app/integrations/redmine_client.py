@@ -219,10 +219,6 @@ class RedmineClient:
     def list_managed_project_identifiers_for_user_strict(self, redmine_user_id: int) -> list[str]:
         """Return project identifiers where user has a managerial role (no fallback).
         
-        Unlike list_managed_project_identifiers_for_user(), this does NOT fall back to 
-        member-only projects if no manager roles are found. Only returns projects where 
-        the user has an explicit managerial role (manager, lead, owner, chef, responsable).
-        
         Use this for strict PM classification during user sync.
         """
         managed_identifiers: list[str] = []

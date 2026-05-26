@@ -4,11 +4,11 @@ import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut, LampCeiling } from "l
 
 const props = defineProps<{
   role: "admin" | "project_manager";
-  currentView: "dashboard" | "chat" | "profile";
+  currentView: "dashboard" | "access-management" | "chat" | "profile";
 }>();
 
 const emit = defineEmits<{
-  (event: "navigate", view: "dashboard" | "chat" | "profile"): void;
+  (event: "navigate", view: "dashboard" | "access-management" | "chat" | "profile"): void;
   (event: "logout"): void;
 }>();
 
@@ -17,6 +17,13 @@ const isCollapsed = ref(false);
 function roleLabel() {
   return props.role === "admin" ? "Admin" : "Project Manager";
 }
+
+const navItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  ...(props.role === 'admin' ? [{ id: 'access-management', label: 'Access Management', icon: User }] : []),
+  { id: 'chat', label: 'Chatbot', icon: Bot },
+  { id: 'profile', label: 'Profile', icon: User },
+];
 </script>
 
 <template>
@@ -49,11 +56,7 @@ function roleLabel() {
 
     <nav class="flex flex-col gap-1.5 flex-1">
       <button
-        v-for="item in [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'chat', label: 'Chatbot', icon: Bot },
-          { id: 'profile', label: 'Profile', icon: User },
-        ]"
+        v-for="item in navItems"
         :key="item.id"
         :class="[
           'group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium h-11 overflow-hidden',

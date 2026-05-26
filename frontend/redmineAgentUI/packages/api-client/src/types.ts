@@ -51,7 +51,7 @@ export interface SetPmAccessResponse {
   email: string;
   full_name: string;
   enabled: boolean;
-  generated_account: boolean;
+  projects_name: [string];
   enabled_by_admin_id: string | null;
 }
 
@@ -61,7 +61,7 @@ export interface PmCandidate {
   email: string;
   full_name: string;
   in_platform: boolean;
-  credentials_ready: boolean;
+  projects_name: [string];
   enabled: boolean;
 }
 

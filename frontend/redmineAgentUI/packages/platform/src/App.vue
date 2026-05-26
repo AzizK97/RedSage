@@ -8,14 +8,16 @@ import DashboardView from "./views/DashboardView.vue";
 import ProfileView from "./components/Dashboard/ProfileView.vue";
 import { useSession, type PlatformRole } from "@redsage/ui-core/composables/useSession";
 import { useRoute, useRouter } from "vue-router";
+import Accessmanagement from "./components/Dashboard/Accessmanagement.vue";
 
 const { token, role, fullName, email, userId, isAuthenticated, setSession, clearSession } = useSession();
 const router = useRouter();
 const route = useRoute();
 
-const currentView = computed<"dashboard" | "chat" | "profile">(() => {
+const currentView = computed<"dashboard" | "access-management" | "chat" | "profile">(() => {
   if (route.name === "chat") return "chat";
   if (route.name === "profile") return "profile";
+  if (route.name === "access-management") return "access-management";
   return "dashboard";
 });
 
@@ -52,12 +54,17 @@ function startLogin() {
   void router.push({ name: "login" });
 }
 
-function handleNavigate(view: "dashboard" | "chat" | "profile" | "thread", threadId?: string) {
+function handleNavigate(view: "dashboard" | "access-management" | "chat" | "profile" | "thread", threadId?: string) {
+  if (view === "access-management" && role.value !== "admin") {
+    void router.push({ name: "dashboard" });
+    return;
+  }
+
   if (view === 'thread') {
     void router.push({ name: 'chat', query: threadId ? { threadId } : undefined });
     return;
   }
-  void router.push({ name: view as "dashboard" | "chat" | "profile" });
+  void router.push({ name: view as "dashboard" | "access-management" | "chat" | "profile" });
 }
 </script>
 
@@ -94,6 +101,12 @@ function handleNavigate(view: "dashboard" | "chat" | "profile" | "thread", threa
       <section class="app-view">
         <DashboardView
           v-if="currentView === 'dashboard'"
+          :role="role === 'admin' ? 'admin' : 'project_manager'"
+          :token="token"
+        />
+
+        <Accessmanagement
+          v-else-if="currentView === 'access-management'"
           :role="role === 'admin' ? 'admin' : 'project_manager'"
           :token="token"
         />
