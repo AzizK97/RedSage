@@ -96,4 +96,14 @@ export const apiClient = {
     });
     return handleResponse<T>(response);
   },
+
+  async patch<T>(endpoint: string, body: unknown, token?: string): Promise<T> {
+    const headers = authHeaders(token);
+    const response = await fetchWithTimeout(`${BASE_API}${endpoint}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(body),
+    });
+    return handleResponse<T>(response);
+  },
 };

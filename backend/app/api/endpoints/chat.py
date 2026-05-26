@@ -71,6 +71,16 @@ class ThreadListItem(BaseModel):
     updated_at: int
 
 
+class RenameThreadRequest(BaseModel):
+    title: str
+
+    @model_validator(mode="after")
+    def validate_title(self):
+        if not self.title or not self.title.strip():
+            raise ValueError("title cannot be empty")
+        return self
+
+
 def _interrupt_to_payload(interrupt_obj: Any) -> Dict[str, Any]:
     if hasattr(interrupt_obj, "value"):
         value = interrupt_obj.value
@@ -324,6 +334,39 @@ async def delete_thread_endpoint(
         }
     except Exception as e:
         print(f"❌ Delete failed for thread {thread_id}: {e}")
+        _raise_http_from_exception(e)
+
+
+@router.patch("/chat/thread/{thread_id}/rename")
+async def rename_thread_endpoint(
+    thread_id: str,
+    request: RenameThreadRequest,
+    current: CurrentUser = Depends(require_permission(Permission.CHAT_USE)),
+    db: Connection = Depends(get_agent_db),
+):
+    """Rename a conversation thread."""
+    ensure_thread_tables(db)
+    ensure_thread_owner(db, thread_id, current.id)
+    try:
+        thread_repo = ThreadRepository(db)
+        # Get current preview to keep it unchanged
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT preview FROM thread_owners WHERE thread_id = %s",
+                (thread_id,),
+            )
+            row = cur.fetchone()
+            preview = row[0] if row else "No messages yet"
+        
+        # Update title
+        thread_repo.update_metadata(thread_id, request.title.strip(), preview)
+        return {
+            "status": "renamed",
+            "thread_id": thread_id,
+            "title": request.title.strip(),
+        }
+    except Exception as e:
+        print(f"❌ Rename failed for thread {thread_id}: {e}")
         _raise_http_from_exception(e)
 
 

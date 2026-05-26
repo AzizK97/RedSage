@@ -53,7 +53,7 @@ const visibleError = computed(() => error?.value ?? null);
 const isVirginChat = computed(() => (messages.value ? messages.value.length === 0 : true));
 const widgetConversations = computed(() =>
   conversations.value.map((conversation) => ({
-    thread_id: conversation.id,
+    thread_id: String(conversation.id),
     title: conversation.title,
     preview: conversation.preview,
     updated_at: conversation.updatedAt,
@@ -76,6 +76,7 @@ function handleClose() {
 }
 
 function handleNewThread() {
+  lastView.value = 'history';
   createThread();
   currentView.value = 'chat';
 }

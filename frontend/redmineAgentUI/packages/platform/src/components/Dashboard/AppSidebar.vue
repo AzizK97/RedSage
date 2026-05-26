@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut, LampCeiling } from "lucide-vue-next";
+import { ChevronsLeft, LayoutDashboard, Bot, User, LogOut, LampCeiling, KeyRound } from "lucide-vue-next";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -20,7 +20,7 @@ function roleLabel() {
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  ...(props.role === 'admin' ? [{ id: 'access-management', label: 'Access Management', icon: User }] : []),
+  ...(props.role === 'admin' ? [{ id: 'access-management', label: 'Access Management', icon: KeyRound }] : []),
   { id: 'chat', label: 'Chatbot', icon: Bot },
   { id: 'profile', label: 'Profile', icon: User },
 ];

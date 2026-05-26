@@ -19,6 +19,7 @@ const emit = defineEmits<{
   (e: "select", threadId: string): void;
   (e: "new"): void;
   (e: "delete", threadId: string): void;
+  (e: "rename", threadId: string): void;
 }>();
 
 const openMenu = ref<string | null>(null);
@@ -65,7 +66,7 @@ function handleDelete(threadId: string) {
 }
 
 function handleRename(threadId: string) {
-  console.log("Rename conversation:", threadId);
+  emit("rename", threadId);
   openMenu.value = null;
 }
 </script>
@@ -109,6 +110,7 @@ function handleRename(threadId: string) {
             <button
               class="flex-1 px-4 py-3 h-full text-left min-w-0"
               type="button"
+              :title="conversation.title || 'Untitled Chat'"
               @click="emit('select', conversation.id)"
             >
               <p class="text-xs font-semibold truncate">{{ conversation.title || 'Untitled Chat' }}</p>

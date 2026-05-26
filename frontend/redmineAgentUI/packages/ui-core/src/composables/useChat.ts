@@ -23,6 +23,7 @@ export function useChat(token: string, userId: string) {
         syncError,
         isSyncing,
         reloadThreadMessages,
+        renameThread,
     } = useThreads(token, userId);
 
     const messages: Ref<Message[]> = ref(getMessages(activeThreadId.value));
@@ -211,6 +212,7 @@ export function useChat(token: string, userId: string) {
         createThread,
         setActiveThread,
         deleteThread,
+        renameThread,
         sendMessage,
         submitDecision
     };

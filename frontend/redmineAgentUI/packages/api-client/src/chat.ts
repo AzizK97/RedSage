@@ -29,6 +29,10 @@ export const chatApi = {
     return apiClient.delete(`/chat/thread/${thread_id}`, token);
   },
 
+  async renameThread(thread_id: string, title: string, token: string): Promise<{ status: string; thread_id: string; title: string }> {
+    return apiClient.patch(`/chat/thread/${thread_id}/rename`, { title }, token);
+  },
+
   async getThreadMessages(
     thread_id: string,
     token: string,

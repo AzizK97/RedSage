@@ -67,11 +67,73 @@ function normalizeMessages(rawMessages: unknown): Message[] {
 }
 
 function deriveTitle(messages: Message[]) {
+  if (messages.length === 0) return "New conversation";
+
+  // Extract smart title from all messages
+  const combinedText = messages.map(m => m.content).join(" ").toLowerCase();
+  
+  // Common action patterns
+  const actionPatterns = [
+    { regex: /\b(create|add|new)\s+/i, label: "Create" },
+    { regex: /\b(update|edit|modify|change|set)\s+/i, label: "Update" },
+    { regex: /\b(delete|remove|drop)\s+/i, label: "Delete" },
+    { regex: /\b(list|show|get|fetch|retrieve|view|display)\s+/i, label: "List" },
+    { regex: /\b(report|summary|summarize|analysis)\s+/i, label: "Report" },
+    { regex: /\b(assign|reassign)\s+/i, label: "Assign" },
+    { regex: /\b(close|resolve|complete)\s+/i, label: "Close" },
+    { regex: /\b(bulk|batch)\s+/i, label: "Bulk" },
+  ];
+
+  // Entity patterns
+  const entityPatterns = [
+    { regex: /project[s]?\s+(?:named\s+)?["']?([^"',.;!?\n]+)/i, type: "project" },
+    { regex: /issue[s]?\s+(?:named\s+)?["']?([^"',.;!?\n]+)/i, type: "issue" },
+    { regex: /version[s]?\s+(?:named\s+)?["']?([^"',.;!?\n]+)/i, type: "version" },
+    { regex: /sprint[s]?\s+(?:named\s+)?["']?([^"',.;!?\n]+)/i, type: "sprint" },
+    { regex: /#(\d+)/i, type: "issueId" },
+  ];
+
+  let detectedAction = "";
+  let detectedEntity = "";
+
+  // Find action verb
+  for (const pattern of actionPatterns) {
+    if (pattern.regex.test(combinedText)) {
+      detectedAction = pattern.label;
+      break;
+    }
+  }
+
+  // Find entity
+  for (const pattern of entityPatterns) {
+    const match = combinedText.match(pattern.regex);
+    if (match) {
+      detectedEntity = match[1] ? match[1].trim().substring(0, 20) : "";
+      break;
+    }
+  }
+
+  // Build title from detected components
+  if (detectedAction && detectedEntity) {
+    const title = `${detectedAction} ${detectedEntity}`;
+    return title.length > 42 ? `${title.substring(0, 41)}…` : title;
+  } else if (detectedAction) {
+    // Find object after action
+    const actionObjMatch = combinedText.match(/\b(create|update|list|delete|assign|close)\s+(\w+)/);
+    if (actionObjMatch) {
+      const obj = actionObjMatch[2].charAt(0).toUpperCase() + actionObjMatch[2].slice(1);
+      const title = `${detectedAction} ${obj}`;
+      return title.length > 42 ? `${title.substring(0, 41)}…` : title;
+    }
+    return detectedAction;
+  }
+
+  // Fallback to first user message
   const firstUser = messages.find((message) => message.role === "user" && message.content.trim());
   if (!firstUser) return "New conversation";
 
   const compact = firstUser.content.replace(/\s+/g, " ").trim();
-  return compact.length > 42 ? `${compact.slice(0, 42)}…` : compact;
+  return compact.length > 42 ? `${compact.substring(0, 41)}…` : compact;
 }
 
 function derivePreview(messages: Message[]) {
@@ -339,15 +401,27 @@ export function useThreads(token: string, userId: string) {
     persistState(userId);
   }
 
-  function renameThread(threadId: string, title: string) {
-    if (!userId) return;
+  async function renameThread(threadId: string, title: string) {
+    if (!userId || !token) return;
     const normalizedTitle = title.trim() || "New conversation";
+    
+    // Optimistic update
     conversations.value = conversations.value.map((conversation) =>
       conversation.id === threadId
         ? { ...conversation, title: normalizedTitle, updatedAt: Date.now() }
         : conversation,
     );
     persistState(userId);
+
+    // Sync with backend
+    try {
+      await chatApi.renameThread(threadId, normalizedTitle, token);
+    } catch (error) {
+      console.error("Failed to rename thread on server:", error);
+      syncError.value = error instanceof Error ? error.message : "Failed to rename conversation";
+      // Revert optimistic update on error
+      await refreshThreadsFromServer();
+    }
   }
 
   function setPendingInterrupt(threadId: string, interrupt: Record<string, any> | null) {

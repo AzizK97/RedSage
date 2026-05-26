@@ -32,6 +32,7 @@ const {
   createThread,
   setActiveThread,
   deleteThread,
+  renameThread,
 } = useChat(props.token, props.userId);
 
 // When parent requests opening a specific thread, set it active
@@ -53,6 +54,9 @@ const isVirginChat = computed(() => messages.value.length === 0);
 const visibleError = computed(() => error.value || syncError.value);
 const virginDraft = ref("");
 const hideThinkingBar = ref(false);
+const renameDialogOpen = ref(false);
+const renameThreadId = ref("");
+const renameDraft = ref("");
 const starterSuggestions = [
   "Give me a list of all the projects",
   "List high-priority tasks that are due this week",
@@ -109,6 +113,39 @@ async function startNewConversation() {
   }
 }
 
+function openRenameDialog(threadId: string) {
+  renameThreadId.value = threadId;
+  const conversation = conversations.value.find((c) => c.id === threadId);
+  renameDraft.value = conversation?.title || "";
+  renameDialogOpen.value = true;
+}
+
+function closeRenameDialog() {
+  renameDialogOpen.value = false;
+  renameThreadId.value = "";
+  renameDraft.value = "";
+}
+
+function submitRename() {
+  const trimmed = renameDraft.value.trim();
+  if (!trimmed) {
+    alert("Please enter a conversation name");
+    return;
+  }
+  const promise = renameThread(renameThreadId.value, trimmed);
+  if (promise instanceof Promise) {
+    promise
+      .then(() => {
+        closeRenameDialog();
+      })
+      .catch(() => {
+        alert("Failed to rename conversation");
+      });
+  } else {
+    closeRenameDialog();
+  }
+}
+
 async function selectConversation(threadId: string) {
   try {
     await setActiveThread(threadId);
@@ -144,6 +181,7 @@ async function removeConversation(threadId: string) {
       @new="startNewConversation"
       @select="selectConversation"
       @delete="removeConversation"
+      @rename="openRenameDialog"
     />
 
     <!-- Main Panel -->
@@ -231,6 +269,43 @@ async function removeConversation(threadId: string) {
           </div>
         </div>
       </template>
+    </div>
+
+    <!-- Rename Dialog Modal -->
+    <div
+      v-if="renameDialogOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      @click="closeRenameDialog"
+    >
+      <div
+        class="bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl p-8 w-full max-w-md animate-in fade-in zoom-in-95 duration-300"
+        @click.stop
+      >
+        <h3 class="text-lg font-bold text-white mb-4">Rename Conversation</h3>
+        <input
+          v-model="renameDraft"
+          type="text"
+          placeholder="Enter new conversation name..."
+          class="w-full bg-surface-800 border border-surface-700 p-3 rounded-xl text-sm font-semibold text-surface-100 placeholder:text-surface-600 focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all outline-none mb-6"
+          @keyup.enter="submitRename"
+          @keyup.escape="closeRenameDialog"
+          autofocus
+        />
+        <div class="flex gap-3">
+          <button
+            @click="closeRenameDialog"
+            class="flex-1 h-10 rounded-xl bg-surface-800 hover:bg-surface-700 text-surface-300 font-bold text-sm transition-all active:scale-95"
+          >
+            Cancel
+          </button>
+          <button
+            @click="submitRename"
+            class="flex-1 h-10 rounded-xl bg-sage-500 hover:bg-sage-400 text-surface-950 font-bold text-sm transition-all active:scale-95"
+          >
+            Rename
+          </button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
