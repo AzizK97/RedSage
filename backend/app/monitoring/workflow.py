@@ -12,6 +12,17 @@ from app.agent.supervisor import create_llm
 from app.core.settings import settings
 from app.integrations.redmine_client import redmine_client
 
+"""
+DEPRECATED — LangGraph monitoring prototype (not used in production).
+
+This module was an earlier proof-of-concept that ran the monitoring pipeline
+as a LangGraph StateGraph. It has been superseded by MonitoringService in
+app/monitoring/service.py, which is the active implementation called by the
+scheduler and the /api/monitoring endpoints.
+
+Kept for reference only. Do not wire this into any router or scheduler job.
+"""
+
 
 class MonitoringState(TypedDict):
     events: list[dict[str, Any]]

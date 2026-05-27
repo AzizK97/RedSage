@@ -10,7 +10,6 @@ from app.core.config import settings
 from app.integrations.redmine_client import redmine_client
 from app.monitoring.cache import MonitoringCache
 from app.monitoring.repository import MonitoringRepository
-from app.services.user_sync_service import UserSyncService
 
 
 @dataclass
@@ -238,9 +237,99 @@ class MonitoringService:
             )
             return
 
-        payload = {
-            "text": f"[{event['severity'].upper()}] {event['title']}\n{event.get('details', '')}".strip(),
-        }
+        # Build a richer Block Kit payload for project managers
+        overview = {}
+        try:
+            overview = repo.get_overview() or {}
+        except Exception:
+            overview = {}
+
+        metrics = overview.get("metrics", {})
+        last_run = overview.get("last_run") or {}
+
+        redmine_issue_url = None
+        issue_id = event.get("issue_id")
+        if issue_id and settings.REDMINE_URL:
+            redmine_issue_url = f"{settings.REDMINE_URL.rstrip('/')}/issues/{issue_id}"
+
+        header_text = f"[{event['severity'].upper()}] {event.get('title', '')}"
+        tl_dr = (event.get("details") or "No details available.")
+
+        blocks: list[dict[str, Any]] = []
+        blocks.append({
+            "type": "header",
+            "text": {"type": "plain_text", "text": header_text, "emoji": True},
+        })
+
+        counts_line = ""
+        if metrics:
+            counts_line = (
+                f"Projects: {metrics.get('total_projects', 0)} • "
+                f"Open: {metrics.get('open_issues', 0)} • "
+                f"Overdue: {metrics.get('overdue', 0)} • "
+                f"Critical: {metrics.get('critical', 0)}"
+            )
+
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"*TL;DR*: {tl_dr}\n{counts_line}"},
+        })
+
+        # If we have an issue link, add a short field with assignee/due info when available
+        if issue_id:
+            issue_link = redmine_issue_url or f"Issue #{issue_id}"
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Top item*: <{issue_link}|#{issue_id}>"},
+            })
+
+        # Add optional suggested action and run context
+        suggested = "Triage the listed items and reassign owners as needed."
+        run_info = ""
+        if last_run and last_run.get("id"):
+            run_info = f"Run: {last_run.get('id')}"
+
+        blocks.append({
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"*Suggested action*: {suggested}\n{run_info}"},
+        })
+
+        # Actions: link to Redmine issue or to the monitoring overview endpoint when possible
+        actions = []
+        if redmine_issue_url:
+            actions.append(
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "View issue", "emoji": True},
+                    "url": redmine_issue_url,
+                }
+            )
+
+        monitoring_url = None
+        if last_run and settings.REDMINE_URL:
+            # best-effort link to platform; fall back to REDMINE root when no explicit monitoring UI
+            monitoring_url = f"{settings.REDMINE_URL.rstrip('/')}/"
+
+        if monitoring_url:
+            actions.append(
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "View monitoring", "emoji": True},
+                    "url": monitoring_url,
+                }
+            )
+
+        if actions:
+            blocks.append({"type": "actions", "elements": actions})
+
+        blocks.append({
+            "type": "context",
+            "elements": [
+                {"type": "plain_text", "text": f"Fingerprint: {event.get('fingerprint', '')}", "emoji": False}
+            ],
+        })
+
+        payload = {"blocks": blocks}
 
         try:
             response = requests.post(
@@ -319,16 +408,14 @@ class MonitoringService:
             )
             events_count = len(stored_events)
 
-            # for event in stored_events:
-            #     repo.record_notification(
-            #         event_id=event["id"],
-            #         channel="in_app",
-            #         status="queued",
-            #         response_text="stored",
-            #     )
-            #     await self._send_slack(event, repo)
-
-            synced_count = UserSyncService(db).sync_project_managers()
+            for event in stored_events:
+                repo.record_notification(
+                    event_id=event["id"],
+                    channel="in_app",
+                    status="queued",
+                    response_text="stored",
+                )
+                await self._send_slack(event, repo)
 
             repo.finish_run(
                 run_id,
@@ -336,7 +423,7 @@ class MonitoringService:
                 projects_count=projects_count,
                 issues_count=issues_count,
                 events_count=events_count,
-                synced_pms=synced_count,
+                synced_pms=0,
             )
 
             await self.cache.delete(self.cache_key_overview)

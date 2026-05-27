@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { dashboardApi } from "@redsage/api-client/dashboard";
 import { monitoringApi } from "@redsage/api-client/monitoring";
 import type { AtRiskProjectInsight, DashboardProject, MonitoringOverview, OverdueTicketInsight, ProjectStatus, TaskDistributionItem } from "@redsage/ui-core/types";
-import { Info, TrendingUp, AlertTriangle, Clock, ChevronRight, ChevronDown, Check } from "lucide-vue-next";
+import { Info, TrendingUp, AlertTriangle, Clock, ChevronRight, ChevronDown, Check, Printer } from "lucide-vue-next";
+import DashboardPdfPreview from "../components/Dashboard/DashboardPdfPreview.vue";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -70,6 +71,8 @@ const projectRows = computed(() => {
     };
   });
 });
+
+const showPdfPreview = ref(false);
 
 const runTrendBars = computed((): { id: string; label: string; fullDate: string; height: string; value: number; toneClass: string }[] => {
   const trend = (monitoringOverview.value?.run_trend ?? []) as Array<{ started_at: string; events_count?: number | string }>;
@@ -365,6 +368,26 @@ async function loadProjects() {
   }
 }
 
+provide("dashboardData", {
+  projects,
+  topOverdueTickets,
+  atRiskProjects,
+  taskDistribution,
+  monitoringOverview,
+  selectedProjectId,
+  selectedProjectIdentifier,
+  openIssuesCount,
+  overdueIssuesCount,
+  criticalIssuesCount,
+  scheduleHealthSummary,
+  taskDistributionSummary,
+  projectRows,
+  schedulePressureChart,
+  milestoneSlippage,
+  teamWorkloadInsight,
+  selectedProjectLabel,
+});
+
 function mapDashboardProject(project: DashboardProject): ProjectStatus {
   const progress = Number.isFinite(project.progress as number) ? Math.max(0, Math.min(100, project.progress ?? 0)) : 0;
   const health: ProjectStatus["health"] =
@@ -456,8 +479,27 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="min-h-full bg-surface-950 px-4 sm:px-6 lg:px-8 py-8 sm:py-10 text-surface-900">
-    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 lg:gap-8">
+  <main id="dashboard-root" class="min-h-full bg-surface-950 px-4 sm:px-6 lg:px-8 py-8 sm:py-10 text-surface-900">
+    <div id="dashboard-print-root" class="mx-auto flex w-full max-w-7xl flex-col gap-6 lg:gap-8">
+      <!-- Print header (hidden by default, visible only during print) -->
+      <div class="no-print-hide print-only-show" 
+           style="display:none"
+           id="pdf-report-header">
+        <div style="display:flex; justify-content:space-between; align-items:center; 
+                    padding-bottom: 12px; border-bottom: 2px solid #c0392b; margin-bottom: 20px">
+          <div>
+            <span style="font-size:22px; font-weight:800; color:#c0392b">RedSage</span>
+            <span style="font-size:15px; font-weight:600; color:#111; margin-left:12px">
+              Project Health & Advancement
+            </span>
+            <div style="font-size:11px; color:#666; margin-top:2px">
+              Generated on: {{ new Date().toLocaleString() }}
+            </div>
+          </div>
+          <div style="font-size:12px; color:#666">{{ selectedProjectLabel }}</div>
+        </div>
+      </div>
+
       <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div class="space-y-2">
           <div class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-sage-400">
@@ -474,7 +516,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div ref="projectSelectorRef" class="w-full max-w-xs">
+        <div ref="projectSelectorRef" class="w-full max-w-xs no-print">
           <label class="mb-2 block text-[10px] font-semibold uppercase tracking-[0.24em] text-surface-500">Project scope</label>
           <div class="relative">
             <button
@@ -514,6 +556,16 @@ onBeforeUnmount(() => {
               </div>
             </transition>
           </div>
+        </div>
+        <div class="flex items-end justify-end mt-3 lg:mt-0">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-md border border-surface-700 bg-surface-800 px-3 py-2 text-sm font-semibold text-surface-200 hover:bg-surface-700 no-print"
+            @click="showPdfPreview = true"
+          >
+            <Printer :size="16" />
+            <span>Download as PDF</span>
+          </button>
         </div>
       </header>
 
@@ -896,7 +948,7 @@ onBeforeUnmount(() => {
               <div v-if="projectsError" class="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-400">{{ projectsError }}</div>
             </header>
 
-            <div class="max-h-[340px] space-y-3 overflow-auto pr-1 custom-scrollbar">
+            <div class="space-y-3 overflow-auto pr-1 custom-scrollbar">
               <div v-for="project in projectRows" :key="project.id" class="rounded-2xl border border-surface-700 bg-surface-800 p-4 transition hover:border-surface-600 hover:bg-surface-700">
                 <div class="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div class="space-y-1">
@@ -993,6 +1045,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
   </main>
+  <DashboardPdfPreview v-if="showPdfPreview" @close="showPdfPreview = false" />
 </template>
 
 <style>

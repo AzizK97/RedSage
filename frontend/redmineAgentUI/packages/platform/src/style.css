@@ -610,3 +610,86 @@ body {
 @keyframes blink {
   50% { border-color: transparent; }
 }
+
+/* Print stylesheet for dashboard PDF export */
+@media print {
+  /* Hide everything that is not the dashboard content */
+  body.print-mode #app > * {
+    display: none !important;
+  }
+  body.print-mode #app #dashboard-print-root {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    overflow: visible;
+  }
+
+  /* Hide UI chrome inside the dashboard */
+  body.print-mode .no-print {
+    display: none !important;
+  }
+
+  /* Light mode overrides for print */
+  body.print-mode #dashboard-print-root {
+    background: white !important;
+    color: #111 !important;
+  }
+  body.print-mode #dashboard-print-root * {
+    color: inherit !important;
+  }
+
+  /* Convert dark card surfaces to white with border */
+  body.print-mode #dashboard-print-root [class*="bg-"] {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Fix overflow on containers */
+  body.print-mode #dashboard-print-root .overflow-auto,
+  body.print-mode #dashboard-print-root .overflow-hidden {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Text overflow handling */
+  body.print-mode #dashboard-print-root .truncate {
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: normal !important;
+  }
+
+  /* Fix progress bars — keep color but ensure visibility on white */
+  body.print-mode #dashboard-print-root [class*="rounded-full"] {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Flex wrapping for better layout */
+  body.print-mode #dashboard-print-root [class*="flex"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* Table layout optimization */
+  body.print-mode #dashboard-print-root table {
+    table-layout: auto;
+    width: 100%;
+  }
+  body.print-mode #dashboard-print-root td,
+  body.print-mode #dashboard-print-root th {
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 12mm 12mm 12mm 12mm;
+  }
+
+  /* Show print-only header */
+  body.print-mode #pdf-report-header {
+    display: block !important;
+  }
+}
