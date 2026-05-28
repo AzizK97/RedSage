@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from "vue";
 import type { Message } from "../../../../ui-core/src/types/index.ts";
+import { isReportMessage } from "../../../../ui-core/src/utils/reportDetection";
 import MarkDownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import { Lightbulb } from "lucide-vue-next";
 import ApprovalDialog from "./ApprovalDialog.vue";
+import ChatReportPdfPreview from "./ChatReportPdfPreview.vue";
 
 const props = defineProps<{
   messages: Message[];
@@ -24,6 +26,7 @@ defineEmits<{
 
 const listRef = ref<HTMLElement | null>(null);
 const approvalDialogRef = ref<HTMLElement | null>(null);
+const previewContent = ref<string | null>(null);
 
 const md = new MarkDownIt({
   html: false,
@@ -47,6 +50,14 @@ async function scrollApprovalDialogIntoView() {
   if (approvalDialogRef.value) {
     approvalDialogRef.value.scrollIntoView({ behavior: "smooth", block: "center" });
   }
+}
+
+function openReportPreview(content: string) {
+  previewContent.value = content;
+}
+
+function closeReportPreview() {
+  previewContent.value = null;
 }
 
 watch(
@@ -104,6 +115,30 @@ onMounted(() => {
               class="prose dark:prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-surface-900 prose-pre:border prose-pre:border-surface-800 prose-code:text-sage-400 prose-code:bg-surface-900 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-th:text-surface-200 prose-td:text-surface-400" 
               v-html="renderMarkdown(msg.content)"
             ></div>
+
+            <!-- PDF download button — only shown for report-type messages -->
+            <div
+              v-if="msg.role === 'assistant' && isReportMessage(msg.content)"
+              class="mt-3 flex"
+            >
+              <button
+                @click="openReportPreview(msg.content)"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium
+                       rounded-lg border transition-colors
+                       text-surface-400 border-surface-700/60 hover:text-white
+                       hover:border-sage-600/60 hover:bg-sage-900/20"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                Download as PDF
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -163,6 +198,13 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- Chat report PDF preview modal -->
+      <ChatReportPdfPreview
+        v-if="previewContent !== null"
+        :content="previewContent"
+        @close="closeReportPreview"
+      />
     </div>
   </div>
 </template>

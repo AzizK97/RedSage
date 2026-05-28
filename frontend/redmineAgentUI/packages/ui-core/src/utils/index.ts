@@ -5,3 +5,5 @@ export function debounce<T extends (...args: any[]) => void>(fn: T, wait = 300) 
     timer = setTimeout(() => fn(...args), wait);
   };
 }
+
+export * from './reportDetection';

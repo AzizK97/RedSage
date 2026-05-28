@@ -773,3 +773,21 @@ body {
     display: block !important;
   }
 }
+
+@media print {
+  /* Chat report print mode */
+  body.print-report-mode > * {
+    display: none !important;
+  }
+  body.print-report-mode #chat-report-print-content {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    box-shadow: none;
+  }
+  body.print-report-mode .no-print {
+    display: none !important;
+  }
+}
