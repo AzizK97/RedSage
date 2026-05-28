@@ -1,114 +1,61 @@
-import os
+# backend/tests/conftest.py - Shared fixtures
+
 import pytest
+from pytest_asyncio import fixture
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 import psycopg
-from httpx import AsyncClient, ASGITransport
-from fastapi.testclient import TestClient
-from app.main import app
-from app.dependencies.db import get_db
-from app.dependencies.auth import get_current_user
-from app.core.security import create_access_token
-from app.models.user import RedmineUser
 
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL", 
-    "postgresql+psycopg://localhost/redmine_chat_test"
-)
+@pytest.fixture
+def db_engine():
+    """Test database (in-memory SQLite or test Postgres)"""
+    engine = create_engine("sqlite:///:memory:")
+    # Create all tables from models
+    Base.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
 
-# ==================== DATABASE FIXTURES ====================
-
-@pytest.fixture(scope="function")
-def test_db_connection():
-    """Create a real DB connection with transaction rollback per test."""
-    conn = psycopg.connect(TEST_DATABASE_URL, autocommit=False)
-    try:
-        with conn.transaction():
-            yield conn
-            # If no exception, we rollback at the end of the 'with' block
-    finally:
-        conn.close()
-
-
-def get_test_db_override(conn):
-    """Dependency override for FastAPI."""
-    def _get_db():
+@pytest.fixture
+async def app_client(db_engine):
+    """FastAPI test client with mocked database"""
+    from app.main import app
+    from app.dependencies.db import get_db
+    
+    def override_get_db():
+        SessionLocal = sessionmaker(bind=db_engine)
+        db = SessionLocal()
         try:
-            yield conn
+            yield db
         finally:
-            pass  # Connection will be cleaned by the transaction context
-    return _get_db
-
-
-# ==================== USER & AUTH FIXTURES ====================
-
-@pytest.fixture(scope="function")
-def test_user():
-    return RedmineUser(
-        id=1,
-        redmine_user_id=123,
-        email="test@example.com",
-        full_name="Test User",
-        role="project_manager",
-    )
-
-
-@pytest.fixture
-def test_token(test_user):
-    return create_access_token(
-        data={
-            "sub": str(test_user.redmine_user_id),
-            "redmine_user_id": test_user.redmine_user_id,
-            "email": test_user.email,
-            "role": test_user.role,
-        },
-        expires_minutes=60 * 24
-    )
-
-
-def get_test_user_override(test_user):
-    async def _get_current_user():
-        return test_user
-    return _get_current_user
-
-
-# ==================== CLIENT FIXTURES ====================
-
-@pytest.fixture
-async def async_client(test_db_connection, test_user):
-    """Async client with dependency overrides."""
-    app.dependency_overrides[get_db] = get_test_db_override(test_db_connection)
-    app.dependency_overrides[get_current_user] = get_test_user_override(test_user)
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test"
-    ) as ac:
-        yield ac
-
-    # Cleanup
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def sync_client(test_db_connection, test_user):
-    """Synchronous TestClient (useful for simpler tests)."""
-    app.dependency_overrides[get_db] = get_test_db_override(test_db_connection)
-    app.dependency_overrides[get_current_user] = get_test_user_override(test_user)
-
-    with TestClient(app) as client:
+            db.close()
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
+    async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
-
+    
     app.dependency_overrides.clear()
 
-
-# ==================== AUTHENTICATED CLIENTS ====================
+@pytest.fixture
+def mock_redmine_api(monkeypatch):
+    """Mock Redmine API responses"""
+    def mock_post(url, **kwargs):
+        class MockResponse:
+            status_code = 201
+            def json(self):
+                if "issues" in url:
+                    return {"issue": {"id": 123}}
+                return {}
+        return MockResponse()
+    
+    monkeypatch.setattr("requests.post", mock_post)
 
 @pytest.fixture
-async def authenticated_async_client(async_client, test_token):
-    async_client.headers["Authorization"] = f"Bearer {test_token}"
-    return async_client
-
-
-@pytest.fixture
-def authenticated_sync_client(sync_client, test_token):
-    sync_client.headers["Authorization"] = f"Bearer {test_token}"
-    return sync_client
+def mock_llm(monkeypatch):
+    """Mock LLM responses"""
+    def mock_invoke(messages, **kwargs):
+        class MockMessage:
+            content = "I'll create an issue for you."
+        return MockMessage()
+    
+    monkeypatch.setattr("langchain_openai.ChatOpenAI.invoke", mock_invoke)
