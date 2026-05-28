@@ -65,9 +65,23 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 
 const previewCloneRef = ref<HTMLElement | null>(null)
 const previewScale = ref(0.7)
+const previousTheme = ref<string | null>(null)
 
 // Calculate bottom margin to compensate for CSS scale shrinking the layout height
 const scaledMarginBottom = ref(0)
+
+function applyLightThemeForPdf() {
+  previousTheme.value = document.documentElement.getAttribute('data-theme')
+  document.documentElement.setAttribute('data-theme', 'light')
+}
+
+function restorePreviousTheme() {
+  if (previousTheme.value === null) {
+    document.documentElement.removeAttribute('data-theme')
+    return
+  }
+  document.documentElement.setAttribute('data-theme', previousTheme.value)
+}
 
 function updateScale() {
   // Scale preview to fit comfortably in the modal width
@@ -85,18 +99,62 @@ function buildPreviewClone() {
 
   // Apply print-mode light styles inline on the clone so it looks like the PDF
   clone.style.background = 'white'
-  clone.style.color = '#111'
   clone.style.width = '794px'
   clone.style.padding = '24px'
   clone.style.boxSizing = 'border-box'
   clone.style.overflow = 'visible'
 
-  // Add overflow handling styles
+  // Add print-like styles so preview matches final PDF output
   const styleEl = document.createElement('style')
   styleEl.textContent = `
+    .pdf-preview-clone {
+      max-width: none !important;
+    }
+    .pdf-preview-clone #dashboard-print-root {
+      background: white !important;
+      color: #111 !important;
+    }
     .pdf-preview-clone * {
       overflow-wrap: break-word;
       word-break: break-word;
+      max-width: 100% !important;
+    }
+    .pdf-preview-clone .no-print {
+      display: none !important;
+    }
+    .pdf-preview-clone #pdf-report-header {
+      display: block !important;
+    }
+    .pdf-preview-clone [class*="bg-"] {
+      background: white !important;
+      border: 1px solid #e5e7eb !important;
+    }
+    /* Convert ALL grid layouts to single column */
+    .pdf-preview-clone [class*="grid"] {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: inherit !important;
+    }
+    /* Override any grid-cols classes */
+    .pdf-preview-clone [class*="grid-cols-"] {
+      grid-template-columns: 1fr !important;
+    }
+    .pdf-preview-clone [class*="xl:grid-cols-"] {
+      grid-template-columns: 1fr !important;
+    }
+    .pdf-preview-clone [class*="lg:grid-cols-"] {
+      grid-template-columns: 1fr !important;
+    }
+    .pdf-preview-clone [class*="md:grid-cols-"] {
+      grid-template-columns: 1fr !important;
+    }
+    /* Sections take full width */
+    .pdf-preview-clone section {
+      width: 100% !important;
+    }
+    .pdf-preview-clone article {
+      width: 100% !important;
+      overflow: visible !important;
     }
     .pdf-preview-clone [class*="truncate"] {
       overflow: hidden;
@@ -109,53 +167,33 @@ function buildPreviewClone() {
     .pdf-preview-clone [class*="overflow"] {
       overflow: visible !important;
     }
+    .pdf-preview-clone .truncate {
+      overflow: visible !important;
+      text-overflow: unset !important;
+      white-space: normal !important;
+    }
+    .pdf-preview-clone [class*="rounded-full"] {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
     .pdf-preview-clone table {
-      table-layout: fixed;
+      table-layout: auto;
+      width: 100%;
     }
     .pdf-preview-clone td, .pdf-preview-clone th {
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow-wrap: break-word;
       word-break: break-word;
+      padding: 8px !important;
+    }
+    /* Ensure headers don't stack unnecessarily */
+    .pdf-preview-clone header {
+      display: block !important;
+    }
+    .pdf-preview-clone header > div {
+      width: 100% !important;
     }
   `
   clone.appendChild(styleEl)
-
-  // Walk all elements and invert dark backgrounds to white
-  clone.querySelectorAll<HTMLElement>('*').forEach(el => {
-    const computed = window.getComputedStyle(el)
-    const bg = computed.backgroundColor
-    // If background is very dark (rgb values all < 60), replace with white
-    const match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
-    if (match) {
-      const [, r, g, b] = match.map(Number)
-      if (r < 60 && g < 60 && b < 60) {
-        el.style.backgroundColor = 'white'
-        el.style.border = '1px solid #e5e7eb'
-      }
-    }
-    // Fix text colors
-    const color = computed.color
-    const cm = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
-    if (cm) {
-      const [, r, g, b] = cm.map(Number)
-      // If text is very light (near white), make it dark
-      if (r > 200 && g > 200 && b > 200) {
-        el.style.color = '#111111'
-      } else if (r > 150 && g > 150 && b > 150) {
-        el.style.color = '#444444'
-      }
-    }
-    // Remove elements with no-print class
-    if (el.classList.contains('no-print')) {
-      el.style.display = 'none'
-    }
-    
-    // Fix overflow on scrollable containers
-    if (el.classList.contains('custom-scrollbar') || el.classList.contains('overflow-auto') || el.classList.contains('overflow-hidden')) {
-      el.style.overflow = 'visible'
-      el.style.height = 'auto'
-    }
-  })
 
   // Clear the clone container and append
   previewCloneRef.value.innerHTML = ''
@@ -172,6 +210,9 @@ function handlePrint() {
   // Remove clone from DOM temporarily — it must not interfere with print
   if (previewCloneRef.value) previewCloneRef.value.innerHTML = ''
 
+  // Ensure PDF always uses light theme regardless of current app theme
+  applyLightThemeForPdf()
+
   // Add print-mode to body so @media print stylesheet kicks in
   document.body.classList.add('print-mode')
 
@@ -181,15 +222,18 @@ function handlePrint() {
 
 function onAfterPrint() {
   document.body.classList.remove('print-mode')
+  restorePreviousTheme()
   emit('close')
 }
 
 function handleCancel() {
   document.body.classList.remove('print-mode')
+  restorePreviousTheme()
   emit('close')
 }
 
 onMounted(() => {
+  applyLightThemeForPdf()
   updateScale()
   window.addEventListener('resize', updateScale)
   // Small delay to ensure dashboard DOM is fully rendered
@@ -198,6 +242,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.body.classList.remove('print-mode')
+  restorePreviousTheme()
   window.removeEventListener('resize', updateScale)
 })
 </script>

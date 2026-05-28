@@ -613,13 +613,65 @@ body {
 
 /* Print stylesheet for dashboard PDF export */
 @media print {
-  /* Hide everything that is not the dashboard content */
-  body.print-mode #app > * {
-    display: none !important;
+  body.print-mode,
+  body.print-mode #dashboard-print-root {
+    --sage-50: 20 29 19;
+    --sage-100: 42 58 40;
+    --sage-200: 50 69 48;
+    --sage-300: 60 84 57;
+    --sage-400: 74 104 71;
+    --sage-500: 95 129 91;
+    --sage-600: 125 154 121;
+    --sage-700: 161 180 158;
+    --sage-800: 195 209 193;
+    --sage-900: 224 232 223;
+    --sage-950: 255 255 255;
+
+    --copper-50: 253 246 240;
+    --copper-100: 249 230 212;
+    --copper-200: 242 201 164;
+    --copper-300: 233 166 110;
+    --copper-400: 224 133 63;
+    --copper-500: 212 105 42;
+    --copper-600: 184 80 31;
+    --copper-700: 153 61 27;
+    --copper-800: 125 51 29;
+    --copper-900: 106 44 27;
+    --copper-950: 59 21 12;
+
+    --surface-50: 14 16 12;
+    --surface-100: 30 33 27;
+    --surface-200: 58 63 53;
+    --surface-300: 88 95 83;
+    --surface-400: 109 117 103;
+    --surface-500: 135 144 126;
+    --surface-600: 163 173 156;
+    --surface-700: 196 203 191;
+    --surface-800: 221 225 216;
+    --surface-900: 238 240 235;
+    --surface-950: 255 255 255;
+
+    --bg-app: #ffffff;
+    --text-app: #0f172a;
+    color-scheme: light;
   }
-  body.print-mode #app #dashboard-print-root {
-    display: block !important;
-    position: fixed;
+
+  body.print-mode #dashboard-print-root,
+  body.print-mode #dashboard-print-root * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide everything that is not the dashboard content */
+  body.print-mode #app * {
+    visibility: hidden !important;
+  }
+  body.print-mode #dashboard-print-root,
+  body.print-mode #dashboard-print-root * {
+    visibility: visible !important;
+  }
+  body.print-mode #dashboard-print-root {
+    position: absolute;
     inset: 0;
     width: 100%;
     overflow: visible;
@@ -630,13 +682,40 @@ body {
     display: none !important;
   }
 
+  /* Single column layout for print */
+  body.print-mode #dashboard-print-root [class*="grid"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+  body.print-mode #dashboard-print-root [class*="grid-cols-"] {
+    grid-template-columns: 1fr !important;
+  }
+  body.print-mode #dashboard-print-root [class*="xl:grid-cols-"] {
+    grid-template-columns: 1fr !important;
+  }
+  body.print-mode #dashboard-print-root [class*="lg:grid-cols-"] {
+    grid-template-columns: 1fr !important;
+  }
+  body.print-mode #dashboard-print-root [class*="md:grid-cols-"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Section and article full width */
+  body.print-mode #dashboard-print-root section {
+    width: 100% !important;
+  }
+  body.print-mode #dashboard-print-root article {
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
   /* Light mode overrides for print */
   body.print-mode #dashboard-print-root {
     background: white !important;
     color: #111 !important;
   }
   body.print-mode #dashboard-print-root * {
-    color: inherit !important;
+    max-width: 100% !important;
   }
 
   /* Convert dark card surfaces to white with border */
@@ -680,6 +759,7 @@ body {
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: break-word;
+    padding: 8px !important;
   }
 
   /* Page setup */
