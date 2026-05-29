@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import date
+from datetime import date, timedelta
 from langchain_core.tools import tool
 
 from app.agent.cache import get_cached, set_cached, get_cached_sync, set_cached_sync
@@ -122,6 +122,27 @@ def _as_str_id(value):
 # ── Read Tools ─────────────────────────────────────────────────────────────────
 
 @tool
+def get_today() -> dict:
+    """
+    Returns today's date and useful derived date strings.
+    ALWAYS call this first when the user's question involves any time-relative
+    concept: 'today', 'this week', 'overdue', 'due soon', 'this sprint',
+    'urgent now', 'tomorrow', 'next week', or any date range.
+    Never ask the user for the current date.
+    """
+    today = date.today()
+    week_end = today + timedelta(days=(6 - today.weekday()))
+    tomorrow = today + timedelta(days=1)
+    next_week_end = week_end + timedelta(days=7)
+    return {
+        "today": today.isoformat(),
+        "tomorrow": tomorrow.isoformat(),
+        "week_end": week_end.isoformat(),       # end of current ISO week (Sunday)
+        "next_week_end": next_week_end.isoformat(),
+        "day_of_week": today.strftime("%A"),
+    }
+
+@tool
 def get_projects() -> dict:
     """
     Retrieve all available Redmine projects.
@@ -158,6 +179,85 @@ def get_projects() -> dict:
     # await set_cached(cache_key, result, ttl_seconds=3600)  # Cache for 1 hour
     return result
 
+@tool
+def get_all_issues(
+    status_id: str = "open",
+    priority_id: str | None = None,
+    due_before: str | None = None,
+    due_after: str | None = None,
+) -> dict:
+    """
+    Retrieve issues across ALL accessible projects in one call.
+    Use when the user asks about issues without specifying a project,
+    or says 'all projects', 'everything', 'across all projects',
+    'what needs attention', 'what is critical today', etc.
+    Respects RBAC: project managers only see their allowed projects.
+
+    Args:
+        status_id:   'open', 'closed', or '*' for all (default 'open')
+        priority_id: '1'=low '2'=normal '3'=high '4'=urgent '5'=immediate
+        due_before:  YYYY-MM-DD — upper bound on due date
+        due_after:   YYYY-MM-DD — lower bound on due date
+                     Set both to the same value for exact date match.
+    """
+    data = _get("/projects.json", {"limit": 100})
+    projects = data.get("projects", [])
+
+    if _ALLOWED_PROJECT_IDENTIFIERS is not None:
+        projects = [
+            p for p in projects
+            if p.get("identifier") in _ALLOWED_PROJECT_IDENTIFIERS
+        ]
+
+    all_issues = []
+
+    for p in projects:
+        identifier = p.get("identifier")
+        if not identifier:
+            continue
+
+        params: dict = {
+            "project_id": identifier,
+            "status_id": str(status_id),
+            "limit": 100,
+        }
+        if priority_id:
+            params["priority_id"] = str(priority_id)
+
+        # Apply date filter — use >= when we have due_after, else <=
+        if due_after:
+            params["due_date"] = f">={due_after}"
+        try:
+            result = _get("/issues.json", params)
+            issues = result.get("issues", [])
+
+            # Post-filter upper bound for range queries
+            if due_before and due_after:
+                issues = [
+                    i for i in issues
+                    if i.get("due_date") and i["due_date"] <= due_before
+                ]
+
+            all_issues.extend(issues)
+        except Exception:
+            continue
+
+    return {
+        "total_count": len(all_issues),
+        "issues": [
+            {
+                "id": i["id"],
+                "subject": i["subject"],
+                "status": i["status"]["name"],
+                "priority": i["priority"]["name"],
+                "assigned_to": i.get("assigned_to", {}).get("name", "Unassigned"),
+                "due_date": i.get("due_date", "Not set"),
+                "project": i["project"]["name"],
+                "version": i.get("fixed_version", {}).get("name", "No sprint"),
+            }
+            for i in all_issues
+        ],
+    }
 
 @tool
 def get_issues(
@@ -166,6 +266,7 @@ def get_issues(
     priority_id:    str | int | None = None,
     assigned_to_id: str | int | None = None,
     due_before:     str | None = None,
+    due_after:      str | None = None,
     version_id:     str | int | None = None,
     limit:          int = 50
 ) -> dict:
@@ -178,7 +279,10 @@ def get_issues(
         status_id:      'open', 'closed', or '*' for all
         priority_id:    '1'=low  '2'=normal  '3'=high  '4'=urgent '5'=immediate
         assigned_to_id: User/assignee ID (string or integer)
-        due_before:     YYYY-MM-DD — returns tasks whose due date <= this date
+        due_before:     YYYY-MM-DD — returns issues whose due date <= this date
+        due_after:      YYYY-MM-DD — returns issues whose due date >= this date
+                        For exact date: set both due_before=X and due_after=X
+                        For a range: set due_after=start and due_before=end
         version_id:     Sprint/version ID (string or integer)
         limit:          Max results to return (default 50)
     """
@@ -192,8 +296,14 @@ def get_issues(
         params["priority_id"] = _as_str_id(priority_id)
     if assigned_to_id:
         params["assigned_to_id"] = _as_str_id(assigned_to_id)
-    if due_before:
+    if due_before and due_after:
+        # Range query: use Redmine's >= filter via API, then post-filter in Python
+        # Redmine only supports one due_date operator at a time
+        params["due_date"] = f">={due_after}"
+    elif due_before:
         params["due_date"] = f"<={due_before}"
+    elif due_after:
+        params["due_date"] = f">={due_after}"
     if version_id:
         params["fixed_version_id"] = _as_str_id(version_id)
 
@@ -207,7 +317,17 @@ def get_issues(
             return {"total_count": 0, "issues": []}
 
     data = _get("/issues.json", params)
-    result =  {
+    raw_issues = data.get("issues", [])
+
+    # Post-filter for range queries: Redmine only supports one due_date
+    # operator per request, so we apply the upper bound in Python.
+    if due_before and due_after:
+        raw_issues = [
+            i for i in raw_issues
+            if i.get("due_date") and i["due_date"] <= due_before
+        ]
+
+    result = {
         "total_count": data.get("total_count", 0),
         "issues": [
             {
@@ -220,7 +340,7 @@ def get_issues(
                 "project":     i["project"]["name"],
                 "version":     i.get("fixed_version", {}).get("name", "No sprint")
             }
-            for i in data.get("issues", [])
+            for i in raw_issues
         ]
     }
 
@@ -345,3 +465,109 @@ def get_issue_detail(issue_id: int | str) -> dict:
         "created_on":  issue.get("created_on"),
         "updated_on":  issue.get("updated_on")
     }
+
+
+@tool
+def get_project_metrics(project_id: str) -> dict:
+    """
+    Calculate completion and other quick metrics for a single project.
+
+    Returns:
+        total_issues, open, closed, completion_pct, overdue_open, urgent_open,
+        and a short list of top open issues (by priority & due date).
+    """
+    if _ALLOWED_PROJECT_IDENTIFIERS is not None:
+        if not _ALLOWED_PROJECT_IDENTIFIERS or project_id not in _ALLOWED_PROJECT_IDENTIFIERS:
+            return {"project": project_id, "total_issues": 0, "open": 0, "closed": 0, "completion_pct": None, "overdue_open": 0, "urgent_open": 0, "top_open": []}
+
+    today = date.today().isoformat()
+
+    open_count = _get("/issues.json", {"project_id": project_id, "status_id": "open", "limit": 1}).get("total_count", 0)
+    closed_count = _get("/issues.json", {"project_id": project_id, "status_id": "closed", "limit": 1}).get("total_count", 0)
+    total = open_count + closed_count
+    completion_pct = None
+    if total > 0:
+        completion_pct = round((closed_count / total) * 100, 1)
+
+    # Overdue open issues (due <= today and still open)
+    overdue_open = _get("/issues.json", {"project_id": project_id, "status_id": "open", "due_date": f"<={today}", "limit": 1}).get("total_count", 0)
+
+    # Urgent open issues: aggregate priority 4 and 5 (urgent / immediate)
+    urgent_open = 0
+    try:
+        urgent_open += _get("/issues.json", {"project_id": project_id, "status_id": "open", "priority_id": "4", "limit": 1}).get("total_count", 0)
+        urgent_open += _get("/issues.json", {"project_id": project_id, "status_id": "open", "priority_id": "5", "limit": 1}).get("total_count", 0)
+    except Exception:
+        urgent_open = 0
+
+    # Fetch a sample of open issues to surface top items
+    sample = []
+    try:
+        data = _get("/issues.json", {"project_id": project_id, "status_id": "open", "limit": 100})
+        issues = data.get("issues", [])
+        # Sort by priority id desc (if present) then due_date asc
+        def sort_key(i):
+            pri = (i.get("priority") or {}).get("id") or 0
+            due = i.get("due_date") or "9999-99-99"
+            return (-int(pri), due)
+
+        issues_sorted = sorted(issues, key=sort_key)
+        for i in issues_sorted[:5]:
+            sample.append({
+                "id": i.get("id"),
+                "subject": i.get("subject"),
+                "priority": i.get("priority", {}).get("name"),
+                "assigned_to": i.get("assigned_to", {}).get("name", "Unassigned"),
+                "due_date": i.get("due_date", "Not set"),
+                "status": i.get("status", {}).get("name"),
+            })
+    except Exception:
+        sample = []
+
+    return {
+        "project": project_id,
+        "total_issues": total,
+        "open": open_count,
+        "closed": closed_count,
+        "completion_pct": completion_pct,
+        "overdue_open": overdue_open,
+        "urgent_open": urgent_open,
+        "top_open": sample,
+    }
+
+
+@tool
+def get_all_projects_metrics() -> dict:
+    """
+    Compute basic metrics for all accessible projects and return a summary.
+
+    Returns per-project metrics (as in `get_project_metrics`) and aggregate totals.
+    """
+    data = _get("/projects.json", {"limit": 100})
+    projects = data.get("projects", [])
+
+    if _ALLOWED_PROJECT_IDENTIFIERS is not None:
+        projects = [p for p in projects if p.get("identifier") in _ALLOWED_PROJECT_IDENTIFIERS]
+
+    metrics = []
+    agg = {"total_projects": 0, "total_issues": 0, "open": 0, "closed": 0, "overdue_open": 0, "urgent_open": 0}
+
+    for p in projects:
+        identifier = p.get("identifier")
+        if not identifier:
+            continue
+        m = get_project_metrics(identifier)
+        metrics.append({"project_name": p.get("name"), "identifier": identifier, **m})
+        agg["total_projects"] += 1
+        agg["total_issues"] += m.get("total_issues", 0) or 0
+        agg["open"] += m.get("open", 0) or 0
+        agg["closed"] += m.get("closed", 0) or 0
+        agg["overdue_open"] += m.get("overdue_open", 0) or 0
+        agg["urgent_open"] += m.get("urgent_open", 0) or 0
+
+    # Compute overall completion
+    agg_completion = None
+    if agg["total_issues"] > 0:
+        agg_completion = round((agg["closed"] / agg["total_issues"]) * 100, 1)
+
+    return {"summary": {**agg, "completion_pct": agg_completion}, "projects": metrics}

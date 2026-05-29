@@ -1,6 +1,15 @@
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from app.agent.tools.read import get_projects, get_issues, get_members, get_issue_detail
+from app.agent.tools.read import (
+    get_today,
+    get_projects,
+    get_issues,
+    get_all_issues,
+    get_project_metrics,
+    get_all_projects_metrics,
+    get_members,
+    get_issue_detail,
+)
 from app.agent.tools.write import (
     create_issue,
     update_issue_status,
@@ -13,18 +22,22 @@ from langchain.agents.middleware import HumanInTheLoopMiddleware
 from langfuse import Langfuse
 
 tools = [
-            get_projects,
-            get_issues,
-            get_members,
-            get_issue_detail,
-            
-            create_issue,
-            update_issue_status,
-            reassign_issue,
-            add_comment_to_issue,
-            update_issue_dates,
-            log_time
-        ]
+    get_today,
+    get_projects,
+    get_issues,
+    get_all_issues,
+    get_project_metrics,
+    get_all_projects_metrics,
+    get_members,
+    get_issue_detail,
+
+    create_issue,
+    update_issue_status,
+    reassign_issue,
+    add_comment_to_issue,
+    update_issue_dates,
+    log_time,
+]
 
 CREATE_ISSUE_SCHEMA = {
     "type": "object",

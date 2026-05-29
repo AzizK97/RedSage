@@ -1,9 +1,18 @@
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from app.agent.tools.read import get_projects, get_issues, get_members, get_versions
+from app.agent.tools.read import (
+    get_today,
+    get_projects,
+    get_issues,
+    get_all_issues,
+    get_project_metrics,
+    get_all_projects_metrics,
+    get_members,
+    get_versions,
+)
 from langfuse import Langfuse
 
-tools = [get_projects, get_issues, get_members, get_versions]
+tools = [get_today, get_projects, get_issues, get_all_issues, get_project_metrics, get_all_projects_metrics, get_members, get_versions]
 
 def create_overview_agent(llm: ChatOpenAI):
     """

@@ -1,19 +1,20 @@
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from app.agent.tools.read import get_projects, get_versions, get_issues
+from app.agent.tools.read import get_today, get_projects, get_versions, get_issues, get_project_metrics
 from app.agent.tools.write import create_version, update_version_dates
 from langchain.agents.middleware import HumanInTheLoopMiddleware
 from langfuse import get_client, Langfuse
 
 tools = [
-            
-            get_projects,
-            get_versions,
-            get_issues,
+    get_today,
+    get_projects,
+    get_versions,
+    get_issues,
+    get_project_metrics,
 
-            create_version,
-            update_version_dates
-        ]
+    create_version,
+    update_version_dates,
+]
 
 CREATE_VERSION_SCHEMA = {
     "type": "object",
