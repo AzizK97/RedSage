@@ -1,0 +1,38 @@
+/* typography.css - RedSage widget typography tokens and utilities */
+:root {
+  --rds-font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --rds-font-size-12: 12px;
+  --rds-font-size-14: 14px;
+  --rds-font-size-16: 16px;
+  --rds-font-size-18: 18px;
+  --rds-font-size-20: 20px;
+  --rds-font-weight-400: 400;
+  --rds-font-weight-500: 500;
+  --rds-font-weight-600: 600;
+  --rds-font-weight-700: 700;
+}
+
+/* Base */
+.rds-font-base {
+  font-family: var(--rds-font-family);
+  color: inherit;
+  line-height: 1.4;
+}
+
+/* Sizes */
+.rds-text-12 { font-size: var(--rds-font-size-12); }
+.rds-text-14 { font-size: var(--rds-font-size-14); }
+.rds-text-16 { font-size: var(--rds-font-size-16); }
+.rds-text-18 { font-size: var(--rds-font-size-18); }
+.rds-text-20 { font-size: var(--rds-font-size-20); }
+
+/* Weights */
+.rds-font-400 { font-weight: var(--rds-font-weight-400); }
+.rds-font-500 { font-weight: var(--rds-font-weight-500); }
+.rds-font-600 { font-weight: var(--rds-font-weight-600); }
+.rds-font-700 { font-weight: var(--rds-font-weight-700); }
+
+/* Utilities */
+.rds-uppercase { text-transform: uppercase; letter-spacing: 0.02em; }
+.rds-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rds-lead { font-size: var(--rds-font-size-16); color: rgba(0,0,0,0.75); }

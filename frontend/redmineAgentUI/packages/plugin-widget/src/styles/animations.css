@@ -1,0 +1,32 @@
+/* animations.css - timings and common keyframes */
+:root {
+  --rds-duration-fast: 150ms;
+  --rds-duration-base: 200ms;
+  --rds-duration-slow: 300ms;
+}
+
+/* Transition utilities */
+.rds-transition-fast { transition: all var(--rds-duration-fast) ease; }
+.rds-transition { transition: all var(--rds-duration-base) ease; }
+.rds-transition-slow { transition: all var(--rds-duration-slow) ease; }
+
+/* Keyframes */
+@keyframes slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes typing {
+  0%   { width: 0; opacity: 0.2; }
+  50%  { width: 60%; opacity: 1; }
+  100% { width: 100%; opacity: 0.2; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.rds-animate-slide-up { animation: slideUp var(--rds-duration-base) ease both; }
+.rds-animate-typing { animation: typing 1.2s steps(4,end) infinite; }
+.rds-animate-fade-in { animation: fadeIn var(--rds-duration-base) ease both; }

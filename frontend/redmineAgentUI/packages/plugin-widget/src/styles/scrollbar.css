@@ -1,0 +1,20 @@
+/* scrollbar.css - chat scrollbar styles (6px, orange theme) */
+:root {
+  --rds-scrollbar-thumb: #ff7a18; /* orange theme */
+  --rds-scrollbar-track: rgba(0,0,0,0.04);
+  --rds-scrollbar-size: 6px;
+}
+
+/* Apply to chat areas with .rds-chat-scroll */
+.rds-chat-scroll { overflow-y: auto; }
+
+.rds-chat-scroll::-webkit-scrollbar { width: var(--rds-scrollbar-size); height: var(--rds-scrollbar-size); }
+.rds-chat-scroll::-webkit-scrollbar-track { background: transparent; }
+.rds-chat-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--rds-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid rgba(0,0,0,0.04);
+}
+
+/* Firefox */
+.rds-chat-scroll { scrollbar-width: thin; scrollbar-color: var(--rds-scrollbar-thumb) transparent; }
