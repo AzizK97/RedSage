@@ -9,6 +9,7 @@ from app.agent.cache import get_cached, set_cached, get_cached_sync, set_cached_
 _SESSION_REDMINE_USER_ID: int | None = None
 _SESSION_IS_ADMIN: bool = False
 _ALLOWED_PROJECT_IDENTIFIERS: set[str] | None = None
+_SESSION_DEFAULT_PROJECT: str | None = None
 
 
 def set_session_user(redmine_user_id: int | None, is_admin: bool = False):
@@ -25,6 +26,21 @@ def set_session_user(redmine_user_id: int | None, is_admin: bool = False):
 
     if redmine_user_id is None or _SESSION_IS_ADMIN:
         return
+
+
+def set_session_project(project_identifier: str | None):
+    """Set a session-level default project identifier used by write tools.
+
+    Call this before invoking agents so tools like `create_issue` and
+    `create_version` can default to the current thread's project when the
+    agent did not explicitly provide `project_id`.
+    """
+    global _SESSION_DEFAULT_PROJECT
+    _SESSION_DEFAULT_PROJECT = project_identifier
+
+
+def get_session_project() -> str | None:
+    return _SESSION_DEFAULT_PROJECT
 
     try:
         # Try cache first

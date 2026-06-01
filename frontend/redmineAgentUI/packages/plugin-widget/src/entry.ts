@@ -40,6 +40,7 @@ declare global {
       userId: string;
       role: 'admin' | 'project_manager';
       backendUrl?: string;
+      platformUrl?: string;
       containerId?: string;
     }) => void;
     __updateModalClass?: (className: string) => void;
@@ -51,6 +52,7 @@ function mountWidget(options: {
   userId: string;
   role: 'admin' | 'project_manager';
   backendUrl?: string;
+  platformUrl?: string;
   containerId?: string;
 }) {
   const containerId = options.containerId || 'ai-chat-widget-mount';
@@ -76,6 +78,7 @@ function mountWidget(options: {
     token: options.token,
     userId: options.userId,
     role: options.role,
+    platformUrl: options.platformUrl,
   });
 
   app.mount(appRoot);

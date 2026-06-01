@@ -79,6 +79,45 @@ class ThreadRepository:
 
         return {"total": total, "items": items}
 
+    def search_threads_for_user(
+        self,
+        query: str,
+        owner_user_id: str,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> dict:
+        """Search threads by title for a specific user. Title-only ILIKE match."""
+        like_query = f"%{query}%"
+        with self.db.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM thread_owners WHERE owner_user_id = %s AND title ILIKE %s",
+                (owner_user_id, like_query),
+            )
+            total = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                SELECT thread_id, title, preview, updated_at
+                FROM thread_owners
+                WHERE owner_user_id = %s AND title ILIKE %s
+                ORDER BY updated_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (owner_user_id, like_query, limit, offset),
+            )
+            rows = cur.fetchall()
+
+        items = [
+            {
+                "thread_id": r[0],
+                "title": r[1],
+                "preview": r[2],
+                "updated_at": int(r[3].timestamp() * 1000) if r[3] else None,
+            }
+            for r in rows
+        ]
+        return {"total": total, "items": items}
+
     def get_owner(self, thread_id: str) -> str | None:
         with self.db.cursor() as cur:
             cur.execute(
@@ -201,4 +240,22 @@ class ThreadRepository:
     def delete_thread(self, thread_id: str) -> None:
         with self.db.cursor() as cur:
             cur.execute("DELETE FROM thread_owners WHERE thread_id = %s", (thread_id,))
+        self.db.commit()
+
+    def get_project_identifier(self, thread_id: str) -> str | None:
+        with self.db.cursor() as cur:
+            cur.execute(
+                "SELECT project_identifier FROM thread_owners WHERE thread_id = %s",
+                (thread_id,),
+            )
+            row = cur.fetchone()
+        return row[0] if row and row[0] is not None else None
+
+    def set_project_identifier(self, thread_id: str, project_identifier: str | None) -> None:
+        now = datetime.now(timezone.utc)
+        with self.db.cursor() as cur:
+            cur.execute(
+                "UPDATE thread_owners SET project_identifier = %s, updated_at = %s WHERE thread_id = %s",
+                (project_identifier, now, thread_id),
+            )
         self.db.commit()

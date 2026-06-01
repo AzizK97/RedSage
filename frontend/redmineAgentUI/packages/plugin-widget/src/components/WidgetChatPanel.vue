@@ -14,6 +14,7 @@ const props = defineProps<{
   visibleError?: string | null;
   threadId?: string | null;
   threadTitle?: string | null;
+  platformUrl?: string;
   isVirginChat: boolean;
   starterSuggestions: string[];
 }>();
@@ -104,7 +105,7 @@ watch(
 
     <template v-else>
       <div class="rs-widget__message-panel">
-        <WidgetMessageList :messages="messages" />
+        <WidgetMessageList :messages="messages" :thread-id="threadId" :platform-url="platformUrl" />
 
         <div v-if="isLoading && loadingStatus" class="rs-widget__loading-pill">
           <span class="rs-widget__loading-dots" aria-hidden="true">

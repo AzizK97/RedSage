@@ -12,6 +12,7 @@ const props = defineProps<{
   userId: string;
   role: "admin" | "project_manager";
   openThreadId?: string | null;
+  openPreview?: string | null;
 }>();
 
 const {
@@ -35,6 +36,8 @@ const {
   renameThread,
 } = useChat(props.token, props.userId);
 
+const forceReportPreview = ref(false);
+
 // When parent requests opening a specific thread, set it active
 watch(
   () => props.openThreadId,
@@ -48,6 +51,14 @@ watch(
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => props.openPreview,
+  (value) => {
+    forceReportPreview.value = value === "pdf";
+  },
+  { immediate: true },
 );
 
 const isVirginChat = computed(() => messages.value.length === 0);
@@ -254,10 +265,12 @@ async function removeConversation(threadId: string) {
                 :token="token"
                 :interrupt="pendingInterrupt"
                 :disabled="isLoading"
+                :force-report-preview="forceReportPreview"
                 @approve="onApprove"
                 @reject="onReject"
                 @edit="onEdit"
                 @skip-thinking="onSkipThinkingBar"
+                @report-preview-opened="forceReportPreview = false"
               />
             </div>
           </div>

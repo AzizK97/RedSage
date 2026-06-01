@@ -11,6 +11,7 @@ interface Props {
   token: string;
   userId: string;
   role: 'admin' | 'project_manager';
+  platformUrl?: string;
 }
 
 const props = defineProps<Props>();
@@ -133,6 +134,7 @@ async function handleEdit(editPayload: { name: string; args: Record<string, any>
           :visible-error="visibleError"
           :thread-id="currentThreadId"
           :thread-title="threadTitle"
+          :platform-url="props.platformUrl"
           :is-virgin-chat="isVirginChat"
           :starter-suggestions="starterSuggestions"
           @send="sendMessage"

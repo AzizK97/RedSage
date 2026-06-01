@@ -3,8 +3,7 @@ import { Bell, Search, UserCircle2, Sun, Moon, AlertCircle, CheckCircle2, Info, 
 import { ref, onBeforeUnmount, onMounted } from "vue";
 import { monitoringApi } from "@redsage/api-client/monitoring";
 import type { MonitoringNotification } from "../../../../ui-core/src/types/index.ts";
-import { debounce } from "@redsage/ui-core/utils";
-import { search } from "@redsage/api-client/search";
+import { searchThreads, type ThreadSearchResult } from "@redsage/api-client/search";
 
 const props = defineProps<{
   role: "admin" | "project_manager";
@@ -27,38 +26,62 @@ let lastSeenCreatedAt: number | null = null;
 // Search state
 const query = ref("");
 const showResults = ref(false);
-const results = ref<any[]>([]);
-const loading = ref(false);
-const error = ref("");
-const activeTab = ref<'messages'|'threads'>('messages');
+const results = ref<ThreadSearchResult[]>([]);
+const isSearching = ref(false);
+const searchError = ref("");
 
-const tokenVal = props.token || '';
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-const debouncedDoSearch = debounce(async (q: string, tab: 'messages'|'threads') => {
-  if (!q || q.trim().length < 2) {
-    results.value = [];
-    loading.value = false;
+function onSearchInput() {
+  const q = query.value.trim();
+
+  if (searchTimer) clearTimeout(searchTimer);
+
+  if (q.length < 2) {
     showResults.value = false;
+    results.value = [];
     return;
   }
 
-  loading.value = true;
-  error.value = '';
-  try {
-    const resp = await search(q.trim(), tab, tokenVal, 10, 0);
-    results.value = resp.items || [];
-    showResults.value = true;
-  } catch (err: any) {
-    error.value = err instanceof Error ? err.message : String(err);
-    results.value = [];
-    showResults.value = true;
-  } finally {
-    loading.value = false;
-  }
-}, 300);
+  searchTimer = setTimeout(async () => {
+    isSearching.value = true;
+    searchError.value = '';
+    try {
+      const resp = await searchThreads(q, props.token, 10);
+      results.value = resp.items;
+      showResults.value = true;
+    } catch (err: any) {
+      searchError.value = 'Search failed';
+      results.value = [];
+      showResults.value = true;
+    } finally {
+      isSearching.value = false;
+    }
+  }, 300);
+}
 
-function onInput() {
-  debouncedDoSearch(query.value, activeTab.value);
+function clearSearch() {
+  query.value = '';
+  showResults.value = false;
+  results.value = [];
+  if (searchTimer) clearTimeout(searchTimer);
+}
+
+function selectThread(threadId: string) {
+  clearSearch();
+  emit('navigate', 'thread', threadId);
+}
+
+function formatUpdatedAt(ms: number | null): string {
+  if (!ms) return '';
+  const diff = Math.max(0, Date.now() - ms);
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 onMounted(() => {
@@ -137,80 +160,58 @@ function timeAgo(createdAt: number): string {
   const days = Math.floor(hours / 24);
   return `${days} d ago`;
 }
-
-function openThread(id: string) {
-  showResults.value = false;
-  query.value = '';
-  emit('navigate', 'thread', id);
-}
 </script>
 
 <template>
-  <header class="h-16 border-b border-surface-800 bg-surface-950 px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
+  <header class="h-16 border-b border-surface-800 bg-surface-950 px-6 flex items-center justify-between gap-4 sticky top-0 z-30" style="z-index: 50;">
     <div class="flex-1 max-w-2xl relative">
       <div class="relative group">
         <Search :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-surface-500 group-focus-within:text-sage-400 transition-colors" />
         <input 
           v-model="query" 
-          @input="onInput" 
+          @input="onSearchInput" 
+          @keydown.escape="clearSearch"
           type="search" 
-          placeholder="Search projects, tasks, or conversations..." 
+          placeholder="Search conversations..." 
           class="w-full bg-surface-900 border border-surface-800 text-surface-200 text-sm rounded-xl py-2 pl-10 pr-4 outline-none focus:border-sage-500/40 focus:ring-4 focus:ring-sage-500/5 transition-all shadow-inner"
         />
       </div>
 
-      <div v-if="showResults" class="absolute top-[calc(100%+12px)] left-0 w-full max-h-[60vh] bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden flex flex-col backdrop-blur-xl">
-        <div class="flex gap-2 p-3 border-b border-surface-800 bg-surface-950/50">
-          <button 
-            v-for="tab in ['messages', 'threads']" :key="tab"
-            @click="activeTab = tab as any"
-            :class="[
-              'px-4 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all border',
-              activeTab === tab 
-                ? 'bg-sage-600/10 text-sage-300 border-sage-500/20' 
-                : 'text-surface-400 border-transparent hover:bg-surface-800'
-            ]"
-          >
-            {{ tab }}
-          </button>
+      <div v-if="showResults" class="absolute top-[calc(100%+8px)] left-0 w-full bg-surface-900 border border-surface-800 rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden flex flex-col">
+        <div v-if="isSearching" class="p-6 flex items-center justify-center gap-2 text-surface-500">
+          <div class="w-4 h-4 border-2 border-sage-500/30 border-t-sage-500 rounded-full animate-spin"></div>
+          <span class="text-xs">Searching...</span>
         </div>
-        
-        <div class="flex-1 overflow-auto p-2">
-          <div v-if="loading" class="p-8 flex flex-col items-center gap-3 text-surface-500">
-            <div class="w-5 h-5 border-2 border-sage-500/30 border-t-sage-500 rounded-full animate-spin"></div>
-            <p class="text-xs font-medium">Searching...</p>
-          </div>
-          <p v-else-if="error" class="p-8 text-center text-xs text-red-400 bg-red-400/5 rounded-xl border border-red-400/10">{{ error }}</p>
-          <ul v-else-if="results.length" class="space-y-1">
-            <li
-              v-for="item in results"
-              :key="item.id || item.thread_id"
-              @click="openThread(item.thread_id || item.id)"
-              class="group p-3 rounded-xl hover:bg-surface-800 transition-all cursor-pointer border border-transparent hover:border-surface-700"
-            >
-              <div class="flex flex-col gap-1.5">
-                <div class="flex items-center gap-3">
-                  <strong class="text-sm text-surface-200 group-hover:text-sage-300 transition-colors">{{ item.title || 'Conversation' }}</strong>
-                  <div class="flex gap-2 ml-auto">
-                    <span v-if="item.project_name" class="px-2 py-0.5 rounded-md bg-surface-950 text-[10px] font-bold text-surface-400 border border-surface-800 uppercase tracking-wider">
-                      {{ item.project_name }}
-                    </span>
-                    <span v-if="item.issue_id" class="px-2 py-0.5 rounded-md bg-copper-500/10 text-[10px] font-bold text-copper-400 border border-copper-500/20">
-                      #{{ item.issue_id }}
-                    </span>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 text-[11px] text-surface-500">
-                  <span class="font-medium text-surface-400">{{ item.author_name || 'Unknown' }}</span>
-                  <span class="opacity-30">•</span>
-                  <span>{{ item.created_at ? timeAgo(item.created_at) : '' }}</span>
-                </div>
-              </div>
-            </li>
-          </ul>
-          <div v-else class="p-12 text-center">
-            <p class="text-sm text-surface-500 font-medium">No results found for "{{ query }}"</p>
-          </div>
+
+        <p v-else-if="searchError" class="p-6 text-center text-xs text-red-400">
+          {{ searchError }}
+        </p>
+
+        <ul v-else-if="results.length" class="divide-y divide-surface-800/60">
+          <li
+            v-for="item in results"
+            :key="item.thread_id"
+            @click="selectThread(item.thread_id)"
+            class="flex flex-col gap-1 px-4 py-3 hover:bg-surface-800 cursor-pointer transition-colors group"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-sm font-medium text-surface-200 group-hover:text-sage-300 transition-colors truncate">
+                {{ item.title }}
+              </span>
+              <span class="text-[10px] text-surface-500 whitespace-nowrap shrink-0">
+                {{ formatUpdatedAt(item.updated_at) }}
+              </span>
+            </div>
+            <p v-if="item.preview" class="text-xs text-surface-500 truncate leading-relaxed">
+              {{ item.preview }}
+            </p>
+          </li>
+        </ul>
+
+        <div v-else class="p-8 text-center">
+          <p class="text-sm text-surface-500">
+            No conversations matching <span class="text-surface-300">"{{ query }}"</span>
+          </p>
         </div>
       </div>
     </div>

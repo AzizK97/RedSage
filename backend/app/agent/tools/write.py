@@ -94,7 +94,7 @@ def _put(endpoint: str, payload: dict) -> dict:
 
 @tool
 def create_issue(
-    project_id:     str,
+    project_id:     str | None,
     subject:        str,
     tracker_id:     int | str | None = None,
     description:    str  = None,
@@ -121,6 +121,15 @@ def create_issue(
         start_date:     Start date in YYYY-MM-DD format
         due_date:       Due date in YYYY-MM-DD format
     """
+    # Allow callers to omit project_id; fall back to session default.
+    from app.agent.tools.read import get_session_project
+
+    if project_id is None:
+        project_id = get_session_project()
+
+    if not project_id:
+        raise RuntimeError("MISSING_PROJECT_ID: project_id is required and no session default is set.")
+
     issue: dict = {
         "project_id": project_id,
         "tracker_id": _as_str_id(tracker_id) if tracker_id is not None else None,
@@ -310,7 +319,7 @@ def log_time(
 
 @tool
 def create_version(
-    project_id:  str,
+    project_id:  str | None,
     name:        str,
     due_date:    str  = None,
     description: str  = None,
@@ -327,6 +336,15 @@ def create_version(
         description: Optional description of the sprint
         status:      'open' or 'locked' or 'closed'  (default: 'open')
     """
+    # Allow callers to omit project_id; fall back to session default.
+    from app.agent.tools.read import get_session_project
+
+    if project_id is None:
+        project_id = get_session_project()
+
+    if not project_id:
+        raise RuntimeError("MISSING_PROJECT_ID: project_id is required and no session default is set.")
+
     version: dict = {
         "name":   name,
         "status": status

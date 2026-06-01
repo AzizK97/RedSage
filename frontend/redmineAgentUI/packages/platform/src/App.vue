@@ -26,6 +26,11 @@ const selectedThreadId = computed(() => {
   return typeof threadId === "string" && threadId.trim() ? threadId.trim() : null;
 });
 
+const selectedPreview = computed(() => {
+  const preview = route.query.preview;
+  return typeof preview === "string" && preview.trim() ? preview.trim() : null;
+});
+
 const isOAuthCallback = computed(() => route.name === "oauth-callback");
 
 const isLanding = computed(() => route.name === "landing");
@@ -54,14 +59,15 @@ function startLogin() {
   void router.push({ name: "login" });
 }
 
-function handleNavigate(view: "dashboard" | "access-management" | "chat" | "profile" | "thread", threadId?: string) {
+function handleNavigate(view: "dashboard" | "access-management" | "chat" | "profile" | "thread", threadId?: string, preview?: string) {
   if (view === "access-management" && role.value !== "admin") {
     void router.push({ name: "dashboard" });
     return;
   }
 
   if (view === 'thread') {
-    void router.push({ name: 'chat', query: threadId ? { threadId } : undefined });
+    const query = threadId ? { threadId, ...(preview ? { preview } : {}) } : undefined;
+    void router.push({ name: 'chat', query });
     return;
   }
   void router.push({ name: view as "dashboard" | "access-management" | "chat" | "profile" });
@@ -118,6 +124,7 @@ function handleNavigate(view: "dashboard" | "access-management" | "chat" | "prof
           :user-id="userId"
           :role="role === 'admin' ? 'admin' : 'project_manager'"
           :open-thread-id="selectedThreadId"
+          :open-preview="selectedPreview"
         />
 
         <ProfileView

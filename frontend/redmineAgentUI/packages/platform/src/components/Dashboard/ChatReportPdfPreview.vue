@@ -10,7 +10,7 @@
       <div>
         <div class="text-white font-semibold text-sm">Report Preview</div>
         <div class="text-white/40 text-xs mt-0.5">
-          This is exactly how your PDF will look
+          This is how your PDF will look
         </div>
       </div>
       <div class="flex items-center gap-3">

@@ -15,13 +15,15 @@ const props = defineProps<{
   token: string;
   interrupt: Record<string, any> | null;
   disabled: boolean;
+  forceReportPreview?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "skip-thinking"): void;
   (e: "approve"): void;
   (e: "reject", message: string): void;
   (e: "edit", payload: { name: string; args: Record<string, any> }): void;
+  (e: "report-preview-opened"): void;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
@@ -75,6 +77,22 @@ watch(
       scrollApprovalDialogIntoView();
     }
   },
+);
+
+watch(
+  () => props.forceReportPreview,
+  (enabled) => {
+    if (!enabled) return;
+    const latestReport = [...props.messages]
+      .reverse()
+      .find((m) => m.role === "assistant" && isReportMessage(m.content));
+
+    if (latestReport) {
+      openReportPreview(latestReport.content);
+      emit("report-preview-opened");
+    }
+  },
+  { immediate: true },
 );
 
 onMounted(() => {

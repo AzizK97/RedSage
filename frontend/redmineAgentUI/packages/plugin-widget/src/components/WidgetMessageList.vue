@@ -23,7 +23,7 @@
             class="mt-3 flex"
           >
             <button
-              @click="openReportPreview(message.content)"
+              @click="redirectToPlatformPreview()"
               class="rs-widget__report-download"
               type="button"
             >
@@ -42,12 +42,6 @@
       </article>
     </div>
 
-    <!-- Chat report PDF preview modal -->
-    <ChatReportPdfPreview
-      v-if="previewContent !== null"
-      :content="previewContent"
-      @close="closeReportPreview"
-    />
   </div>
 </template>
 
@@ -58,26 +52,27 @@ import DOMPurify from 'dompurify';
 import MarkdownIt from 'markdown-it';
 import type { Message } from '@redsage/ui-core/types';
 import { isReportMessage } from '../../../ui-core/src/utils/reportDetection';
-import ChatReportPdfPreview from './ChatReportPdfPreview.vue';
 
 const props = defineProps<{
   messages: Message[];
+  threadId?: string | null;
+  platformUrl?: string;
 }>();
 
 const listRef = ref<HTMLElement | null>(null);
-const previewContent = ref<string | null>(null);
 const markdown = new MarkdownIt({ breaks: true, linkify: true });
 
 function renderMarkdown(content: string): string {
   return DOMPurify.sanitize(markdown.render(content || ''));
 }
 
-function openReportPreview(content: string) {
-  previewContent.value = content;
-}
+function redirectToPlatformPreview() {
+  const threadId = props.threadId?.trim();
+  if (!threadId) return;
 
-function closeReportPreview() {
-  previewContent.value = null;
+  const base = (props.platformUrl || '').trim().replace(/\/$/, '') || `${window.location.origin}`;
+  const target = `${base}/chat?threadId=${encodeURIComponent(threadId)}&preview=pdf`;
+  window.open(target, '_blank', 'noopener,noreferrer');
 }
 
 async function scrollToBottom() {

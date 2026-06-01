@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Leaf, Menu, X, Sun, Moon } from 'lucide-vue-next';
+import { Leaf, Menu, X, Sun, Moon, LampCeiling } from 'lucide-vue-next';
 import { useTheme } from '@redsage/ui-core/composables/useTheme';
 
 const { isDark, toggleTheme } = useTheme();
@@ -32,7 +32,7 @@ const emit = defineEmits<{
     <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
       <a href="#" class="flex items-center gap-2.5 group">
         <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sage-400 to-copper-500 flex items-center justify-center shadow-md shadow-sage-300/30 dark:shadow-sage-700/30 group-hover:shadow-copper-400/30 dark:group-hover:shadow-copper-600/30 transition-shadow">
-          <Leaf :size="18" class="text-white" />
+          <LampCeiling :size="18" class="text-white" />
         </div>
         <span class="font-bold text-lg text-sage-900 dark:text-white tracking-tight">Red<span class="gradient-text-copper">Sage</span></span>
       </a>

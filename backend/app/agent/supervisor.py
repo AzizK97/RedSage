@@ -4,6 +4,7 @@ from langchain.agents import create_agent
 from langchain_ollama import ChatOllama
 # from langchain_openai import ChatOpenAI
 # from langchain_groq import ChatGroq
+from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from typing import Any
@@ -23,7 +24,8 @@ from langfuse.langchain import CallbackHandler
 from openai import OpenAI
 
 from app.agent.provider import ModelProvider
-from app.agent.tools.read import set_session_user, clear_session_user
+from app.agent.tools.read import set_session_user, clear_session_user, set_session_project
+from app.repositories.thread_repository import ThreadRepository
 
 
 load_dotenv()
@@ -75,6 +77,16 @@ def create_llm() -> ChatOpenAI:
         max_tokens=800
     )
 
+# def create_llm() -> ChatAnthropic:
+#     return ChatAnthropic(
+#         model="claude-sonnet-4-5-20250929",
+#         temperature=0,
+#         # max_tokens=,
+#         # timeout=,
+#         # max_retries=,
+#     # base_url="...",
+# )
+
 # def create_llm() -> ChatGroq:
 #     return ChatGroq(
 #         model=os.getenv("GROQ_MODEL_NAME","gpt-4o"),
@@ -114,7 +126,9 @@ def overview_tool(query: str) -> str:
 @tool 
 def planning_tool(query: str) -> str:
     """Use this when you need to create or update project plans, 
-    timelines, milestones, roadmaps, dependencies. 
+    timelines, milestones, roadmaps, dependencies, sprints, and versions. 
+    Use it for sprint/version creation or updates so the planning agent can
+    trigger the human approval dialog before writing to Redmine. 
     Returns clean markdown with tables."""
 
     result = planning_agent.invoke({
@@ -127,6 +141,8 @@ def planning_tool(query: str) -> str:
 def tasks_tool(query: str) -> str:
     """Use this when you need to create, update, or list tasks, 
     epics, issues, tickets. Also for task-level details or status. 
+    Prefer exact answers from the tool output; do not invent extra search
+    buckets or task rows when a result set is empty. 
     Returns clean markdown with tables."""
 
     result = tasks_agent.invoke({
@@ -155,11 +171,21 @@ def create_app():
     Returns a compiled LangGraph app ready to invoke.
     """
 
+    SUPERVISOR_LOCAL_RULES = """
+Routing rules:
+- Requests about creating, renaming, rescheduling, locking, or closing sprints, versions, or milestones must go to planning_tool.
+- Do not answer such requests directly in prose when a version write action is needed.
+- If the user is asking to create a sprint/version, route to planning_tool so the planning agent can call the approval-gated create_version tool.
+- If the user is asking to update sprint/version dates or status, route to planning_tool so the planning agent can call the approval-gated update_version_dates tool.
+- Use tasks_tool only for issue/task/ticket operations, not for sprint or version management.
+""".strip()
+
     try:
         compiled_prompt = Langfuse().get_prompt("supervisor", label="production").compile()
         SUPERVISOR_PROMPT = "\n".join(
             m["content"] for m in compiled_prompt if m.get("role") == "system"
         )
+        SUPERVISOR_PROMPT = f"{SUPERVISOR_PROMPT}\n\n{SUPERVISOR_LOCAL_RULES}"
     except Exception as e:
         print("Error loading prompt from Langfuse:", e)
         raise
@@ -221,11 +247,29 @@ def _invoke_chat(question: str, thread_id: str, redmine_user_id: int | None = No
     # Configure read-tool session to enforce project restrictions for PMs
     try:
         set_session_user(redmine_user_id, is_admin=is_admin)
+
+        # Attempt to set a session-level default project from the thread metadata
+        try:
+            postgres_url = os.getenv("POSTGRES_URL")
+            if postgres_url:
+                with psycopg.connect(postgres_url, autocommit=True) as db:
+                    repo = ThreadRepository(db)
+                    project_identifier = repo.get_project_identifier(thread_id)
+                    set_session_project(project_identifier)
+        except Exception:
+            # Fail silently: if we cannot determine the thread project, continue without it.
+            pass
+
         return app.invoke(
             {"messages": [HumanMessage(content=question)]},
             config=config
         )
     finally:
+        # Clear session user and project defaults after invocation
+        try:
+            set_session_project(None)
+        except Exception:
+            pass
         clear_session_user()
 
 
@@ -355,6 +399,16 @@ def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int 
 
     try:
         set_session_user(redmine_user_id, is_admin=is_admin)
+        # Set session project from thread metadata so write tools can fallback
+        try:
+            postgres_url = os.getenv("POSTGRES_URL")
+            if postgres_url:
+                with psycopg.connect(postgres_url, autocommit=True) as db:
+                    repo = ThreadRepository(db)
+                    project_identifier = repo.get_project_identifier(thread_id)
+                    set_session_project(project_identifier)
+        except Exception:
+            pass
         for step in app.stream(
             {"messages": [HumanMessage(content=question)]},
             config=config,
@@ -400,6 +454,10 @@ def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int 
             "content": str(e)
         }
     finally:
+        try:
+            set_session_project(None)
+        except Exception:
+            pass
         clear_session_user()
 
 

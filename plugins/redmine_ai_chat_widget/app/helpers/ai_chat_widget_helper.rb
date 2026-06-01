@@ -50,7 +50,9 @@ module AiChatWidgetHelper
       user_role: role,
       widget_token: generate_widget_token(user),
       # Browser loads scripts and calls fetch() here; must resolve in the user’s browser (not host.docker.internal on Linux).
-      backend_url: public_base
+      backend_url: public_base,
+      # Main platform URL used to open full-screen views from the widget.
+      platform_url: resolved_platform_url
     }
   end
 
@@ -113,6 +115,19 @@ module AiChatWidgetHelper
     return p if p.present?
 
     resolved_backend_url_internal
+  end
+
+  # Main RedSage platform URL for redirects from widget to full app UI.
+  # REDSAGE_PLATFORM_URL overrides plugin setting when set.
+  def resolved_platform_url
+    env_url = ENV['REDSAGE_PLATFORM_URL'].to_s.strip.sub(%r{/\z}, '')
+    return env_url if env_url.present?
+
+    plugin = plugin_settings_hash
+    default_settings = Redmine::Plugin.find(:redmine_ai_chat_widget).settings[:default] || {}
+    platform = plugin['platform_url'].to_s.strip.sub(%r{/\z}, '')
+    platform = default_settings['platform_url'].to_s.strip.sub(%r{/\z}, '') if platform.empty?
+    platform
   end
 
   def resolved_jwt_secret

@@ -16,6 +16,8 @@ Redmine::Plugin.register :redmine_ai_chat_widget do
     'backend_url' => 'http://localhost:8000',
     # Browser (script src / fetch). Dev Docker: set REDSAGE_BACKEND_PUBLIC_URL=http://localhost:8000 or fill below.
     'backend_url_public' => '',
+    # Main RedSage platform URL used by widget actions that should open in platform UI.
+    'platform_url' => 'http://localhost:5173',
     'jwt_secret' => '66uwKYHYwBmlxhdbzEv+ixJcwhZqi/osB/PwyBw5XNk=',
     'jwt_issuer' => 'redsage',
     'jwt_audience' => 'redsage-web',

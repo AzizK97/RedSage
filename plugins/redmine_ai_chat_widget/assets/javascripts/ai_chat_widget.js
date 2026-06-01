@@ -4,6 +4,7 @@
     if (!root || document.getElementById('ai-chat-btn')) return
 
     const backendUrl = (root.dataset.backendUrl || '').replace(/\/$/, '')
+    const platformUrl = (root.dataset.platformUrl || '').replace(/\/$/, '')
     const widgetToken = root.dataset.widgetToken || ''
     const userId = root.dataset.userId || ''
     const userRole = root.dataset.userRole || ''
@@ -127,6 +128,7 @@
                 userId: userId,
                 role: userRole,
                 backendUrl: backendUrl,
+                platformUrl: platformUrl,
                 containerId: 'ai-chat-widget-mount'
               })
               vueAppMounted = true

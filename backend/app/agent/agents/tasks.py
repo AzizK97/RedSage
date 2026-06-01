@@ -139,14 +139,26 @@ def create_tasks_agent(llm: ChatOpenAI):
     Handles: task listing, filtering, workload analysis,
              and all write operations on issues.
     """
+    TASKS_LOCAL_RULES = """
+Task handling rules:
+- Treat task, issue, ticket, and bug as the same work item class.
+- If the user says "this week", use get_today and apply an exact date range for the current week when possible.
+- Prefer precise filters over speculative follow-up searches.
+- If a search returns no results, say so plainly and stop; do not invent another time bucket like next week or overdue unless the user explicitly asks.
+- When the user has not specified a project, assume all projects and use get_all_issues.
+- Never fabricate task rows, dates, assignees, or priorities.
+""".strip()
+
+    TASKS_PROMPT = TASKS_LOCAL_RULES
     try:
         compiled_prompt = Langfuse().get_prompt("tasks_agent", label="latest").compile()
         TASKS_PROMPT = "\n".join(
             m["content"] for m in compiled_prompt if m.get("role") == "system"
         )
+        TASKS_PROMPT = f"{TASKS_PROMPT}\n\n{TASKS_LOCAL_RULES}"
     except Exception as e:
         print("Error loading prompt from Langfuse:", e)
-        raise
+        # Fall back to the local rules only if Langfuse prompt loading fails.
 
     return create_agent(
         model=llm,

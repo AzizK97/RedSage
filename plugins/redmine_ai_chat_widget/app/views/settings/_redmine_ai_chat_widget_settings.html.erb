@@ -16,6 +16,12 @@
   </p>
 
   <p>
+    <label for="settings_platform_url">Main platform URL (redirect target for full preview)</label><br/>
+    <%= text_field_tag 'settings[platform_url]', @settings['platform_url'], size: 80, id: 'settings_platform_url' %>
+    <em class="info">Used by widget actions that should open the main RedSage UI (for example chat PDF preview). Can be overridden by <code>REDSAGE_PLATFORM_URL</code>.</em>
+  </p>
+
+  <p>
     <label for="settings_jwt_secret">JWT secret (HS256, same as <code>JWT_SECRET</code> on the API)</label><br/>
     <%= text_field_tag 'settings[jwt_secret]', @settings['jwt_secret'], size: 80, id: 'settings_jwt_secret', autocomplete: 'off' %>
     <em class="info">Must match <code>JWT_SECRET</code> in the API <strong>exactly</strong>. Alternatively set <code>REDSAGE_JWT_SECRET</code> on the Redmine host.</em>
