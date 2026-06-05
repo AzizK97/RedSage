@@ -385,17 +385,35 @@ def chat_with_interrupts(question: str, thread_id: str = "default", redmine_user
 
 def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int | None = None, is_admin: bool = False):
     """
-    Stream the supervisor's response step by step.
+    Stream the supervisor's response token-by-token.
     Yields dicts with keys: type, agent, content.
 
     Yield types:
-        - "routing"  : supervisor decided which agent to call
-        - "thinking" : agent is reasoning / calling a tool
-        - "answer"   : final response from the agent
-        - "error"    : something went wrong
+        - "token" : incremental assistant text chunk
+        - "error" : something went wrong
     """
     app    = get_app()
     config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
+
+    def _chunk_content_to_text(content: Any) -> str:
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("text") or item.get("content") or ""
+                    if text:
+                        parts.append(str(text))
+                elif item is not None:
+                    parts.append(str(item))
+            return "".join(parts)
+
+        if content is None:
+            return ""
+
+        return str(content)
 
     try:
         set_session_user(redmine_user_id, is_admin=is_admin)
@@ -409,44 +427,27 @@ def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int 
                     set_session_project(project_identifier)
         except Exception:
             pass
-        for step in app.stream(
+
+        for message_chunk, metadata in app.stream(
             {"messages": [HumanMessage(content=question)]},
             config=config,
-            stream_mode="updates"
+            stream_mode="messages",
         ):
-            for node_name, node_data in step.items():
-                messages = node_data.get("messages", [])
-                for message in messages:
-                    from langchain_core.messages import AIMessage, ToolMessage
+            node_name = str((metadata or {}).get("langgraph_node") or "supervisor")
 
-                    if isinstance(message, AIMessage) and message.tool_calls:
-                        yield {
-                            "type":    "thinking",
-                            "agent":   node_name,
-                            "content": f"Calling tool: {message.tool_calls[0]['name']}"
-                        }
+            # Hide internal supervisor routing chatter and stream only assistant agent text.
+            if node_name == "supervisor":
+                continue
 
-                    elif isinstance(message, ToolMessage):
-                        yield {
-                            "type":    "thinking",
-                            "agent":   node_name,
-                            "content": f"Tool result received"
-                        }
+            chunk_text = _chunk_content_to_text(getattr(message_chunk, "content", ""))
+            if not chunk_text:
+                continue
 
-                    elif isinstance(message, AIMessage) and message.content:
-                        # Detect if this is the supervisor routing or a final answer
-                        if node_name == "supervisor":
-                            yield {
-                                "type":    "routing",
-                                "agent":   node_name,
-                                "content": message.content
-                            }
-                        else:
-                            yield {
-                                "type":    "answer",
-                                "agent":   node_name,
-                                "content": message.content
-                            }
+            yield {
+                "type": "token",
+                "agent": node_name,
+                "content": chunk_text,
+            }
     except Exception as e:
         yield {
             "type":    "error",
@@ -476,7 +477,7 @@ if __name__ == "__main__":
             break
 
         print("\nAgent :")
-        final_answer = None
+        final_answer_parts: list[str] = []
 
         for event in chat_stream(question, thread_id):
             etype = event.get("type")
@@ -485,16 +486,14 @@ if __name__ == "__main__":
             if not content:
                 continue
 
-            if etype == "routing":
-                print(f"[routing] {content}")
-            elif etype == "thinking":
-                print(f"[tool] {content}")
-            elif etype == "answer":
-                final_answer = content
+            if etype == "token":
+                print(content, end="", flush=True)
+                final_answer_parts.append(content)
             elif etype == "error":
                 print(f"[error] {content}")
 
-        if final_answer:
-            print(f"\nFinal: {final_answer}\n")
+        if final_answer_parts:
+            final_answer = "".join(final_answer_parts).strip()
+            print(f"\n\nFinal: {final_answer}\n")
         else:
             print("\nFinal: No final text answer generated.\n")

@@ -111,35 +111,70 @@ export function useChat(token: string, userId: string) {
             return;
         }
 
-        let responseReceived = false;
+        let receivedAnyToken = false;
+        let streamDone = false;
+        let assistantMessageIndex = -1;
 
         try{
             pushMessage(messages, "user", userText);
+            messages.value.push({ role: "assistant", content: "", timestamp: Date.now() });
+            assistantMessageIndex = messages.value.length - 1;
             saveMessages(currentThreadId, messages.value);
             startLoadingStatus();
 
-            const response = await chatApi.sendMessage(userText, currentThreadId, token);
-            responseReceived = true;
-            pushMessage(messages, "assistant", response.response);
-            const hasInterruptPayload = Array.isArray(response.interrupts)
-                ? response.interrupts.length > 0
-                : !!response.interrupts && Object.keys(response.interrupts).length > 0;
-            pendingInterrupt.value = (response.requires_human || hasInterruptPayload)
-                ? response.interrupts
-                : null;
-            setPendingInterrupt(currentThreadId, pendingInterrupt.value);
+            await chatApi.streamMessage(userText, currentThreadId, token, {
+                onToken: (tokenChunk) => {
+                    if (!receivedAnyToken) {
+                        receivedAnyToken = true;
+                        stopLoadingStatus();
+                    }
 
-            try {
-                await reloadThreadMessages(currentThreadId);
-                messages.value = getMessages(currentThreadId);
-                pendingInterrupt.value = getPendingInterrupt(currentThreadId);
-            } catch {
-                // Keep optimistic messages if history sync fails.
+                    if (assistantMessageIndex < 0 || !messages.value[assistantMessageIndex]) {
+                        messages.value.push({ role: "assistant", content: "", timestamp: Date.now() });
+                        assistantMessageIndex = messages.value.length - 1;
+                    }
+
+                    messages.value[assistantMessageIndex].content += tokenChunk;
+                },
+                onEvent: (event) => {
+                    if (event.type === "error") {
+                        const detail =
+                            typeof event.content === "string" && event.content.trim()
+                                ? event.content
+                                : "Streaming failed";
+                        throw new Error(detail);
+                    }
+
+                    // Fallback for non-token streams that still emit full answers.
+                    if (event.type === "answer" && typeof event.content === "string") {
+                        if (!receivedAnyToken) {
+                            receivedAnyToken = true;
+                            stopLoadingStatus();
+                        }
+                        if (assistantMessageIndex < 0 || !messages.value[assistantMessageIndex]) {
+                            messages.value.push({ role: "assistant", content: "", timestamp: Date.now() });
+                            assistantMessageIndex = messages.value.length - 1;
+                        }
+                        messages.value[assistantMessageIndex].content += event.content;
+                    }
+                },
+                onDone: () => {
+                    streamDone = true;
+                },
+            });
+
+            if (!streamDone) {
+                throw new Error("Stream ended unexpectedly before completion.");
             }
+
+            pendingInterrupt.value = null;
+            setPendingInterrupt(currentThreadId, null);
             saveMessages(currentThreadId, messages.value);
         }catch(err: any){
-            if (!responseReceived) {
+            if (!receivedAnyToken) {
                 messages.value = messages.value.slice(0, beforeCount);
+                saveMessages(currentThreadId, messages.value);
+            } else {
                 saveMessages(currentThreadId, messages.value);
             }
             error.value = err?.message || "Failed to send message";

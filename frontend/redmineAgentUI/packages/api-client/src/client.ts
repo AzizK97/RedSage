@@ -3,6 +3,10 @@
 const BASE_API = import.meta.env.VITE_API_URL || '/api';
 const REQUEST_TIMEOUT_MS = 3600000;
 
+export function buildApiUrl(endpoint: string): string {
+  return `${BASE_API}${endpoint}`;
+}
+
 export function authHeaders(token?: string): Record<string, string> {
   const resolvedToken = token?.trim();
 
@@ -105,5 +109,35 @@ export const apiClient = {
       body: JSON.stringify(body),
     });
     return handleResponse<T>(response);
+  },
+
+  async postStream(endpoint: string, body: unknown, token?: string): Promise<Response> {
+    const headers = authHeaders(token);
+    const response = await fetchWithTimeout(buildApiUrl(endpoint), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      let errorText = "Unknown error";
+
+      if (contentType.includes("application/json")) {
+        const payload = await response.json().catch(() => null);
+        if (payload && typeof payload === "object") {
+          errorText =
+            (payload as Record<string, unknown>).detail?.toString() ||
+            (payload as Record<string, unknown>).message?.toString() ||
+            JSON.stringify(payload);
+        }
+      } else {
+        errorText = await response.text().catch(() => "Unknown error");
+      }
+
+      throw new Error(`API Error ${response.status}: ${errorText}`);
+    }
+
+    return response;
   },
 };

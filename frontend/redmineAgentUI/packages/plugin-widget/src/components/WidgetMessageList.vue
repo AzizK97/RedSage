@@ -83,7 +83,7 @@ async function scrollToBottom() {
 }
 
 watch(
-  () => props.messages.length,
+  () => props.messages.map((m) => `${m.timestamp}:${m.role}:${m.content.length}`).join('|'),
   () => {
     void scrollToBottom();
   },
