@@ -29,6 +29,7 @@ export function useChat(token: string, userId: string) {
     const messages: Ref<Message[]> = ref(getMessages(activeThreadId.value));
     const threadId = activeThreadId;
     const isLoading: Ref<boolean> = ref(false);
+    const isStreaming: Ref<boolean> = ref(false);
     const pendingInterrupt: Ref<Record<string, any> | null> = ref(null);
     const error: Ref<string | null> = ref(null);
     const loadingStatus: Ref<string> = ref("");
@@ -116,9 +117,11 @@ export function useChat(token: string, userId: string) {
         let assistantMessageIndex = -1;
 
         try{
-            pushMessage(messages, "user", userText);
-            messages.value.push({ role: "assistant", content: "", timestamp: Date.now() });
-            assistantMessageIndex = messages.value.length - 1;
+                pushMessage(messages, "user", userText);
+                // create assistant placeholder with streaming metadata
+                messages.value.push({ role: "assistant", content: "", timestamp: Date.now(), isStreaming: true, finished: false });
+                assistantMessageIndex = messages.value.length - 1;
+                isStreaming.value = true;
             saveMessages(currentThreadId, messages.value);
             startLoadingStatus();
 
@@ -130,11 +133,15 @@ export function useChat(token: string, userId: string) {
                     }
 
                     if (assistantMessageIndex < 0 || !messages.value[assistantMessageIndex]) {
-                        messages.value.push({ role: "assistant", content: "", timestamp: Date.now() });
+                        messages.value.push({ role: "assistant", content: "", timestamp: Date.now(), isStreaming: true, finished: false });
                         assistantMessageIndex = messages.value.length - 1;
                     }
 
-                    messages.value[assistantMessageIndex].content += tokenChunk;
+                    // append token and ensure streaming flag
+                    const msg = messages.value[assistantMessageIndex];
+                    msg.content += tokenChunk;
+                    msg.isStreaming = true;
+                    msg.finished = false;
                 },
                 onEvent: (event) => {
                     if (event.type === "error") {
@@ -160,6 +167,11 @@ export function useChat(token: string, userId: string) {
                 },
                 onDone: () => {
                     streamDone = true;
+                    isStreaming.value = false;
+                    if (assistantMessageIndex >= 0 && messages.value[assistantMessageIndex]) {
+                        messages.value[assistantMessageIndex].isStreaming = false;
+                        messages.value[assistantMessageIndex].finished = true;
+                    }
                 },
             });
 
@@ -178,6 +190,7 @@ export function useChat(token: string, userId: string) {
                 saveMessages(currentThreadId, messages.value);
             }
             error.value = err?.message || "Failed to send message";
+            isStreaming.value = false;
         }finally{
             stopLoadingStatus();
             isLoading.value = false;
@@ -236,6 +249,7 @@ export function useChat(token: string, userId: string) {
         threadId,
         activeThreadId,
         isLoading,
+        isStreaming,
         pendingInterrupt,
         error,
         loadingStatus,

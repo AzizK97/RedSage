@@ -41,6 +41,14 @@ function renderMarkdown(text: string) {
   return DOMPurify.sanitize(raw);
 }
 
+function isMessageStreaming(msg: Message) {
+  return !!msg.isStreaming || !!msg.streaming;
+}
+
+function isMessageFinished(msg: Message) {
+  return !!msg.finished;
+}
+
 async function scrollToBottom() {
   await nextTick();
   if (!listRef.value) return;
@@ -133,6 +141,16 @@ onMounted(() => {
               class="prose dark:prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-surface-900 prose-pre:border prose-pre:border-surface-800 prose-code:text-sage-400 prose-code:bg-surface-900 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-th:text-surface-200 prose-td:text-surface-400" 
               v-html="renderMarkdown(msg.content)"
             ></div>
+
+            <div v-if="msg.role === 'assistant' && isMessageStreaming(msg)" class="mt-2 flex items-center gap-2 text-surface-500" aria-label="assistant streaming">
+              <span class="w-1.5 h-1.5 rounded-full bg-copper-500/80 animate-thinking-dot" />
+              <span class="w-1.5 h-1.5 rounded-full bg-copper-500/80 animate-thinking-dot" style="animation-delay: .12s" />
+              <span class="w-1.5 h-1.5 rounded-full bg-copper-500/80 animate-thinking-dot" style="animation-delay: .24s" />
+            </div>
+
+            <div v-else-if="msg.role === 'assistant' && isMessageFinished(msg)" class="mt-2 text-xs font-semibold uppercase tracking-widest text-emerald-400/90 animate-stream-finish">
+              Finished
+            </div>
 
             <!-- PDF download button — only shown for report-type messages -->
             <div
@@ -289,5 +307,14 @@ onMounted(() => {
 
 .animate-thinking-dot {
   animation: thinking-dot 1s infinite ease-in-out;
+}
+
+@keyframes stream-finish {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-stream-finish {
+  animation: stream-finish 220ms ease-out;
 }
 </style>

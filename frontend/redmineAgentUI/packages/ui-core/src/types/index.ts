@@ -50,6 +50,9 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  isStreaming?: boolean;
+  finished?: boolean;
+  streaming?: boolean;
 }
 
 export interface ThreadSummary {

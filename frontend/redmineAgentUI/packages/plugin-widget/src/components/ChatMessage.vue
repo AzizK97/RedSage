@@ -15,6 +15,9 @@ defineProps<{
 
 const props = defineProps<any>();
 const isAgent = computed(() => !!props.message.isAgent);
+const content = computed(() => props.message.body ?? props.message.content ?? '');
+const isStreaming = computed(() => !!props.message.isStreaming || !!props.message.streaming);
+const isFinished = computed(() => !!props.message.finished);
 </script>
 
 <template>
@@ -31,7 +34,15 @@ const isAgent = computed(() => !!props.message.isAgent);
           </div>
         </div>
 
-        <div class="rds-message-body rds-text-14" style="margin-top:var(--rds-space-2);">{{ message.body }}</div>
+        <div class="rds-message-body rds-text-14" style="margin-top:var(--rds-space-2);">
+          <span v-html="content"></span>
+          <span v-if="isStreaming" class="typing-indicator" aria-hidden="true">
+            <span class="typing-dots">
+              <span></span><span></span><span></span>
+            </span>
+          </span>
+          <span v-else-if="isFinished" class="finished-indicator" aria-hidden="true">✓</span>
+        </div>
 
         <div v-if="message.actions && message.actions.length" class="rds-message-actions" style="margin-top:var(--rds-space-3);display:flex;gap:var(--rds-space-2);">
           <button
@@ -82,5 +93,42 @@ const isAgent = computed(() => !!props.message.isAgent);
 .rds-message-body { white-space:pre-wrap; }
 
 .rds-message-actions .rds-action-btn { padding: 6px 10px; border-radius:6px; font-size:13px; }
+
+.typing-dots {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-left:8px;
+}
+.typing-dots span {
+  width:6px;
+  height:6px;
+  background:rgba(0,0,0,0.25);
+  border-radius:50%;
+  opacity:0.4;
+  transform:translateY(0);
+  animation:typingBounce 1s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay:0.15s; }
+.typing-dots span:nth-child(3) { animation-delay:0.3s; }
+
+@keyframes typingBounce {
+  0%,100% { transform: translateY(0); opacity:0.4 }
+  50% { transform: translateY(-6px); opacity:1 }
+}
+
+.finished-indicator {
+  display:inline-block;
+  margin-left:8px;
+  color: #10b981;
+  font-weight:700;
+  opacity:0;
+  transform:translateY(6px) scale(0.95);
+  animation:finishedPop 300ms ease-out 1 forwards;
+}
+
+@keyframes finishedPop {
+  to { opacity:1; transform:translateY(0) scale(1); }
+}
 
 </style>
