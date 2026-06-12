@@ -1,93 +1,12 @@
-import os
-import requests
 from langchain_core.tools import tool
 
-# ── HTTP Helpers ───────────────────────────────────────────────────────────────
-
-def _redmine_base_url() -> str:
-    return os.getenv("REDMINE_URL", "http://localhost:3000").rstrip("/")
-
-
-def _redmine_timeout_seconds() -> float:
-    return float(os.getenv("REDMINE_TIMEOUT_SECONDS", "10"))
+from app.integrations.redmine_client import redmine_client
 
 
 def _as_str_id(value):
     if value is None:
         return None
     return str(value)
-
-def _post(endpoint: str, payload: dict) -> dict:
-    """Base authenticated POST request to Redmine."""
-    redmine_url = _redmine_base_url()
-    api_key     = os.getenv("REDMINE_API_KEY", "")
-
-    try:
-        response = requests.post(
-            f"{redmine_url}{endpoint}",
-            headers={
-                "X-Redmine-API-Key": api_key,
-                "Content-Type": "application/json"
-            },
-            json=payload,
-            timeout=_redmine_timeout_seconds(),
-        )
-    except requests.exceptions.RequestException as exc:
-        raise RuntimeError(
-            f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{redmine_url}'. "
-            "Make sure Redmine is running and REDMINE_URL is correct."
-        ) from exc
-
-    try:
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as exc:
-        response_body = (response.text or "").strip()
-        raise RuntimeError(
-            f"REDMINE_API_ERROR: POST {endpoint} failed with HTTP {response.status_code}. "
-            f"Response: {response_body or 'empty response'}"
-        ) from exc
-
-    # 201 Created returns a body, 200 may not
-    try:
-        return response.json()
-    except Exception:
-        return {"status": "success", "http_status": response.status_code}
-
-
-def _put(endpoint: str, payload: dict) -> dict:
-    """Base authenticated PUT request to Redmine."""
-    redmine_url = _redmine_base_url()
-    api_key     = os.getenv("REDMINE_API_KEY", "")
-
-    try:
-        response = requests.put(
-            f"{redmine_url}{endpoint}",
-            headers={
-                "X-Redmine-API-Key": api_key,
-                "Content-Type": "application/json"
-            },
-            json=payload,
-            timeout=_redmine_timeout_seconds(),
-        )
-    except requests.exceptions.RequestException as exc:
-        raise RuntimeError(
-            f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{redmine_url}'. "
-            "Make sure Redmine is running and REDMINE_URL is correct."
-        ) from exc
-
-    try:
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as exc:
-        response_body = (response.text or "").strip()
-        raise RuntimeError(
-            f"REDMINE_API_ERROR: PUT {endpoint} failed with HTTP {response.status_code}. "
-            f"Response: {response_body or 'empty response'}"
-        ) from exc
-
-    try:
-        return response.json()
-    except Exception:
-        return {"status": "success", "http_status": response.status_code}
 
 
 # ── Issue Write Tools ──────────────────────────────────────────────────────────
@@ -145,13 +64,13 @@ def create_issue(
     if start_date:     issue["start_date"]     = start_date
     if due_date:       issue["due_date"]        = due_date
 
-    data = _post("/issues.json", {"issue": issue})
+    data = redmine_client.post("/issues.json", {"issue": issue})
     created = data.get("issue", {})
     return {
         "status":  "created",
         "id":      created.get("id"),
         "subject": created.get("subject"),
-        "url":     f"{_redmine_base_url()}/issues/{created.get('id')}"
+        "url":     f"{redmine_client.base_url}/issues/{created.get('id')}"
     }
 
 
@@ -182,7 +101,7 @@ def update_issue_status(
     if notes:
         payload["issue"]["notes"] = notes
 
-    _put(f"/issues/{_as_str_id(issue_id)}.json", payload)
+    redmine_client.put(f"/issues/{_as_str_id(issue_id)}.json", payload)
     status_names = {"1": "New", "2": "In Progress", "3": "Resolved",
                     "4": "Feedback", "5": "Closed", "6": "Rejected"}
     return {
@@ -211,7 +130,7 @@ def reassign_issue(
     if notes:
         payload["issue"]["notes"] = notes
 
-    _put(f"/issues/{_as_str_id(issue_id)}.json", payload)
+    redmine_client.put(f"/issues/{_as_str_id(issue_id)}.json", payload)
     return {
         "status":           "updated",
         "issue_id":         issue_id,
@@ -232,7 +151,7 @@ def add_comment_to_issue(
         issue_id: Numeric ID of the issue
         comment:  The comment text to add
     """
-    _put(f"/issues/{_as_str_id(issue_id)}.json", {"issue": {"notes": comment}})
+    redmine_client.put(f"/issues/{_as_str_id(issue_id)}.json", {"issue": {"notes": comment}})
     return {
         "status":   "comment_added",
         "issue_id": issue_id
@@ -261,7 +180,7 @@ def update_issue_dates(
     if not issue:
         return {"status": "error", "message": "No dates provided."}
 
-    _put(f"/issues/{_as_str_id(issue_id)}.json", {"issue": issue})
+    redmine_client.put(f"/issues/{_as_str_id(issue_id)}.json", {"issue": issue})
     return {
         "status":     "updated",
         "issue_id":   issue_id,
@@ -305,7 +224,7 @@ def log_time(
     if comments: entry["comments"] = comments
     if spent_on: entry["spent_on"] = spent_on
 
-    data = _post("/time_entries.json", {"time_entry": entry})
+    data = redmine_client.post("/time_entries.json", {"time_entry": entry})
     created = data.get("time_entry", {})
     return {
         "status":      "logged",
@@ -352,7 +271,7 @@ def create_version(
     if due_date:    version["due_date"]    = due_date
     if description: version["description"] = description
 
-    data = _post(f"/projects/{project_id}/versions.json", {"version": version})
+    data = redmine_client.post(f"/projects/{project_id}/versions.json", {"version": version})
     created = data.get("version", {})
     return {
         "status":   "created",
@@ -390,7 +309,7 @@ def update_version_dates(
     if not version:
         return {"status": "error", "message": "No fields provided to update."}
 
-    _put(f"/versions/{_as_str_id(version_id)}.json", {"version": version})
+    redmine_client.put(f"/versions/{_as_str_id(version_id)}.json", {"version": version})
     return {
         "status":     "updated",
         "version_id": version_id,

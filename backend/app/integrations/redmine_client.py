@@ -1,3 +1,4 @@
+import os
 import requests
 from app.core.config import settings
 from datetime import datetime
@@ -9,6 +10,70 @@ class RedmineClient:
         self.headers = {
             "X-Redmine-API-Key": settings.REDMINE_API_KEY,
         }
+
+    def _timeout_seconds(self) -> float:
+        return float(os.getenv("REDMINE_TIMEOUT_SECONDS", "10"))
+
+    def _json_headers(self) -> dict:
+        return {**self.headers, "Content-Type": "application/json"}
+
+    def _send(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+        """Issue an authenticated request and translate transport/HTTP failures
+        into the same RuntimeError shapes (REDMINE_UNAVAILABLE / REDMINE_API_ERROR)
+        the agent tools have always raised, so prompts and error handling that
+        key off those messages keep working unchanged."""
+        url = f"{self.base_url}{endpoint}"
+        try:
+            response = requests.request(
+                method,
+                url,
+                headers=self._json_headers(),
+                timeout=self._timeout_seconds(),
+                **kwargs,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{self.base_url}'. "
+                "Make sure Redmine is running and REDMINE_URL is correct."
+            ) from exc
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            response_body = (response.text or "").strip()
+            raise RuntimeError(
+                f"REDMINE_API_ERROR: {method} {endpoint} failed with HTTP {response.status_code}. "
+                f"Response: {response_body or 'empty response'}"
+            ) from exc
+
+        return response
+
+    def get(self, endpoint: str, params: dict | None = None) -> dict:
+        """Generic authenticated GET returning the raw decoded JSON payload.
+
+        Unlike list_projects/list_issues/_paginate, this does not auto-paginate —
+        callers (agent tools) keep full control over filters and result limits,
+        which they need for ad-hoc, LLM-driven query shapes.
+        """
+        return self._send("GET", endpoint, params=params or {}).json()
+
+    def post(self, endpoint: str, payload: dict) -> dict:
+        """Generic authenticated POST. Returns the decoded JSON payload, or a
+        status fallback when Redmine responds with an empty body (e.g. 200)."""
+        response = self._send("POST", endpoint, json=payload)
+        try:
+            return response.json()
+        except Exception:
+            return {"status": "success", "http_status": response.status_code}
+
+    def put(self, endpoint: str, payload: dict) -> dict:
+        """Generic authenticated PUT. Returns the decoded JSON payload, or a
+        status fallback when Redmine responds with an empty body (e.g. 200)."""
+        response = self._send("PUT", endpoint, json=payload)
+        try:
+            return response.json()
+        except Exception:
+            return {"status": "success", "http_status": response.status_code}
 
     def list_users(self) -> list[dict]:
         if not self.base_url or not settings.REDMINE_API_KEY:

@@ -299,6 +299,32 @@ class MonitoringRepository:
             for row in rows
         }
 
+    def get_recent_notifications(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self.db.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, event_type, severity, title, details, occurred_at, project_id, issue_id
+                FROM monitoring_events
+                ORDER BY occurred_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall()
+        return [
+            {
+                "id": row[0],
+                "event_type": row[1],
+                "severity": row[2],
+                "title": row[3],
+                "details": row[4],
+                "occurred_at": row[5],
+                "project_id": row[6],
+                "issue_id": row[7],
+            }
+            for row in rows
+        ]
+
     def get_overview(self) -> dict[str, Any]:
         with self.db.cursor() as cur:
             cur.execute(

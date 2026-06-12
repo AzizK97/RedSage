@@ -1,9 +1,8 @@
-import os
-import requests
 from datetime import date, timedelta
 from langchain_core.tools import tool
 
 from app.agent.cache import get_cached, set_cached, get_cached_sync, set_cached_sync
+from app.integrations.redmine_client import redmine_client
 
 # Session-level state set by supervisor before invoking the agent.
 _SESSION_REDMINE_USER_ID: int | None = None
@@ -51,7 +50,7 @@ def get_session_project() -> str | None:
             return
 
         # Build a set of project identifiers that this user manages.
-        projects = _get("/projects.json", {"limit": 100}).get("projects", [])
+        projects = redmine_client.get("/projects.json", {"limit": 100}).get("projects", [])
         allowed: set[str] = set()
 
         for p in projects:
@@ -59,7 +58,7 @@ def get_session_project() -> str | None:
             if not identifier:
                 continue
             try:
-                members = _get(f"/projects/{identifier}/memberships.json").get("memberships", [])
+                members = redmine_client.get(f"/projects/{identifier}/memberships.json").get("memberships", [])
             except Exception:
                 continue
 
@@ -92,42 +91,6 @@ def clear_session_user():
     _SESSION_REDMINE_USER_ID = None
     _SESSION_IS_ADMIN = False
     _ALLOWED_PROJECT_IDENTIFIERS = None
-
-# ── HTTP Helper ────────────────────────────────────────────────────────────────
-
-def _get(endpoint: str, params: dict | None = None) -> dict:
-    """Base authenticated GET request to Redmine."""
-    redmine_url = os.getenv("REDMINE_URL", "http://localhost:3000").rstrip("/")
-    api_key     = os.getenv("REDMINE_API_KEY", "")
-    timeout_seconds = float(os.getenv("REDMINE_TIMEOUT_SECONDS", "10"))
-
-    try:
-        response = requests.get(
-            f"{redmine_url}{endpoint}",
-            headers={
-                "X-Redmine-API-Key": api_key,
-                "Content-Type": "application/json"
-            },
-            params=params or {},
-            timeout=timeout_seconds,
-        )
-    except requests.exceptions.RequestException as exc:
-        raise RuntimeError(
-            f"REDMINE_UNAVAILABLE: Unable to reach Redmine at '{redmine_url}'. "
-            "Make sure Redmine is running and REDMINE_URL is correct."
-        ) from exc
-
-    try:
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as exc:
-        response_body = (response.text or "").strip()
-        raise RuntimeError(
-            f"REDMINE_API_ERROR: GET {endpoint} failed with HTTP {response.status_code}. "
-            f"Response: {response_body or 'empty response'}"
-        ) from exc
-
-    return response.json()
-
 
 def _as_str_id(value):
     if value is None:
@@ -172,7 +135,7 @@ def get_projects() -> dict:
     # if cached:
     #     return cached
 
-    data = _get("/projects.json", {"limit": 100})
+    data = redmine_client.get("/projects.json", {"limit": 100})
     projects = [
         {
             "id":          p["id"],
@@ -216,7 +179,7 @@ def get_all_issues(
         due_after:   YYYY-MM-DD — lower bound on due date
                      Set both to the same value for exact date match.
     """
-    data = _get("/projects.json", {"limit": 100})
+    data = redmine_client.get("/projects.json", {"limit": 100})
     projects = data.get("projects", [])
 
     if _ALLOWED_PROJECT_IDENTIFIERS is not None:
@@ -244,7 +207,7 @@ def get_all_issues(
         if due_after:
             params["due_date"] = f">={due_after}"
         try:
-            result = _get("/issues.json", params)
+            result = redmine_client.get("/issues.json", params)
             issues = result.get("issues", [])
 
             # Post-filter upper bound for range queries
@@ -332,7 +295,7 @@ def get_issues(
         if str(project_id) not in _ALLOWED_PROJECT_IDENTIFIERS:
             return {"total_count": 0, "issues": []}
 
-    data = _get("/issues.json", params)
+    data = redmine_client.get("/issues.json", params)
     raw_issues = data.get("issues", [])
 
     # Post-filter for range queries: Redmine only supports one due_date
@@ -378,7 +341,7 @@ def get_members(project_id: str) -> dict:
         if not _ALLOWED_PROJECT_IDENTIFIERS or project_id not in _ALLOWED_PROJECT_IDENTIFIERS:
             return {"total_count": 0, "members": []}
 
-    data = _get(f"/projects/{project_id}/memberships.json")
+    data = redmine_client.get(f"/projects/{project_id}/memberships.json")
     result = {
         "total_count": len(data.get("memberships", [])),
         "members": [
@@ -407,7 +370,7 @@ def get_versions(project_id: str) -> dict:
         if not _ALLOWED_PROJECT_IDENTIFIERS or project_id not in _ALLOWED_PROJECT_IDENTIFIERS:
             return {"total_count": 0, "versions": []}
 
-    data  = _get(f"/projects/{project_id}/versions.json")
+    data  = redmine_client.get(f"/projects/{project_id}/versions.json")
     today = date.today().isoformat()
 
     def normalize_due_date(value):
@@ -445,7 +408,7 @@ def get_issue_detail(issue_id: int | str) -> dict:
     Args:
         issue_id: Numeric ID of the issue  e.g. 42
     """
-    data  = _get(f"/issues/{_as_str_id(issue_id)}.json")
+    data  = redmine_client.get(f"/issues/{_as_str_id(issue_id)}.json")
     issue = data.get("issue", {})
 
     # If session filtering is active, ensure the issue's project is allowed.
@@ -458,7 +421,7 @@ def get_issue_detail(issue_id: int | str) -> dict:
         proj_identifier = None
         if proj_id is not None:
             try:
-                proj_data = _get(f"/projects/{proj_id}.json")
+                proj_data = redmine_client.get(f"/projects/{proj_id}.json")
                 proj_identifier = proj_data.get("project", {}).get("identifier")
             except Exception:
                 proj_identifier = None
@@ -498,28 +461,28 @@ def get_project_metrics(project_id: str) -> dict:
 
     today = date.today().isoformat()
 
-    open_count = _get("/issues.json", {"project_id": project_id, "status_id": "open", "limit": 1}).get("total_count", 0)
-    closed_count = _get("/issues.json", {"project_id": project_id, "status_id": "closed", "limit": 1}).get("total_count", 0)
+    open_count = redmine_client.get("/issues.json", {"project_id": project_id, "status_id": "open", "limit": 1}).get("total_count", 0)
+    closed_count = redmine_client.get("/issues.json", {"project_id": project_id, "status_id": "closed", "limit": 1}).get("total_count", 0)
     total = open_count + closed_count
     completion_pct = None
     if total > 0:
         completion_pct = round((closed_count / total) * 100, 1)
 
     # Overdue open issues (due <= today and still open)
-    overdue_open = _get("/issues.json", {"project_id": project_id, "status_id": "open", "due_date": f"<={today}", "limit": 1}).get("total_count", 0)
+    overdue_open = redmine_client.get("/issues.json", {"project_id": project_id, "status_id": "open", "due_date": f"<={today}", "limit": 1}).get("total_count", 0)
 
     # Urgent open issues: aggregate priority 4 and 5 (urgent / immediate)
     urgent_open = 0
     try:
-        urgent_open += _get("/issues.json", {"project_id": project_id, "status_id": "open", "priority_id": "4", "limit": 1}).get("total_count", 0)
-        urgent_open += _get("/issues.json", {"project_id": project_id, "status_id": "open", "priority_id": "5", "limit": 1}).get("total_count", 0)
+        urgent_open += redmine_client.get("/issues.json", {"project_id": project_id, "status_id": "open", "priority_id": "4", "limit": 1}).get("total_count", 0)
+        urgent_open += redmine_client.get("/issues.json", {"project_id": project_id, "status_id": "open", "priority_id": "5", "limit": 1}).get("total_count", 0)
     except Exception:
         urgent_open = 0
 
     # Fetch a sample of open issues to surface top items
     sample = []
     try:
-        data = _get("/issues.json", {"project_id": project_id, "status_id": "open", "limit": 100})
+        data = redmine_client.get("/issues.json", {"project_id": project_id, "status_id": "open", "limit": 100})
         issues = data.get("issues", [])
         # Sort by priority id desc (if present) then due_date asc
         def sort_key(i):
@@ -559,7 +522,7 @@ def get_all_projects_metrics() -> dict:
 
     Returns per-project metrics (as in `get_project_metrics`) and aggregate totals.
     """
-    data = _get("/projects.json", {"limit": 100})
+    data = redmine_client.get("/projects.json", {"limit": 100})
     projects = data.get("projects", [])
 
     if _ALLOWED_PROJECT_IDENTIFIERS is not None:
