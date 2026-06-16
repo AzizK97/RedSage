@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 from typing import Dict, Any, List, Literal, Optional
 import json
 import os
+import re
 import psycopg
 
 from psycopg import Connection
@@ -157,6 +158,22 @@ def _raise_http_from_exception(exc: Exception) -> None:
         raise HTTPException(status_code=503, detail=message)
 
     if message.startswith("REDMINE_API_ERROR:"):
+        # A Redmine 4xx is a request/validation error (e.g. an invalid
+        # version_id), not a gateway failure. Surface it as a 400 carrying
+        # Redmine's own message instead of a misleading 502 Bad Gateway.
+        # Genuine upstream failures (5xx) or unparseable errors stay 502.
+        status_match = re.search(r"HTTP (\d{3})", message)
+        if status_match and 400 <= int(status_match.group(1)) < 500:
+            detail = message
+            body_match = re.search(r"Response:\s*(\{.*\})", message)
+            if body_match:
+                try:
+                    errors = json.loads(body_match.group(1)).get("errors")
+                    if errors:
+                        detail = "; ".join(str(e) for e in errors) if isinstance(errors, list) else str(errors)
+                except Exception:
+                    pass
+            raise HTTPException(status_code=400, detail=detail)
         raise HTTPException(status_code=502, detail=message)
 
     if "human decisions" in message.lower() or "does not match num" in message.lower():
@@ -181,6 +198,21 @@ def _set_thread_pending_interrupt(db: Connection, thread_id: str, pending: dict 
         threads.set_pending_interrupt(thread_id, pending)
     else:
         threads.clear_pending_interrupt(thread_id)
+
+
+def _persist_pending_interrupt_fresh(thread_id: str, pending: dict | None) -> None:
+    """Persist (or clear) a thread's pending interrupt on a dedicated connection.
+
+    The streaming endpoint cannot reuse the request-scoped DB dependency from
+    inside the StreamingResponse generator: that connection is torn down before
+    the generator finishes, so writes there are silently lost. We therefore open
+    a short-lived, autocommit connection just for this write.
+    """
+    url = os.getenv("POSTGRES_URL")
+    if not url:
+        return
+    with psycopg.connect(url, autocommit=True) as conn:
+        _set_thread_pending_interrupt(conn, thread_id, pending)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -239,13 +271,32 @@ async def chat_stream_endpoint(
     ensure_thread_owner(db, request.thread_id, current.id)
 
     def event_generator():
+        saw_interrupt = False
         for event in chat_stream(
             request.message,
             request.thread_id,
             redmine_user_id=current.redmine_user_id,
             is_admin=(current.role == Role.ADMIN),
         ):
+            # A human-in-the-loop approval was raised: persist it as the thread's
+            # pending interrupt so the dialog can be resolved through
+            # POST /chat/approve/{thread_id}, then forward it to the client.
+            if event.get("type") == "interrupt":
+                saw_interrupt = True
+                try:
+                    _persist_pending_interrupt_fresh(
+                        request.thread_id, _interrupt_to_payload(event.get("value"))
+                    )
+                except Exception:
+                    pass
             yield f"data: {json.dumps(event)}\n\n"
+
+        # Clear any stale pending interrupt when the turn completed without one.
+        if not saw_interrupt:
+            try:
+                _persist_pending_interrupt_fresh(request.thread_id, None)
+            except Exception:
+                pass
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
@@ -272,12 +323,21 @@ async def approve_endpoint(
 
     pending_interrupt = _get_thread_pending_interrupt(db, thread_id)
     if not pending_interrupt:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "No pending approval exists for this thread. Refresh the page and wait for a new approval request."
-            ),
-        )
+        # The DB column is only a UI convenience; the checkpoint is the real
+        # source of truth for whether the graph is paused. Fall back to it so a
+        # genuinely interrupted graph can still be resumed.
+        try:
+            snapshot = app.get_state(config)
+            has_state_interrupt = bool(getattr(snapshot, "interrupts", None))
+        except Exception:
+            has_state_interrupt = False
+        if not has_state_interrupt:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "No pending approval exists for this thread. Refresh the page and wait for a new approval request."
+                ),
+            )
 
     try:
         set_session_user(current.redmine_user_id, is_admin=(current.role == Role.ADMIN))

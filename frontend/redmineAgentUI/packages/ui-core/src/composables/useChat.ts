@@ -113,6 +113,7 @@ export function useChat(token: string, userId: string) {
         }
 
         let receivedAnyToken = false;
+        let receivedInterrupt = false;
         let streamDone = false;
         let assistantMessageIndex = -1;
 
@@ -152,6 +153,26 @@ export function useChat(token: string, userId: string) {
                         throw new Error(detail);
                     }
 
+                    // A human-in-the-loop approval is required: surface the
+                    // approval dialog by storing the interrupt payload, and keep
+                    // it so it is not cleared when the stream completes.
+                    if (event.type === "interrupt") {
+                        receivedInterrupt = true;
+                        stopLoadingStatus();
+                        const value = (event as any).value ?? null;
+                        pendingInterrupt.value = value;
+                        setPendingInterrupt(currentThreadId, value);
+                        if (assistantMessageIndex >= 0 && messages.value[assistantMessageIndex]) {
+                            const msg = messages.value[assistantMessageIndex];
+                            if (!msg.content) {
+                                msg.content = "Action waiting for human confirmation.";
+                            }
+                            msg.isStreaming = false;
+                            msg.finished = true;
+                        }
+                        return;
+                    }
+
                     // Fallback for non-token streams that still emit full answers.
                     if (event.type === "answer" && typeof event.content === "string") {
                         if (!receivedAnyToken) {
@@ -179,8 +200,12 @@ export function useChat(token: string, userId: string) {
                 throw new Error("Stream ended unexpectedly before completion.");
             }
 
-            pendingInterrupt.value = null;
-            setPendingInterrupt(currentThreadId, null);
+            // Only clear the pending interrupt when the turn finished without one;
+            // otherwise keep it so the approval dialog stays open.
+            if (!receivedInterrupt) {
+                pendingInterrupt.value = null;
+                setPendingInterrupt(currentThreadId, null);
+            }
             saveMessages(currentThreadId, messages.value);
         }catch(err: any){
             if (!receivedAnyToken) {
@@ -228,18 +253,26 @@ export function useChat(token: string, userId: string) {
             pushMessage(messages, "assistant", response.response);
             pendingInterrupt.value = null;
             setPendingInterrupt(currentThreadId, null);
-
+        }catch(err: any){
+            error.value = err?.message || "Failed to submit decision";
+        }finally{
+            // Reconcile with server truth regardless of the request outcome.
+            // A slow resume can complete on the server (issue created, interrupt
+            // cleared) even when the HTTP call appears to fail or time out at a
+            // proxy. Re-reading the thread lets the dialog dismiss whenever the
+            // backend has actually cleared the interrupt, and keeps it open only
+            // if a genuine approval is still pending.
             try {
                 await reloadThreadMessages(currentThreadId);
                 messages.value = getMessages(currentThreadId);
                 pendingInterrupt.value = getPendingInterrupt(currentThreadId);
+                if (!pendingInterrupt.value) {
+                    error.value = null;
+                }
             } catch {
-                // Keep optimistic assistant message if history sync fails.
+                // Network sync failed; fall back to the optimistic local state.
             }
             saveMessages(currentThreadId, messages.value);
-        }catch(err: any){
-            error.value = err?.message || "Failed to submit decision";
-        }finally{
             isLoading.value = false;
         }
     }

@@ -4,37 +4,77 @@ import psycopg
 from httpx import AsyncClient, ASGITransport
 from fastapi.testclient import TestClient
 from app.main import app
-from app.dependencies.db import get_db
+from app.dependencies.db import get_db, get_agent_db
 from app.dependencies.auth import get_current_user
 from app.core.security import create_access_token
 from app.models.user import RedmineUser
 
+# Point this at a DEDICATED throwaway database; its tables are truncated between
+# tests. The schema is created automatically, but the database must have the
+# pg_trgm extension (CREATE EXTENSION pg_trgm;).
 TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL", 
-    "postgresql+psycopg://localhost/redmine_chat_test"
+    "TEST_DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5433/redmine_chat_test",
 )
+
+# Application-owned tables, children before parents, truncated between tests.
+_APP_TABLES = [
+    "thread_messages",
+    "thread_owners",
+    "entitlements",
+    "redmine_users",
+]
 
 # ==================== DATABASE FIXTURES ====================
 
+
+def _ensure_app_tables(conn):
+    from app.repositories.user_repository import UserRepository
+    from app.repositories.entitlement_repository import EntitlementRepository
+    from app.repositories.thread_repository import ThreadRepository
+    from app.repositories.thread_message_repository import ThreadMessageRepository
+
+    UserRepository(conn).ensure_table()
+    EntitlementRepository(conn).ensure_table()
+    ThreadRepository(conn).ensure_table()
+    ThreadMessageRepository(conn).ensure_table()
+
+
+def _truncate_app_tables(conn):
+    with conn.cursor() as cur:
+        for table in _APP_TABLES:
+            try:
+                cur.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+            except Exception:
+                # Table may not exist yet; with autocommit there is no aborted
+                # transaction to recover from, so ignore and continue.
+                pass
+
+
 @pytest.fixture(scope="function")
 def test_db_connection():
-    """Create a real DB connection with transaction rollback per test."""
-    conn = psycopg.connect(TEST_DATABASE_URL, autocommit=False)
+    """Real connection to the test database, cleaned between tests.
+
+    Uses autocommit: the repositories commit internally, which psycopg forbids
+    inside an explicit transaction block, so per-test isolation is achieved by
+    truncating the application tables rather than by rolling a transaction back.
+    """
+    conn = psycopg.connect(TEST_DATABASE_URL, autocommit=True)
     try:
-        with conn.transaction():
-            yield conn
-            # If no exception, we rollback at the end of the 'with' block
+        _ensure_app_tables(conn)
+        _truncate_app_tables(conn)
+        yield conn
     finally:
-        conn.close()
+        try:
+            _truncate_app_tables(conn)
+        finally:
+            conn.close()
 
 
 def get_test_db_override(conn):
-    """Dependency override for FastAPI."""
+    """Dependency override for FastAPI: yield the shared test connection."""
     def _get_db():
-        try:
-            yield conn
-        finally:
-            pass  # Connection will be cleaned by the transaction context
+        yield conn
     return _get_db
 
 
@@ -76,6 +116,7 @@ def get_test_user_override(test_user):
 async def async_client(test_db_connection, test_user):
     """Async client with dependency overrides."""
     app.dependency_overrides[get_db] = get_test_db_override(test_db_connection)
+    app.dependency_overrides[get_agent_db] = get_test_db_override(test_db_connection)
     app.dependency_overrides[get_current_user] = get_test_user_override(test_user)
 
     async with AsyncClient(
@@ -92,6 +133,7 @@ async def async_client(test_db_connection, test_user):
 def sync_client(test_db_connection, test_user):
     """Synchronous TestClient (useful for simpler tests)."""
     app.dependency_overrides[get_db] = get_test_db_override(test_db_connection)
+    app.dependency_overrides[get_agent_db] = get_test_db_override(test_db_connection)
     app.dependency_overrides[get_current_user] = get_test_user_override(test_user)
 
     with TestClient(app) as client:

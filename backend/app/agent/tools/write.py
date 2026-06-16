@@ -9,6 +9,48 @@ def _as_str_id(value):
     return str(value)
 
 
+def _resolve_version_id(project_id, version_id) -> str | None:
+    """Resolve a version reference to a real Redmine version id.
+
+    The model often passes a sprint *name* or number (e.g. "0" for "sprint 0")
+    as the version_id. Sending that straight to Redmine yields HTTP 422
+    ("Target version is not included in the list"). We look the value up among
+    the project's versions, matching by id first then by name, and omit it
+    (return None) when it cannot be resolved rather than send an invalid value.
+    """
+    if version_id is None:
+        return None
+    raw = str(version_id).strip()
+    if not raw:
+        return None
+
+    try:
+        versions = redmine_client.list_project_versions(project_id) if project_id else []
+    except Exception:
+        versions = []
+
+    if not versions:
+        # Could not list versions; only trust a plausible real id (positive int).
+        return raw if raw.isdigit() and int(raw) > 0 else None
+
+    by_id = {str(v.get("id")) for v in versions if v.get("id") is not None}
+    if raw in by_id:
+        return raw
+
+    target = raw.lower()
+    target_compact = target.replace("sprint", "").strip()
+    for v in versions:
+        name = str(v.get("name", "")).strip().lower()
+        if not name:
+            continue
+        name_compact = name.replace("sprint", "").strip()
+        if target in (name, name_compact) or target_compact in (name, name_compact):
+            return str(v.get("id"))
+
+    # Unresolvable reference -> omit rather than send an invalid version.
+    return None
+
+
 # ── Issue Write Tools ──────────────────────────────────────────────────────────
 
 @tool
@@ -60,7 +102,10 @@ def create_issue(
         issue.pop("tracker_id")
     if description:    issue["description"]    = description
     if assigned_to_id is not None: issue["assigned_to_id"] = _as_str_id(assigned_to_id)
-    if version_id is not None:     issue["fixed_version_id"] = _as_str_id(version_id)
+    if version_id is not None:
+        resolved_version = _resolve_version_id(project_id, version_id)
+        if resolved_version is not None:
+            issue["fixed_version_id"] = resolved_version
     if start_date:     issue["start_date"]     = start_date
     if due_date:       issue["due_date"]        = due_date
 

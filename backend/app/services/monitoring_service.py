@@ -69,8 +69,11 @@ class MonitoringService:
                 "subtitle": event["event_type"].replace("_", " ").title(),
                 "message": event.get("details") or "",
                 "severity": _SEVERITY_MAP.get(event["severity"], "info"),
+                # Milliseconds since epoch, matching the rest of the app's
+                # timestamps (the frontend's timeAgo expects ms). Returning
+                # seconds here made every item read as ~20k days ago.
                 "created_at": (
-                    int(event["occurred_at"].timestamp())
+                    int(event["occurred_at"].timestamp() * 1000)
                     if event.get("occurred_at")
                     else None
                 ),

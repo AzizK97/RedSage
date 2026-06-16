@@ -68,14 +68,14 @@ def build_invoke_config(thread_id: str, entrypoint: str = "chat") -> dict:
 
     return config
 
-def create_llm() -> ChatOpenAI:
-    return ChatOpenAI(
-        model=os.getenv("MODEL_NAME","openrouter/auto"),
-        openai_api_key=os.getenv("OPENROUTER_API_KEY"),
-        openai_api_base=os.getenv("OPENROUTER_BASE_URL"),
-        temperature=0,
-        max_tokens=800
-    )
+# def create_llm() -> ChatOpenAI:
+#     return ChatOpenAI(
+#         model=os.getenv("MODEL_NAME","openrouter/auto"),
+#         openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+#         openai_api_base=os.getenv("OPENROUTER_BASE_URL"),
+#         temperature=0,
+#         max_tokens=800
+#     )
 
 # def create_llm() -> ChatAnthropic:
 #     return ChatAnthropic(
@@ -93,11 +93,13 @@ def create_llm() -> ChatOpenAI:
 #         temperature=0
 #     )
 
-# def create_llm() -> ChatOllama:
-#     return ChatOllama(
-#         model="qwen3:4b-thinking",
-#         temperature=0
-#     )
+OLLAMA_URL = "https://eldest-turtle-semicolon.ngrok-free.dev"
+def create_llm() -> ChatOllama:
+    return ChatOllama(
+        base_url=OLLAMA_URL,
+        model="gemma4:e4b",
+        temperature=0,
+    )
 
 # def create_llm() -> ChatOllama:
 #     provider = ModelProvider.instance()
@@ -386,11 +388,13 @@ def chat_with_interrupts(question: str, thread_id: str = "default", redmine_user
 def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int | None = None, is_admin: bool = False):
     """
     Stream the supervisor's response token-by-token.
-    Yields dicts with keys: type, agent, content.
+    Yields dicts with keys: type, agent, and either content or value.
 
     Yield types:
-        - "token" : incremental assistant text chunk
-        - "error" : something went wrong
+        - "token"     : incremental assistant text chunk (key: content)
+        - "interrupt" : a human-in-the-loop approval is required before a write
+                        (key: value -> the interrupt payload with action_requests)
+        - "error"     : something went wrong (key: content)
     """
     app    = get_app()
     config = build_invoke_config(thread_id=thread_id, entrypoint="chat_stream")
@@ -428,15 +432,55 @@ def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int 
         except Exception:
             pass
 
-        for message_chunk, metadata in app.stream(
+        emitted_interrupt = False
+
+        # Stream both the LLM tokens ("messages") and node updates ("updates").
+        # The latter is how LangGraph surfaces a human-in-the-loop pause: when a
+        # write-capable sub-agent hits its approval gate, the supervisor graph
+        # records an "__interrupt__" update. With a list of stream modes each
+        # item is a (mode, payload) tuple.
+        for stream_mode, payload in app.stream(
             {"messages": [HumanMessage(content=question)]},
             config=config,
-            stream_mode="messages",
+            stream_mode=["messages", "updates"],
         ):
-            node_name = str((metadata or {}).get("langgraph_node") or "supervisor")
+            if stream_mode == "updates":
+                interrupts = payload.get("__interrupt__") if isinstance(payload, dict) else None
+                if interrupts:
+                    interrupt_obj = interrupts[0] if isinstance(interrupts, (list, tuple)) else interrupts
+                    emitted_interrupt = True
+                    yield {
+                        "type": "interrupt",
+                        "agent": "supervisor",
+                        "value": getattr(interrupt_obj, "value", interrupt_obj),
+                    }
+                continue
 
-            # Hide internal supervisor routing chatter and stream only assistant agent text.
-            if node_name == "supervisor":
+            # stream_mode == "messages": (message_chunk, metadata)
+            message_chunk, metadata = payload
+            md = metadata or {}
+            node_name = str(md.get("langgraph_node") or "")
+
+            # Stream only the root supervisor's final answer, and drop everything
+            # produced by the sub-agents. Each sub-agent is invoked inside a
+            # routing tool, so it runs in a *nested* graph; LangGraph joins
+            # nested namespace segments with "|" (e.g. "tools:<id>|model:<id>"),
+            # whereas the root supervisor's nodes have a single-segment namespace
+            # ("model:<id>", no "|"). The supervisor's answer is also the message
+            # persisted to the checkpoint and shown when the thread is reloaded,
+            # so streaming it keeps the live view and the reloaded view identical.
+            #
+            # Without this filter the answer is emitted twice: once by the
+            # sub-agent's model node and again by the supervisor's model node
+            # that echoes it. The previous guard (node_name == "supervisor")
+            # never matched, because create_agent names the LLM node "model" for
+            # both the supervisor and every sub-agent.
+            checkpoint_ns = str(md.get("langgraph_checkpoint_ns") or "")
+            if "|" in checkpoint_ns:
+                continue  # nested sub-agent token -> skip
+
+            # Only stream assistant text from the LLM node, never tool outputs.
+            if node_name != "model":
                 continue
 
             chunk_text = _chunk_content_to_text(getattr(message_chunk, "content", ""))
@@ -445,9 +489,26 @@ def chat_stream(question: str, thread_id: str = "default", redmine_user_id: int 
 
             yield {
                 "type": "token",
-                "agent": node_name,
+                "agent": "supervisor",
                 "content": chunk_text,
             }
+
+        # Fallback: if the graph paused without surfacing the interrupt in the
+        # updates stream, recover it from the persisted checkpoint state so the
+        # approval dialog still appears.
+        if not emitted_interrupt:
+            try:
+                snapshot = app.get_state(config)
+                pending = getattr(snapshot, "interrupts", None) or ()
+                if pending:
+                    interrupt_obj = pending[0]
+                    yield {
+                        "type": "interrupt",
+                        "agent": "supervisor",
+                        "value": getattr(interrupt_obj, "value", interrupt_obj),
+                    }
+            except Exception:
+                pass
     except Exception as e:
         yield {
             "type":    "error",

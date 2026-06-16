@@ -26,21 +26,6 @@ def set_session_user(redmine_user_id: int | None, is_admin: bool = False):
     if redmine_user_id is None or _SESSION_IS_ADMIN:
         return
 
-
-def set_session_project(project_identifier: str | None):
-    """Set a session-level default project identifier used by write tools.
-
-    Call this before invoking agents so tools like `create_issue` and
-    `create_version` can default to the current thread's project when the
-    agent did not explicitly provide `project_id`.
-    """
-    global _SESSION_DEFAULT_PROJECT
-    _SESSION_DEFAULT_PROJECT = project_identifier
-
-
-def get_session_project() -> str | None:
-    return _SESSION_DEFAULT_PROJECT
-
     try:
         # Try cache first
         cache_key = f"allowed_projects:{redmine_user_id}"
@@ -84,6 +69,21 @@ def get_session_project() -> str | None:
     except Exception:
         # Fail closed: if we cannot determine allowed projects, disallow access.
         _ALLOWED_PROJECT_IDENTIFIERS = set()
+
+
+def set_session_project(project_identifier: str | None):
+    """Set a session-level default project identifier used by write tools.
+
+    Call this before invoking agents so tools like `create_issue` and
+    `create_version` can default to the current thread's project when the
+    agent did not explicitly provide `project_id`.
+    """
+    global _SESSION_DEFAULT_PROJECT
+    _SESSION_DEFAULT_PROJECT = project_identifier
+
+
+def get_session_project() -> str | None:
+    return _SESSION_DEFAULT_PROJECT
 
 
 def clear_session_user():
