@@ -1,237 +1,143 @@
-# Redmine Chat Assist
+<div align="center">
 
-Redmine Chat Assist is a three-part system for AI-assisted Redmine workflows:
+# 🤖 RedSage
 
-- a **backend** API that handles chat, monitoring, authentication, and Redmine integration
-- a **frontend** web app for the chat and dashboard experience
-- a **Redmine plugin** that embeds the assistant inside Redmine
+**A production-grade multi-agent AI assistant for Redmine project management**
 
-This README focuses on the current architecture and the exact steps to clone and start each part.
+Built on a LangGraph supervisor architecture coordinating four specialized ReAct agents — with human-in-the-loop approval gates, two-tier memory, and full observability.
+
+<img src="https://img.shields.io/badge/LangGraph-1C3C3C?style=flat-square&logo=langchain&logoColor=white" />
+<img src="https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi" />
+<img src="https://img.shields.io/badge/Vue.js-4FC08D?style=flat-square&logo=vue.js&logoColor=white" />
+<img src="https://img.shields.io/badge/PostgreSQL-336791?style=flat-square&logo=postgresql&logoColor=white" />
+<img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" />
+<img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" />
+<img src="https://img.shields.io/badge/k3s-FFC61C?style=flat-square&logo=kubernetes&logoColor=black" />
+<img src="https://img.shields.io/badge/LangFuse-black?style=flat-square" />
+
+</div>
+
+---
+
+## What it does
+
+RedSage embeds an AI assistant directly into Redmine to help project managers with day-to-day work: answering questions about project state, triaging issues, and automating routine PM tasks — with a human approving anything that changes real data.
+
+It's a three-part system:
+
+| Part | Role |
+|---|---|
+| **Backend** (`backend/`) | FastAPI app running the LangGraph agent graph, auth, and Redmine integration |
+| **Frontend** (`frontend/redmineAgentUI/`) | Vue 3 + Vite + TypeScript chat and dashboard UI |
+| **Redmine plugin** (`plugins/redmine_ai_chat_widget/`) | Embeds the assistant widget directly inside Redmine pages |
 
 ## Architecture
 
-### Backend
+```mermaid
+flowchart TD
+    U[User in Redmine] --> P[Redmine Plugin<br/>widget + signed JWT]
+    P --> F[Vue 3 Frontend<br/>chat & dashboard]
+    F --> B[FastAPI Backend]
+    B --> S[LangGraph Supervisor]
+    S --> A1[Agent: Search]
+    S --> A2[Agent: Monitoring]
+    S --> A3[Agent: Task Mgmt]
+    S --> A4[Agent: Reporting]
+    A1 & A2 & A3 & A4 --> RM[(Redmine REST API)]
+    S --> HITL{Human approval<br/>gate}
+    B --> RD[(Redis<br/>short-term memory)]
+    B --> PG[(PostgreSQL<br/>long-term memory)]
+    B --> LF[LangFuse<br/>observability]
+```
 
-The backend lives in `backend/` and is a FastAPI application.
-
-What it does:
-
-- exposes chat, auth, dashboard, search, and monitoring endpoints
-- talks to Redmine through the REST API
-- runs background jobs for project-manager sync and monitoring
-- provides CORS access for the frontend and the Redmine plugin
-
-Main entry point:
-
-- `backend/app/main.py`
-
-Key configuration:
-
-- `backend/.env` for backend runtime settings
-- `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE`
-- `CORS_ORIGINS_PLATFORM`
-- `CORS_ORIGINS_PLUGIN`
-
-### Frontend
-
-The frontend lives in `frontend/redmineAgentUI/` and is a Vue 3 + Vite + TypeScript app.
-
-What it does:
-
-- provides the main user interface for chat, dashboard, and monitoring views
-- calls the backend API over HTTP
-- uses Vue Router so views survive refreshes
-
-Main commands:
-
-- `pnpm dev` for local development
-- `pnpm build` for production build checks
-
-### Redmine Plugin
-
-The plugin lives in `plugins/redmine_ai_chat_widget/` and is installed inside a Redmine instance.
-
-What it does:
-
-- injects the assistant widget into Redmine pages
-- passes user context and a signed widget token to the frontend
-- reads its settings from Redmine's plugin settings page
-
-Important plugin settings:
-
-- `backend_url`
-- `jwt_secret`
-- `jwt_issuer`
-- `jwt_audience`
-
-The plugin does not run as a separate server. Redmine loads it as part of the Redmine application.
+**Key design points:**
+- 🧠 **Supervisor pattern** — a LangGraph supervisor routes requests to the right specialized ReAct agent instead of one monolithic prompt
+- 🛑 **Human-in-the-loop gates** — any action that mutates Redmine data waits for explicit approval
+- 🔧 **14 custom Redmine tools** wrapping the REST API for issues, tasks, and PM workflows
+- 🗂️ **Two-tier memory** — Redis for fast short-term context, PostgreSQL for durable long-term memory
+- 📊 **Full observability** via LangFuse tracing, background sync jobs via APScheduler
+- 🔐 **JWT-based auth** shared across backend, frontend, and the embedded plugin
 
 ## Repository layout
 
-```text
-backend/                     FastAPI backend and agents
-frontend/redmineAgentUI/     Vue frontend
-plugins/redmine_ai_chat_widget/  Redmine plugin
-scripts/                     Helper scripts
-docker-compose.yml           Local full-stack setup
-Dockerfile                   Container image for the backend stack
+```
+backend/                         FastAPI backend and agent graph
+frontend/redmineAgentUI/         Vue 3 frontend
+plugins/redmine_ai_chat_widget/  Redmine plugin (embeds the widget)
+scripts/                         Environment verification helpers
+docker-compose.yml               Local full-stack setup
+Dockerfile                       Backend container image
 ```
 
-## Clone the repository
+---
+
+## Quick start
+
+### 1. Clone
 
 ```bash
-git clone <repo-url>
-cd RedmineChatAssist_Test1
+git clone https://github.com/AzizK97/RedSage.git
+cd RedSage
 ```
 
-## Start the backend
-
-The backend is the API that the frontend and plugin both depend on.
-
-### 1) Configure environment variables
-
-Create `backend/.env` from the sample file:
-
-```bash
-cp backend/.env.sample backend/.env
-```
-
-Fill in at least these values:
-
-- `OPENROUTER_API_KEY`
-- `REDMINE_URL`
-- `REDMINE_API_KEY`
-- `JWT_SECRET`
-- `CORS_ORIGINS_PLATFORM`
-- `CORS_ORIGINS_PLUGIN`
-
-### 2) Install dependencies
+### 2. Backend
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
+cp .env.sample .env   # fill in OPENROUTER_API_KEY, REDMINE_URL, REDMINE_API_KEY, JWT_SECRET, CORS_ORIGINS_*
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-On Windows PowerShell:
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-### 3) Start the backend server
-
-```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+API at `http://localhost:8000`, docs at `http://localhost:8000/docs`.
 
-Backend URLs:
-
-- API: `http://localhost:8000`
-- docs: `http://localhost:8000/docs`
-
-## Start the frontend
-
-The frontend is the browser UI for the assistant.
-
-### 1) Configure environment variables
-
-Create `frontend/redmineAgentUI/.env` from the sample file:
-
-```bash
-cp frontend/redmineAgentUI/.env.sample frontend/redmineAgentUI/.env
-```
-
-The most important value is:
-
-- `VITE_API_BASE_URL` — usually `http://localhost:8000`
-
-### 2) Install dependencies
+### 3. Frontend
 
 ```bash
 cd frontend/redmineAgentUI
+cp .env.sample .env   # set VITE_API_BASE_URL=http://localhost:8000
 pnpm install
-```
-
-### 3) Start the frontend dev server
-
-```bash
 pnpm dev
 ```
+UI at `http://localhost:5173`.
 
-Frontend URL:
-
-- `http://localhost:5173`
-
-### 4) Optional production build check
+### 4. Redmine plugin
 
 ```bash
-pnpm build
+cp -R plugins/redmine_ai_chat_widget /path/to/redmine/plugins/
 ```
-
-## Install and start the Redmine plugin
-
-The plugin is how the assistant appears inside Redmine.
-
-### 1) Copy the plugin into Redmine
-
-From your Redmine installation directory, copy the plugin folder into `plugins/`:
-
-```bash
-cp -R /path/to/RedmineChatAssist_Test1/plugins/redmine_ai_chat_widget /path/to/redmine/plugins/
-```
-
-You can also symlink it during development if that is easier.
-
-### 2) Install plugin dependencies and migrate
-
 From the Redmine root:
-
 ```bash
 bundle install
 bundle exec rake redmine:plugins:migrate RAILS_ENV=production
 ```
+Restart Redmine, then set `backend_url`, `jwt_secret`, `jwt_issuer`, `jwt_audience` in the plugin's settings page (must match the backend).
 
-If you are developing locally, use the appropriate environment instead of `production`.
+**Startup order:** backend → frontend → Redmine (with plugin enabled).
 
-### 3) Restart Redmine
+### Or with Docker
 
-Restart the Redmine application so it loads the plugin.
+```bash
+docker-compose up
+```
+See `DOCKER_README.md` for details.
 
-### 4) Configure the plugin in Redmine
-
-Open the Redmine plugin settings and set:
-
-- `backend_url` to the backend address, usually `http://localhost:8000`
-- `jwt_secret` to the same secret used by the backend
-- `jwt_issuer` if you use issuer validation
-- `jwt_audience` if you use audience validation
-
-The plugin expects the backend to allow the Redmine origin through CORS.
-
-## How the parts work together
-
-1. The **backend** serves the API and generates/validates the assistant tokens.
-2. The **frontend** provides the standalone web UI for the assistant.
-3. The **Redmine plugin** embeds the assistant inside Redmine and points to the backend.
-
-In practice, you usually start them in this order:
-
-1. backend
-2. frontend
-3. Redmine with the plugin enabled
-
-## Useful scripts
-
-- `scripts/verify_env.sh` — checks common environment variables on Linux/macOS
-- `scripts/verify_env.ps1` — checks common environment variables on Windows PowerShell
+---
 
 ## Troubleshooting
 
-- If the frontend cannot reach the backend, confirm `VITE_API_BASE_URL` and CORS settings.
-- If the Redmine plugin cannot reach the backend, confirm `backend_url` and `CORS_ORIGINS_PLUGIN`.
-- If authentication fails, confirm `JWT_SECRET`, `JWT_ISSUER`, and `JWT_AUDIENCE` match between backend and plugin.
+| Symptom | Check |
+|---|---|
+| Frontend can't reach backend | `VITE_API_BASE_URL` and CORS settings |
+| Plugin can't reach backend | `backend_url` and `CORS_ORIGINS_PLUGIN` |
+| Auth failures | `JWT_SECRET`, `JWT_ISSUER`, `JWT_AUDIENCE` match across backend and plugin |
+
+Helper scripts: `scripts/verify_env.sh` (Linux/macOS) and `scripts/verify_env.ps1` (Windows).
+
+---
+
+<div align="center">
+
+Built as part of a final-year engineering internship at Elyos Digital · [Contact](mailto:YOUR-EMAIL) · [LinkedIn](https://www.linkedin.com/in/YOUR-LINKEDIN)
+
+</div>
