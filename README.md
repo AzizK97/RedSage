@@ -2,7 +2,7 @@
 
 # 🤖 RedSage
 
-**A production-grade multi-agent AI assistant for Redmine project management**
+**A multi-agent AI assistant for Redmine project management**
 
 Built on a LangGraph supervisor architecture coordinating four specialized ReAct agents — with human-in-the-loop approval gates, two-tier memory, and full observability.
 
@@ -51,7 +51,7 @@ flowchart TD
 ```
 
 **Key design points:**
-- 🧠 **Supervisor pattern** — a LangGraph supervisor routes requests to the right specialized ReAct agent instead of one monolithic prompt
+- 🧠 **Supervisor pattern** — a supervisor routes requests to the right specialized ReAct agent instead of one monolithic prompt
 - 🛑 **Human-in-the-loop gates** — any action that mutates Redmine data waits for explicit approval
 - 🔧 **14 custom Redmine tools** wrapping the REST API for issues, tasks, and PM workflows
 - 🗂️ **Two-tier memory** — Redis for fast short-term context, PostgreSQL for durable long-term memory
@@ -138,6 +138,6 @@ Helper scripts: `scripts/verify_env.sh` (Linux/macOS) and `scripts/verify_env.ps
 
 <div align="center">
 
-Built as part of a final-year engineering internship at Elyos Digital · [Contact](mailto:YOUR-EMAIL) · [LinkedIn](https://www.linkedin.com/in/YOUR-LINKEDIN)
+Built as part of a final-year engineering internship at Elyos Digital · [Contact](mailto:azizkanoun06@gmail.com) · [LinkedIn](https://www.linkedin.com/in/aziz-kanoun)
 
 </div>
