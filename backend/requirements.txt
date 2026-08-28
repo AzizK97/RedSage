@@ -5,8 +5,13 @@ redis>=5.0.0
 
 langchain
 langchain-openai
+langchain-ollama
+langchain-anthropic
 langgraph
 langgraph-supervisor
+langfuse
+openai
+apscheduler
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 pydantic>=2.7.0
